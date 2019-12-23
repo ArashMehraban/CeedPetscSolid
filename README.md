@@ -19,7 +19,7 @@ To run, `./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -probl
 
 Example: `./elasticity ./meshes/beamss16.exo  -degree 2 -nu .3 -E 10e6 -problem hyperSS`
 
-### CEED/PETSc Hyperelasticity at small strain problem
+### CEED/PETSc Hyperelasticity at finite strain problem
 
 To build, run `make`
 
