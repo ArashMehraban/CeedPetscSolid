@@ -1,7 +1,8 @@
 ## libCEED + PETSc Examples
 This code is able to solve boundary value linear elasticity, hyperelasticity at small strain and 
 hyperelasticity at finite strain (large deformation) using libCEED and PETSc. The hyperlesticity 
-at finite strain formulation is Total Lagrangian.
+at finite strain formulation is Total Lagrangian. This code was tested in valgrind with the 
+following arguments and passed: `--track-origins=yes`, `--leak-check=full`, `--show-leak-kinds=all`
 
 ### CEED/PETSc Linear Elascticity problem 
 
