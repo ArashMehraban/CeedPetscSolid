@@ -40,7 +40,6 @@ int main(int argc, char **argv) {
   ierr = VecGetSize(Uloc, &Ulsz); CHKERRQ(ierr);
   ierr = VecDuplicate(U, &R); CHKERRQ(ierr);
   ierr = VecDuplicate(Uloc, &Rloc); CHKERRQ(ierr);
-
   ierr = VecZeroEntries(Rloc); CHKERRQ(ierr);
 
 

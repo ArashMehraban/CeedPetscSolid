@@ -37,64 +37,54 @@ typedef struct{
 
 // Problem specific data
 typedef struct {
-  CeedInt ncompu, qdatasize;
-  // CeedQFunctionUser setupgeo, setuprhs, apply, error;
-  // const char *setupgeofname, *setuprhsfname, *applyfname, *errorfname;
-  // CeedEvalMode inmode, outmode;
-  // CeedQuadMode qmode;
-  // PetscBool enforce_bc;
+  CeedInt qdatasize;
+  CeedQFunctionUser setupgeo, apply, error;
+  const char *setupgeofname, *applyfname, *errorfname;
+  CeedEvalMode inmode, outmode;
+  CeedQuadMode qmode;
   PetscErrorCode (*bcs_func)(PetscInt, PetscReal, const PetscReal *,
                              PetscInt, PetscScalar *, void *);
 }problemData;
 
 problemData problemOptions[3] = {
   [ELAS_LIN] = {
-      .ncompu = 3,
-      // .qdatasize = 10,
-      // .setupgeo = SetupDiffGeo,
-      // .apply = Diff3,  //<---- linearElasticity
-      // .error = Error3,
-      // .setuprhs = SetupDiffRhs,
-      // .setupgeofname = SetupDiffGeo_loc,
-      // .setuprhsfname = SetupDiffRhs3_loc,
-      // .applyfname = Diff_loc,
-      // .errorfname = Error3_loc,
-      // .inmode = CEED_EVAL_GRAD,
-      // .outmode = CEED_EVAL_GRAD,
-      // .qmode = CEED_GAUSS,
-       .bcs_func = NULL//BcOne // Drichlet of all 1's
+      .qdatasize = 6,
+      .setupgeo = SetupLinElasGeo,
+      .apply = LinElas,
+      .error = Error,
+      .setupgeofname = SetupLinElasGeo_loc,
+      .applyfname = LinElas_loc,
+      .errorfname = Error_loc,
+      .inmode = CEED_EVAL_GRAD,
+      .outmode = CEED_EVAL_GRAD,
+      .qmode = CEED_GAUSS,
+      .bcs_func = NULL // Drichlet of all 1's
   },
   [ELAS_HYPER_SS] = {
-      .ncompu = 3,
-      // .qdatasize = 10,
-      // .setupgeo = SetupDiffGeo,
-      // .setuprhs = SetupDiffRhs3,
-      // .apply = Diff3,  //<---- hyperelasticitySS
-      // .error = Error3,
-      // .setupgeofname = SetupDiffGeo_loc,
-      // .setuprhsfname = SetupDiffRhs3_loc,
-      // .applyfname = Diff_loc,
-      // .errorfname = Error3_loc,
-      // .inmode = CEED_EVAL_GRAD,
-      // .outmode = CEED_EVAL_GRAD,
-      // .qmode = CEED_GAUSS,
-      .bcs_func = NULL //BCsDiff
+     // .qdatasize = 10,
+     // .setupgeo = SetupHyperSSGeo,
+     // .apply = HyperSS,
+     // .error = Error,
+     // .setupgeofname = SetupHyperSSGeo_loc,
+     // .applyfname = HyperSS_loc,
+     // .errorfname = Error_loc,
+     // .inmode = CEED_EVAL_GRAD,
+     // .outmode = CEED_EVAL_GRAD,
+     // .qmode = CEED_GAUSS,
+     //  .bcs_func = NULL // Drichlet of all 1's
   },
   [ELAS_HYPER_FS] = {
-      .ncompu = 3,
-      // .qdatasize = 10,
-      // .setupgeo = SetupDiffGeo,
-      // .setuprhs = SetupDiffRhs3,
-      // .apply = Diff3,   //<---- hyperelasticityFS
-      // .error = Error3,
-      // .setupgeofname = SetupDiffGeo_loc,
-      // .setuprhsfname = SetupDiffRhs3_loc,
-      // .applyfname = Diff_loc,
-      // .errorfname = Error3_loc,
-      // .inmode = CEED_EVAL_GRAD,
-      // .outmode = CEED_EVAL_GRAD,
-      // .qmode = CEED_GAUSS,
-      .bcs_func = NULL //BCsDiff
+     // .qdatasize = 10,
+     // .setupgeo = SetupHyperFSGeo,
+     // .apply = HyperFS,
+     // .error = Error,
+     // .setupgeofname = SetupHyperFSGeo_loc,
+     // .applyfname = HyperFS_loc,
+     // .errorfname = Error_loc,
+     // .inmode = CEED_EVAL_GRAD,
+     // .outmode = CEED_EVAL_GRAD,
+     // .qmode = CEED_GAUSS,
+     //  .bcs_func = NULL // Drichlet of all 1's
     }
 };
 
@@ -222,7 +212,7 @@ static int SetupDMByDegree(DM dm, AppCtx *appCtx, PetscInt ncompu){
  PetscFunctionBeginUser;
 
   ierr = DMGetDimension(dm, &dim);
- 
+
   //setup FE space (Space P) for tensor polynomials
   ierr = PetscSpaceCreate(PetscObjectComm((PetscObject) dm), &P); CHKERRQ(ierr);
   //ierr = PetscObjectSetOptionsPrefix((PetscObject) P, prefix); CHKERRQ(ierr);
