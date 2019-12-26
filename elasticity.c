@@ -15,7 +15,13 @@ int main(int argc, char **argv) {
   DM          dm;
   PetscInt    ncompu = 3;  // 3 dofs in 3D
   Vec         U,Uloc, R,Rloc; //loc: Local R:Residual
-  PetscInt    Usz,Ulsz;    // sz: size
+  PetscInt    Ugsz,Ulsz,Ulocsz;    // sz: size
+  UserMult    userMult;  //Shell Matrix context
+  Mat         mat;
+  //Ceed constituents
+  char        ceedresource[PETSC_MAX_PATH_LEN] = "/cpu/self";
+  Ceed        ceed;
+  CeedData    ceeddata;
 
 
 
@@ -32,24 +38,46 @@ int main(int argc, char **argv) {
   ierr = createDistributedDM(comm, &appCtx, &dm);CHKERRQ(ierr);
   //setup DM by polinomial degree
   ierr = SetupDMByDegree(dm, &appCtx, ncompu);
+
   // Create Unknonw vector U and Residual Vector R
   ierr = DMCreateGlobalVector(dm, &U); CHKERRQ(ierr);
-  ierr = VecGetLocalSize(U, &Ulsz); CHKERRQ(ierr);
-  ierr = VecGetSize(U, &Usz); CHKERRQ(ierr);
+  ierr = VecGetSize(U, &Ugsz); CHKERRQ(ierr);
+  ierr = VecGetLocalSize(U, &Ulsz); CHKERRQ(ierr); //For matShell
+
   ierr = DMCreateLocalVector(dm, &Uloc); CHKERRQ(ierr);
-  ierr = VecGetSize(Uloc, &Ulsz); CHKERRQ(ierr);
+  ierr = VecGetSize(Uloc, &Ulocsz); CHKERRQ(ierr); //For libCeed
+
   ierr = VecDuplicate(U, &R); CHKERRQ(ierr);
   ierr = VecDuplicate(Uloc, &Rloc); CHKERRQ(ierr);
   ierr = VecZeroEntries(Rloc); CHKERRQ(ierr);
 
 
-  //Free objects
+  ierr = PetscMalloc1(1, &userMult); CHKERRQ(ierr);
+  ierr = MatCreateShell(comm, Ulsz,Ulsz,Ugsz,Ugsz,userMult,&mat); CHKERRQ(ierr);
+
+  // Set up libCEED
+  CeedInit(ceedresource, &ceed);
+  ierr = PetscMalloc1(1, &ceeddata); CHKERRQ(ierr);
+  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, ceeddata, ncompu, Ugsz,Ulocsz);
+         CHKERRQ(ierr);
+
+
+
+   //Free objects
   ierr = DMDestroy(&dm); CHKERRQ(ierr);
   ierr = VecDestroy(&U); CHKERRQ(ierr);
   ierr = VecDestroy(&Uloc); CHKERRQ(ierr);
   ierr = VecDestroy(&R); CHKERRQ(ierr);
   ierr = VecDestroy(&Rloc); CHKERRQ(ierr);
+  //ierr = VecDestroy(&userMult->Yloc); CHKERRQ(ierr);
+  ierr = MatDestroy(&mat); CHKERRQ(ierr);
+  ierr = PetscFree(userMult); CHKERRQ(ierr);
 
+  // NOTE Begin: CeedDataDestroy MUST be Implemented in setup.h
+  //   ****Use valgrind to test correctness****
+  // ierr = CeedDataDestroy(0, ceeddata); CHKERRQ(ierr);
+  // NOTE end.
+  CeedDestroy(&ceed);
 
 
 
