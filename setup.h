@@ -29,7 +29,7 @@ typedef struct{
   PetscInt      degree;
 }AppCtx;
 
-//Physics for Elasticty and Hyperelasticity probelms
+//Physics for Elasticty and Hyperelasticity problems
 typedef struct{
   PetscScalar   nu;      //Poisson's ratio
   PetscScalar   E;       //Young's Modulus
@@ -358,20 +358,20 @@ CeedInt      P, Q;
 CeedInt      dim, ncompx;
 CeedBasis    basisx, basisu;
 DM           dmcoord;
-CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui,
-                    Erestrictqdi;
+CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui, Erestrictqdi;
 CeedInt      cStart, cEnd, nelem;
 Vec          coords;
 const PetscScalar *coordArray;
 PetscSection section;
 CeedVector   xcoord, qdata, xceed, yceed;
-CeedQFunction qf_setupgeo;
+CeedQFunction qf_setupgeo, qf_apply;
+CeedOperator op_setupgeo, op_apply;
 
 PetscFunctionBeginUser;
 
 ierr = DMGetDimension(dm,&dim);CHKERRQ(ierr);
 ncompx = dim;
-// CEED bases
+// CEED bases (solid problems)
 P = degree + 1;
 Q = P;
 CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompu, P, Q,
@@ -415,16 +415,38 @@ CeedVectorCreate(ceed, Ulocsz, &yceed);
 
 // Create the Q-function that builds the operator (i.e. computes its
 // quadrature data) and set its context data
+// qdata returns dXdx_i,j and w * det.
 CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].setupgeo,
                     problemOptions[problemChoice].setupgeofname, &qf_setupgeo);
 CeedQFunctionAddInput(qf_setupgeo, "dx", ncompx*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_setupgeo, "weight", 1, CEED_EVAL_WEIGHT);
 CeedQFunctionAddOutput(qf_setupgeo, "qdata", qdatasize, CEED_EVAL_NONE);
+CeedOperatorCreate(ceed, qf_setupgeo, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_setupgeo);
+CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, CEED_NOTRANSPOSE, basisx, xcoord);
 
-PetscPrintf(PETSC_COMM_WORLD, "qdatasize in setup.h: %D\n\n",qdatasize);
+//Question1:
+//This will sets warning in make and error when running
+//warning:
+//  passing argument 1 of ‘CeedOperatorSetField’ from incompatible pointer type [-Wincompatible-pointer-types]
+ CeedOperatorSetField(qf_apply, "du", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].apply,
+                            problemOptions[problemChoice].applyfname, &qf_apply);
+CeedQFunctionAddInput(qf_apply, "du", ncompu*dim, CEED_EVAL_GRAD);
+CeedQFunctionAddOutput(qf_apply, "du", ncompu*dim, CEED_EVAL_GRAD);
+CeedOperatorCreate(ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_apply);
+CeedOperatorSetField(qf_apply, "du", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+//End of Question 1
+
+//Question 2:
+//How about the Transposes of dXdx?
+//CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, CEED_TRANSPOSE, basisx, CEED_VECTOR_ACTIVE);
+//End of Question 2
+
+//Question 3:
+//How about the Transposes of du?
+//End of Question 3
 
 PetscFunctionReturn(0);
-
 }
 
 

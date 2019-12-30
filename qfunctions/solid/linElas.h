@@ -33,7 +33,7 @@
       CeedScalar (*qdata)[Q] = (CeedScalar(*)[Q])out[0];
       // *INDENT-ON*
 
- PetscPrintf(PETSC_COMM_WORLD, "size of Q in SetupLinElasGeo: %D\n\n",Q);
+ PetscPrintf(PETSC_COMM_WORLD, "Test: size of Q in SetupLinElasGeo (linElas.h file): %D\n\n",Q);
       CeedPragmaSIMD
       // Quadrature Point Loop
       for (CeedInt i=0; i<Q; i++) {
