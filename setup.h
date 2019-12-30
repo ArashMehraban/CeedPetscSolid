@@ -428,13 +428,12 @@ CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, CEED_NOTRANSPOSE, basisx, xc
 //This will sets warning in make and error when running
 //warning:
 //  passing argument 1 of ‘CeedOperatorSetField’ from incompatible pointer type [-Wincompatible-pointer-types]
- CeedOperatorSetField(qf_apply, "du", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].apply,
                             problemOptions[problemChoice].applyfname, &qf_apply);
 CeedQFunctionAddInput(qf_apply, "du", ncompu*dim, CEED_EVAL_GRAD);
-CeedQFunctionAddOutput(qf_apply, "du", ncompu*dim, CEED_EVAL_GRAD);
+CeedQFunctionAddOutput(qf_apply, "dv", ncompu*dim, CEED_EVAL_GRAD);
 CeedOperatorCreate(ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_apply);
-CeedOperatorSetField(qf_apply, "du", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+CeedOperatorSetField(qf_apply, "dv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 //End of Question 1
 
 //Question 2:
