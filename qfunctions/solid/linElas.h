@@ -31,63 +31,58 @@
       PetscScalar   E;       //Young's Modulus
     };
 
+    CEED_QFUNCTION(SetupGeo)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out) {
 
+     // Inputs
+     const CeedScalar *J = in[0], *w = in[1];
 
+     // Outputs
+     CeedScalar *qdata = out[0];
 
-    CEED_QFUNCTION(SetupLinElasGeo)(void *ctx, CeedInt Q,
-                          const CeedScalar *const *in, CeedScalar *const *out) {
-      // *INDENT-OFF*
-      // Inputs
-      const CeedScalar (*J)[3][Q] = (CeedScalar(*)[3][Q])in[0],
-                       (*w) = in[1];
+     CeedPragmaSIMD
+     // Quadrature Point Loop
+     for (CeedInt i=0; i<Q; i++) {
+       // Setup
+       const CeedScalar J11 = J[i+Q*0];
+       const CeedScalar J21 = J[i+Q*1];
+       const CeedScalar J31 = J[i+Q*2];
+       const CeedScalar J12 = J[i+Q*3];
+       const CeedScalar J22 = J[i+Q*4];
+       const CeedScalar J32 = J[i+Q*5];
+       const CeedScalar J13 = J[i+Q*6];
+       const CeedScalar J23 = J[i+Q*7];
+       const CeedScalar J33 = J[i+Q*8];
+       const CeedScalar A11 = J22*J33 - J23*J32;
+       const CeedScalar A12 = J13*J32 - J12*J33;
+       const CeedScalar A13 = J12*J23 - J13*J22;
+       const CeedScalar A21 = J23*J31 - J21*J33;
+       const CeedScalar A22 = J11*J33 - J13*J31;
+       const CeedScalar A23 = J13*J21 - J11*J23;
+       const CeedScalar A31 = J21*J32 - J22*J31;
+       const CeedScalar A32 = J12*J31 - J11*J32;
+       const CeedScalar A33 = J11*J22 - J12*J21;
+       const CeedScalar detJ = J11*A11 + J21*A12 + J31*A13;
 
-      // Outputs
-      CeedScalar (*qdata)[Q] = (CeedScalar(*)[Q])out[0];
-      // *INDENT-ON*
+       // Qdata
+       // -- quadrature weights
+       qdata[0*Q+i] = w[i] * detJ;
+       // -- Interp-to-Grad qdata
+       // Inverse of change of coordinate matrix: X_i,j
+       qdata[1*Q+i] = A11 / detJ;
+       qdata[2*Q+i] = A12 / detJ;
+       qdata[3*Q+i] = A13 / detJ;
+       qdata[4*Q+i] = A21 / detJ;
+       qdata[5*Q+i] = A22 / detJ;
+       qdata[6*Q+i] = A23 / detJ;
+       qdata[7*Q+i] = A31 / detJ;
+       qdata[8*Q+i] = A32 / detJ;
+       qdata[9*Q+i] = A33 / detJ;
 
-       CeedPragmaSIMD
-      // Quadrature Point Loop
-      for (CeedInt i=0; i<Q; i++) {
-        // Setup
-        const CeedScalar J11 = J[0][0][i];
-        const CeedScalar J21 = J[0][1][i];
-        const CeedScalar J31 = J[0][2][i];
-        const CeedScalar J12 = J[1][0][i];
-        const CeedScalar J22 = J[1][1][i];
-        const CeedScalar J32 = J[1][2][i];
-        const CeedScalar J13 = J[2][0][i];
-        const CeedScalar J23 = J[2][1][i];
-        const CeedScalar J33 = J[2][2][i];
-        const CeedScalar A11 = J22*J33 - J23*J32;
-        const CeedScalar A12 = J13*J32 - J12*J33;
-        const CeedScalar A13 = J12*J23 - J13*J22;
-        const CeedScalar A21 = J23*J31 - J21*J33;
-        const CeedScalar A22 = J11*J33 - J13*J31;
-        const CeedScalar A23 = J13*J21 - J11*J23;
-        const CeedScalar A31 = J21*J32 - J22*J31;
-        const CeedScalar A32 = J12*J31 - J11*J32;
-        const CeedScalar A33 = J11*J22 - J12*J21;
-        const CeedScalar detJ = J11*A11 + J21*A12 + J31*A13;
+     } // End of Quadrature Point Loop
 
-        // Qdata
-        // -- Interp-to-Interp qdata
-        qdata[0][i] = w[i] * detJ;
-        // -- Interp-to-Grad qdata
-        // Inverse of change of coordinate matrix: X_i,j
-        qdata[1][i] = A11 / detJ;
-        qdata[2][i] = A12 / detJ;
-        qdata[3][i] = A13 / detJ;
-        qdata[4][i] = A21 / detJ;
-        qdata[5][i] = A22 / detJ;
-        qdata[6][i] = A23 / detJ;
-        qdata[7][i] = A31 / detJ;
-        qdata[8][i] = A32 / detJ;
-        qdata[9][i] = A33 / detJ;
-
-      } // End of Quadrature Point Loop
-
-      return 0;
-    }
+     // Return
+     return 0;
+  }
 // -----------------------------------------------------------------------------
 CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q,
                          const CeedScalar *const *in,

@@ -44,10 +44,10 @@ typedef struct {
 problemData problemOptions[3] = {
   [ELAS_LIN] = {
       .qdatasize = 10, // For linear Elasticty we could do 6
-      .setupgeo = SetupLinElasGeo,
+      .setupgeo = SetupGeo,
       .apply = LinElas,
       .error = Error,
-      .setupgeofname = SetupLinElasGeo_loc,
+      .setupgeofname = SetupGeo_loc,
       .applyfname = LinElas_loc,
       .errorfname = Error_loc,
       .qmode = CEED_GAUSS,
@@ -55,10 +55,10 @@ problemData problemOptions[3] = {
   },
   [ELAS_HYPER_SS] = {
      // .qdatasize = 10,
-     // .setupgeo = SetupHyperSSGeo,
+     // .setupgeo = SetupGeo,
      // .apply = HyperSS,
      // .error = Error,
-     // .setupgeofname = SetupHyperSSGeo_loc,
+     // .setupgeofname = SetupGeo_loc,
      // .applyfname = HyperSS_loc,
      // .errorfname = Error_loc,
      // .qmode = CEED_GAUSS,
@@ -66,10 +66,10 @@ problemData problemOptions[3] = {
   },
   [ELAS_HYPER_FS] = {
      // .qdatasize = 10,
-     // .setupgeo = SetupHyperFSGeo,
+     // .setupgeo = SetupGeo,
      // .apply = HyperFS,
      // .error = Error,
-     // .setupgeofname = SetupHyperFSGeo_loc,
+     // .setupgeofname = SetupGeo_loc,
      // .applyfname = HyperFS_loc,
      // .errorfname = Error_loc,
      // .qmode = CEED_GAUSS,
@@ -398,7 +398,8 @@ CeedVectorCreate(ceed, Ulocsz, &yceed);
 // Create the Q-function that builds the operator (i.e. computes its
 // quadrature data) and set its context data
 // qdata returns dXdx_i,j and w * det.
-CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].setupgeo,problemOptions[problemChoice].setupgeofname, &qf_setupgeo);
+CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].setupgeo,problemOptions[problemChoice].setupgeofname,
+                            &qf_setupgeo);
 CeedQFunctionAddInput(qf_setupgeo, "dx", ncompx*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_setupgeo, "weight", 1, CEED_EVAL_WEIGHT);
 CeedQFunctionAddOutput(qf_setupgeo, "qdata", qdatasize, CEED_EVAL_NONE);
@@ -414,7 +415,7 @@ CeedQFunctionAddOutput(qf_apply, "dv", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionSetContext(qf_apply, &phys, sizeof(phys));
 CeedOperatorCreate(ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_apply);
 CeedOperatorSetField(op_apply, "dv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
-CeedOperatorSetField(op_apply, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata); // Need to provide operator field for "qdata"
+CeedOperatorSetField(op_apply, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
 CeedOperatorSetField(op_apply, "du", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 
 CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);

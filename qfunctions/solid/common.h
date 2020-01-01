@@ -1,6 +1,5 @@
 // -----------------------------------------------------------------------------
-CEED_QFUNCTION(Error)(void *ctx, CeedInt Q,
-                       const CeedScalar *const *in, CeedScalar *const *out) {
+CEED_QFUNCTION(Error)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out) {
 
   // const CeedScalar *u = in[0], *target = in[1];
   // CeedScalar *err = out[0];
