@@ -16,8 +16,7 @@
 typedef enum {  //SmallStrain      FiniteStrain
   ELAS_LIN = 0, ELAS_HYPER_SS = 1, ELAS_HYPER_FS = 2
 } problemType;
-static const char *const problemTypes[] = {"linElas","hyperSS","hyperFS",
-                                            "problemType","ELAS_",0};
+static const char *const problemTypes[] = {"linElas","hyperSS","hyperFS", "problemType","ELAS_",0};
 
 // -----------------------------------------------------------------------------
 // Structs
@@ -35,13 +34,11 @@ typedef struct{
 
 // Problem specific data
 typedef struct {
-  CeedInt qdatasize;
+  CeedInt           qdatasize;
   CeedQFunctionUser setupgeo, apply, error;
-  const char *setupgeofname, *applyfname, *errorfname;
-  CeedEvalMode inmode, outmode;
-  CeedQuadMode qmode;
-  PetscErrorCode (*bcs_func)(PetscInt, PetscReal, const PetscReal *,
-                             PetscInt, PetscScalar *, void *);
+  const char        *setupgeofname, *applyfname, *errorfname;
+  CeedQuadMode      qmode;
+  PetscErrorCode    (*bcs_func)(PetscInt, PetscReal, const PetscReal *, PetscInt, PetscScalar *, void *);
 }problemData;
 
 problemData problemOptions[3] = {
@@ -53,8 +50,6 @@ problemData problemOptions[3] = {
       .setupgeofname = SetupLinElasGeo_loc,
       .applyfname = LinElas_loc,
       .errorfname = Error_loc,
-      .inmode = CEED_EVAL_GRAD,
-      .outmode = CEED_EVAL_GRAD,
       .qmode = CEED_GAUSS,
       .bcs_func = NULL // Drichlet of all 1's
   },
@@ -66,8 +61,6 @@ problemData problemOptions[3] = {
      // .setupgeofname = SetupHyperSSGeo_loc,
      // .applyfname = HyperSS_loc,
      // .errorfname = Error_loc,
-     // .inmode = CEED_EVAL_GRAD,
-     // .outmode = CEED_EVAL_GRAD,
      // .qmode = CEED_GAUSS,
      //  .bcs_func = NULL // Drichlet of all 1's
   },
@@ -79,8 +72,6 @@ problemData problemOptions[3] = {
      // .setupgeofname = SetupHyperFSGeo_loc,
      // .applyfname = HyperFS_loc,
      // .errorfname = Error_loc,
-     // .inmode = CEED_EVAL_GRAD,
-     // .outmode = CEED_EVAL_GRAD,
      // .qmode = CEED_GAUSS,
      //  .bcs_func = NULL // Drichlet of all 1's
     }
@@ -89,24 +80,23 @@ problemData problemOptions[3] = {
 // Data for PETSc Matshell
 typedef struct UserMult_private *UserMult;
 struct UserMult_private {
-  MPI_Comm comm;
-  DM dm;
-  Vec Xloc, Yloc, diag;
-  CeedVector xceed, yceed;
+  MPI_Comm     comm;
+  DM           dm;
+  Vec          Xloc, Yloc, diag;
+  CeedVector   xceed, yceed;
   CeedOperator op;
-  Ceed ceed;
+  Ceed         ceed;
 };
 
 // libCEED data struct for level
 typedef struct CeedData_private *CeedData;
 struct CeedData_private {
-  Ceed ceed;
-  CeedBasis basisx, basisu, basisctof;
-  CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui,
-                      Erestrictqdi;
-  CeedQFunction qf_apply;
-  CeedOperator op_apply, op_restrict, op_interp;
-  CeedVector qdata, xceed, yceed;
+  Ceed                ceed;
+  CeedBasis           basisx, basisu, basisctof;
+  CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui, Erestrictqdi;
+  CeedQFunction       qf_apply;
+  CeedOperator        op_apply, op_restrict, op_interp;
+  CeedVector          qdata, xceed, yceed;
 };
 
 // -----------------------------------------------------------------------------
@@ -123,7 +113,6 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx){
   PetscFunctionBeginUser;
 
   ierr = PetscOptionsBegin(comm, NULL, "Elasticity / Hyperelasticity in PETSc with libCEED", NULL); CHKERRQ(ierr);
-
   ierr = PetscOptionsInt("-degree", "Polynomial degree of tensor product basis", NULL, appCtx->degree, &appCtx->degree,
                          &degreeFalg); CHKERRQ(ierr);
 
@@ -278,6 +267,31 @@ static int SetupDMByDegree(DM dm, AppCtx *appCtx, PetscInt ncompu){
   PetscFunctionReturn(0);
 }
 
+// Destroy libCEED operator objects
+static PetscErrorCode CeedDataDestroy(CeedInt i, CeedData data) {
+  PetscInt ierr;
+
+  CeedVectorDestroy(&data->qdata);
+  CeedVectorDestroy(&data->xceed);
+  CeedVectorDestroy(&data->yceed);
+  CeedBasisDestroy(&data->basisx);
+  CeedBasisDestroy(&data->basisu);
+  CeedElemRestrictionDestroy(&data->Erestrictu);
+  CeedElemRestrictionDestroy(&data->Erestrictx);
+  CeedElemRestrictionDestroy(&data->Erestrictui);
+  CeedElemRestrictionDestroy(&data->Erestrictxi);
+  CeedElemRestrictionDestroy(&data->Erestrictqdi);
+  CeedQFunctionDestroy(&data->qf_apply);
+  CeedOperatorDestroy(&data->op_apply);
+  if (i > 0) {
+    CeedOperatorDestroy(&data->op_interp);
+    CeedBasisDestroy(&data->basisctof);
+    CeedOperatorDestroy(&data->op_restrict);
+  }
+  ierr = PetscFree(data); CHKERRQ(ierr);
+
+  PetscFunctionReturn(0);
+}
 
 // Get CEED restriction data from DMPlex
 static int CreateRestrictionPlex(Ceed ceed, CeedInt P, CeedInt ncomp, CeedElemRestriction *Erestrict, DM dm) {
@@ -384,8 +398,7 @@ CeedVectorCreate(ceed, Ulocsz, &yceed);
 // Create the Q-function that builds the operator (i.e. computes its
 // quadrature data) and set its context data
 // qdata returns dXdx_i,j and w * det.
-CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].setupgeo,
-                    problemOptions[problemChoice].setupgeofname, &qf_setupgeo);
+CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].setupgeo,problemOptions[problemChoice].setupgeofname, &qf_setupgeo);
 CeedQFunctionAddInput(qf_setupgeo, "dx", ncompx*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_setupgeo, "weight", 1, CEED_EVAL_WEIGHT);
 CeedQFunctionAddOutput(qf_setupgeo, "qdata", qdatasize, CEED_EVAL_NONE);
@@ -408,7 +421,6 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
 
 PetscFunctionReturn(0);
 }
-
 
 
 #endif

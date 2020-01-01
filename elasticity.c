@@ -10,13 +10,13 @@ const char help[] = "Solve solid Problems with CEED and PETSc DMPlex\n";
 int main(int argc, char **argv) {
   PetscInt    ierr;
   MPI_Comm    comm;
-  AppCtx      appCtx; //contains degree, problem choice & mesh filename
+  AppCtx      appCtx; //contains polynomila basis degree, problem choice & mesh filename
   Physics     phys;   //contains nu and E
   DM          dm;
-  PetscInt    ncompu = 3;  // 3 dofs in 3D
-  Vec         U,Uloc, R,Rloc; //loc: Local R:Residual
-  PetscInt    Ugsz,Ulsz,Ulocsz;    // sz: size
-  UserMult    userMult;  //Shell Matrix context
+  PetscInt    ncompu = 3;        // 3 dofs in 3D
+  Vec         U, Uloc, R, Rloc;  // loc: Local R:Residual
+  PetscInt    Ugsz,Ulsz,Ulocsz;  // sz: size
+  UserMult    userMult;          //Shell Matrix context
   Mat         mat;
   //Ceed constituents
   char        ceedresource[PETSC_MAX_PATH_LEN] = "/cpu/self";
@@ -59,8 +59,7 @@ int main(int argc, char **argv) {
   // Set up libCEED
   CeedInit(ceedresource, &ceed);
   ierr = PetscMalloc1(1, &ceeddata); CHKERRQ(ierr);
-  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz,Ulocsz);
-         CHKERRQ(ierr);
+  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz,Ulocsz);CHKERRQ(ierr);
 
 
 
@@ -74,10 +73,8 @@ int main(int argc, char **argv) {
   ierr = MatDestroy(&mat); CHKERRQ(ierr);
   ierr = PetscFree(userMult); CHKERRQ(ierr);
 
-  // NOTE Begin: CeedDataDestroy MUST be Implemented in setup.h
-  //   ****Use valgrind to test correctness****
-  // ierr = CeedDataDestroy(0, ceeddata); CHKERRQ(ierr);
-  // NOTE end.
+  ierr = PetscFree(phys);CHKERRQ(ierr);
+  //ierr = CeedDataDestroy(0, ceeddata); CHKERRQ(ierr);
   CeedDestroy(&ceed);
 
 
