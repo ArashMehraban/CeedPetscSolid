@@ -86,9 +86,7 @@
          return 0;
        }
 // -----------------------------------------------------------------------------
-CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q,
-                         const CeedScalar *const *in,
-                         CeedScalar *const *out) {
+CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out) {
    // Inputs
    const CeedScalar *ug = in[0], *qdata = in[1];
 
@@ -96,7 +94,7 @@ CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q,
    CeedScalar *vg = out[0];
 
    // Context
-    const Physics context = ctx;
+   const Physics context = ctx;
    const CeedScalar E  = context->E;
    const CeedScalar nu = context->nu;
 
@@ -138,7 +136,7 @@ CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q,
            gradu[j][k] += dXdx[j][m]*du[k][m];
        }
 
-     // Compute Strain : e (e:epsilon)
+     // Compute Strain : e (epsilon)
      // e = 1/2 (grad u + (grad u)^T)
      const CeedScalar e[3][3]     =  {{(gradu[0][0] + gradu[0][0])*0.5,
                                        (gradu[0][1] + gradu[1][0])*0.5,
@@ -151,7 +149,7 @@ CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q,
                                        (gradu[2][2] + gradu[2][2])*0.5}
                                      };
 
-     // Sigma = S e
+    // Sigma = S * epsilon
     //                         [1-nu   nu    nu                                    ]
     //                         [ nu   1-nu   nu                                    ]
     //                         [ nu    nu   1-nu                                   ]
