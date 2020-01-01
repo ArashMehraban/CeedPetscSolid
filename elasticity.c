@@ -33,7 +33,8 @@ int main(int argc, char **argv) {
   //set mesh-file, polynomial degree, problem type
   ierr = processCommandLineOptions(comm, &appCtx);CHKERRQ(ierr);
   //set Poison's ratio, Young's Modulus
-  ierr = processPhysics(comm, &phys);CHKERRQ(ierr);
+  ierr = PetscMalloc1(1, &phys); CHKERRQ(ierr);
+  ierr = processPhysics(comm, phys);CHKERRQ(ierr);
   //create distributed DM from mesh file (interpolate if polynomial degree > 1)
   ierr = createDistributedDM(comm, &appCtx, &dm);CHKERRQ(ierr);
   //setup DM by polinomial degree
@@ -58,7 +59,7 @@ int main(int argc, char **argv) {
   // Set up libCEED
   CeedInit(ceedresource, &ceed);
   ierr = PetscMalloc1(1, &ceeddata); CHKERRQ(ierr);
-  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, &phys, ceeddata, ncompu, Ugsz,Ulocsz);
+  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz,Ulocsz);
          CHKERRQ(ierr);
 
 
