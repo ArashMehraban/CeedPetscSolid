@@ -17,13 +17,13 @@
     //
     // Stored: Aij / detJ
     //   in qdata[1:9] as
-    //   (detJ^-1) * [A11 A12 A13]
-    //               [A21 A22 A23]
-    //               [A31 A32 A33]
+    //              [A11 A12 A13]
+    //  (detJ^-1) * [A21 A22 A23]
+    //              [A31 A32 A33]
     //
     // *****************************************************************************
-#ifndef __Physics__
-#define __Physics__
+#ifndef __LIN_ELAS__H
+#define __LIN_ELAS__H
 
     typedef struct Physics_private *Physics;
     struct Physics_private{
@@ -148,7 +148,16 @@ CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedS
                                        (gradu[2][1] + gradu[1][2])*0.5,
                                        (gradu[2][2] + gradu[2][2])*0.5}
                                      };
-
+    //strain (epsilon)
+    //    and
+    //stress (sigma) in Voigt notation:
+    //           [e11]              [sigma11]
+    //           [e22]              [sigma22]
+    // epsilon = [e33]  ,   sigma = [sigma33]
+    //           [e23]              [sigma23]
+    //           [e13]              [sigma13]
+    //           [e12]              [sigma12]
+    //
     // Sigma = S * epsilon
     //                         [1-nu   nu    nu                                    ]
     //                         [ nu   1-nu   nu                                    ]
@@ -157,6 +166,7 @@ CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedS
     //                         [                             (1-2*nu)/2            ]
     //                         [                                        (1-2*nu)/2 ]
 
+    //Above Voigt Notation is placed in a 3x3 matrix:
      const CeedScalar ss          =  E/((1+nu)*(1-2*nu));
      const CeedScalar sigma[3][3] =
       { {ss*((1-nu)*e[1][1] + nu*e[2][2] +nu*e[3][3]), ss*(1-2*nu)*e[1][2]/2, ss*(1-2*nu)*e[1][3]/2},
@@ -178,4 +188,4 @@ CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedS
    return 0;
 }
 
-#endif //End of __Physics__
+#endif //End of __LIN_ELAS__H
