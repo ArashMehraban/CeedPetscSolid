@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
   // Set up libCEED
   CeedInit(ceedresource, &ceed);
   ierr = PetscMalloc1(1, &ceeddata); CHKERRQ(ierr);
-  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, ceeddata, ncompu, Ugsz,Ulocsz);
+  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, &phys, ceeddata, ncompu, Ugsz,Ulocsz);
          CHKERRQ(ierr);
 
 

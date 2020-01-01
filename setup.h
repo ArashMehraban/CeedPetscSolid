@@ -30,10 +30,10 @@ typedef struct{
 }AppCtx;
 
 //Physics for Elasticty and Hyperelasticity problems
-typedef struct{
-  PetscScalar   nu;      //Poisson's ratio
-  PetscScalar   E;       //Young's Modulus
-}Physics;
+// typedef struct{
+//   PetscScalar   nu;      //Poisson's ratio
+//   PetscScalar   E;       //Young's Modulus
+// }Physics;
 
 // Problem specific data
 typedef struct {
@@ -158,6 +158,18 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx){
   }
 
 PetscFunctionReturn(0);
+}
+
+static int createPhysic(Physic *phys)
+{
+    PetscErrorCode ierr;
+    PetscFunctionBeginUser;
+    Physics ph;
+    ierr = PetscMalloc(1,&Ph);CHKERRQ(ierr);
+    Ph->E=0;
+    Ph->nu=0;
+    *Phys = ph;
+    PetscFunctionReturn(0);
 }
 
 static int processPhysics(MPI_Comm comm, Physics *phys){
@@ -347,7 +359,7 @@ static int CreateRestrictionPlex(Ceed ceed, CeedInt P, CeedInt ncomp,
 }
 
 //Set up libCEED for a given degree
-static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, CeedData data,
+static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics * physics, CeedData data,
                                 PetscInt ncompu, PetscInt Ugsz,PetscInt Ulocsz){
 
 int          ierr;
@@ -423,27 +435,23 @@ CeedQFunctionAddInput(qf_setupgeo, "weight", 1, CEED_EVAL_WEIGHT);
 CeedQFunctionAddOutput(qf_setupgeo, "qdata", qdatasize, CEED_EVAL_NONE);
 CeedOperatorCreate(ceed, qf_setupgeo, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_setupgeo);
 CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, CEED_NOTRANSPOSE, basisx, xcoord);
+CeedOperatorSetField(op_setupgeo, "weight", Erestrictx, CEED_NOTRANSPOSE, basisx, CEED_VECTOR_NONE); // Need to provide operator field for "weight"
+CeedOperatorSetField(op_setupgeo, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata); // Need to provide operator field for "qdata"
 
-//Question1:
-//This will sets warning in make and error when running
-//warning:
-//  passing argument 1 of ‘CeedOperatorSetField’ from incompatible pointer type [-Wincompatible-pointer-types]
+
 CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].apply,
                             problemOptions[problemChoice].applyfname, &qf_apply);
 CeedQFunctionAddInput(qf_apply, "du", ncompu*dim, CEED_EVAL_GRAD);
+CeedQFunctionAddInput(qf_apply, "qdata", qdatasize, CEED_EVAL_NONE);
 CeedQFunctionAddOutput(qf_apply, "dv", ncompu*dim, CEED_EVAL_GRAD);
+CeedQFunctionSetContext(qf_apply, &physics, sizeof(physics));
 CeedOperatorCreate(ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_apply);
-CeedOperatorSetField(qf_apply, "dv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
-//End of Question 1
+CeedOperatorSetField(op_apply, "dv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+CeedOperatorSetField(op_apply, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata); // Need to provide operator field for "qdata"
+CeedOperatorSetField(op_apply, "du", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 
-//Question 2:
-//How about the Transposes of dXdx?
-//CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, CEED_TRANSPOSE, basisx, CEED_VECTOR_ACTIVE);
-//End of Question 2
+CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
 
-//Question 3:
-//How about the Transposes of du?
-//End of Question 3
 
 PetscFunctionReturn(0);
 }

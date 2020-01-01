@@ -1,4 +1,4 @@
-    // *****************************************************************************
+// *****************************************************************************
     // This QFunction sets up the geometric factors required for integration and
     //   coordinate transformations
     //
@@ -22,6 +22,18 @@
     //               [A31 A32 A33]
     //
     // *****************************************************************************
+#ifndef __Physics__
+#define __Physics__
+
+    typedef struct Physics_private *Physics;
+    struct Physics_private{
+      PetscScalar   nu;      //Poisson's ratio
+      PetscScalar   E;       //Young's Modulus
+    };
+#endif
+
+
+
     CEED_QFUNCTION(SetupLinElasGeo)(void *ctx, CeedInt Q,
                           const CeedScalar *const *in, CeedScalar *const *out) {
       // *INDENT-OFF*
@@ -79,43 +91,94 @@
     }
 // -----------------------------------------------------------------------------
 CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q,
-                     const CeedScalar *const *in, CeedScalar *const *out) {
-  // const CeedScalar *ug = in[0], *qd = in[1];
-  // CeedScalar *vg = out[0];
-  //
-  // // Quadrature Point Loop
-  // CeedPragmaSIMD
-  // for (CeedInt i=0; i<Q; i++) {
-  //   // Read spatial derivatives of u components
-  //   const CeedScalar uJ[3][3]        = {{ug[i+(0+0*3)*Q],
-  //                                        ug[i+(0+1*3)*Q],
-  //                                        ug[i+(0+2*3)*Q]},
-  //                                       {ug[i+(1+0*3)*Q],
-  //                                        ug[i+(1+1*3)*Q],
-  //                                        ug[i+(1+2*3)*Q]},
-  //                                       {ug[i+(2+0*3)*Q],
-  //                                        ug[i+(2+1*3)*Q],
-  //                                        ug[i+(2+2*3)*Q]}
-  //                                      };
-  //   // Read qdata (dXdxdXdxT symmetric matrix)
-  //   const CeedScalar dXdxdXdxT[3][3] = {{qd[i+0*Q],
-  //                                        qd[i+1*Q],
-  //                                        qd[i+2*Q]},
-  //                                       {qd[i+1*Q],
-  //                                        qd[i+3*Q],
-  //                                        qd[i+4*Q]},
-  //                                       {qd[i+2*Q],
-  //                                        qd[i+4*Q],
-  //                                        qd[i+5*Q]}
-  //                                      };
-  //
-  //   for (int k=0; k<3; k++) // k = component
-  //     for (int j=0; j<3; j++) // j = direction of vg
-  //       vg[i+(k+j*3)*Q] = (uJ[k][0] * dXdxdXdxT[0][j] +
-  //                          uJ[k][1] * dXdxdXdxT[1][j] +
-  //                          uJ[k][2] * dXdxdXdxT[2][j]);
-  // } // End of Quadrature Point Loop
+                         const CeedScalar *const *in,
+                         CeedScalar *const *out) {
+   // Inputs
+   const CeedScalar *ug = in[0], *qdata = in[1];
 
-  return 0;
+   // Outputs
+   CeedScalar *vg = out[0];
+
+   // Context
+    const Physics context = ctx;
+   const CeedScalar E  = context->E;
+   const CeedScalar nu = context->nu;
+
+   // Quadrature Point Loop
+     CeedPragmaSIMD
+     for (CeedInt i=0; i<Q; i++) {
+       // Read spatial derivatives of u
+       const CeedScalar du[3][3]   = {{ug[i+(0+0*3)*Q],
+                                       ug[i+(0+1*3)*Q],
+                                       ug[i+(0+2*3)*Q]},
+                                      {ug[i+(1+0*3)*Q],
+                                       ug[i+(1+1*3)*Q],
+                                       ug[i+(1+2*3)*Q]},
+                                      {ug[i+(2+0*3)*Q],
+                                       ug[i+(2+1*3)*Q],
+                                       ug[i+(2+2*3)*Q]}
+                                     };
+       // -- Qdata
+       const CeedScalar wJ         =    qdata[0*Q+i];
+       // *INDENT-OFF*
+       const CeedScalar dXdx[3][3] =  {{qdata[1*Q+i],
+                                        qdata[2*Q+i],
+                                        qdata[3*Q+i]},
+                                       {qdata[4*Q+i],
+                                        qdata[5*Q+i],
+                                        qdata[6*Q+i]},
+                                       {qdata[7*Q+i],
+                                        qdata[8*Q+i],
+                                        qdata[9*Q+i]}
+                                      };
+
+
+     // Apply dXdx^-1
+     CeedScalar gradu[3][3];
+     for (int j=0; j<3; j++)
+       for (int k=0; k<3; k++) {
+         gradu[j][k] = 0;
+         for (int m=0; m<3; m++)
+           gradu[j][k] += dXdx[j][m]*gradu[k][m];
+       }
+
+     // Compute e = 1/2 (grad u + (grad u)^T)
+     const CeedScalar e[3][3]     =  {{(gradu[0][0] + gradu[0][0])/2,
+                                       (gradu[0][1] + gradu[1][0])/2,
+                                       (gradu[0][2] + gradu[2][0])/2},
+                                      {(gradu[1][0] + gradu[0][1])/2,
+                                       (gradu[1][1] + gradu[1][1])/2,
+                                       (gradu[1][2] + gradu[2][1])/2},
+                                      {(gradu[2][0] + gradu[0][2])/2,
+                                       (gradu[2][1] + gradu[1][2])/2,
+                                       (gradu[2][2] + gradu[2][2])/2}
+                                     };
+
+     // Sigma = S e
+     const CeedScalar ss          =  E/((1+nu)*(1-2*nu));
+     const CeedScalar sigma[3][3] =
+      { {ss*((1-nu)*e[1][1] + nu*e[2][2] +nu*e[3][3]),
+          ss*(1-2*nu)*e[1][2]/2, ss*(1-2*nu)*e[1][3]/2},
+         {ss*(1-2*nu)*e[2][1]/2, ss*(nu*e[1][1] + (1-nu)*e[2][2] +nu*e[3][3]),
+          ss*(1-2*nu)*e[2][3]/2},
+          {ss*(1-2*nu)*e[3][1]/2, ss*(1-2*nu)*e[3][2]/2,
+            ss*(nu*e[1][1] + nu*e[2][2] +(1-nu)*e[3][3])}
+};
+
+     // *INDENT-ON*
+
+     // Apply dXdx^-T
+     for (int j=0; j<3; j++)
+       for (int k=0; k<3; k++) {
+         vg[i+(j*3+k)*Q] = 0;
+         for (int m=0; m<3; m++)
+           vg[i+(j*3+k)*Q] += dXdx[m][j] * sigma[k][m] * wJ;
+
+       }
+
+   } // End of Quadrature Point Loop
+
+   // Return
+   return 0;
 }
-// -----------------------------------------------------------------------------
+//
