@@ -48,7 +48,8 @@ problemData problemOptions[3] = {
       .apply = LinElas,
       .error = Error,
       .setupgeofname = SetupGeo_loc,
-      .applyfname = LinElas_loc,
+      .applyfname = LinElasF_loc,
+      .jacobfname = LinElasdF_loc,
       .errorfname = Error_loc,
       .qmode = CEED_GAUSS,
       .bcs_func = NULL // Drichlet of all 1's
@@ -94,9 +95,9 @@ struct CeedData_private {
   Ceed                ceed;
   CeedBasis           basisx, basisu, basisctof;
   CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui, Erestrictqdi;
-  CeedQFunction       qf_apply;
-  CeedOperator        op_apply, op_restrict, op_interp;
-  CeedVector          qdata, xceed, yceed;
+  CeedQFunction       qf_apply, qf_jacob;
+  CeedOperator        op_apply, op_jacob, op_restrict, op_interp;
+  CeedVector          qdata, gradu, xceed, yceed;
 };
 
 // -----------------------------------------------------------------------------
@@ -272,6 +273,7 @@ static PetscErrorCode CeedDataDestroy(CeedInt i, CeedData data) {
   PetscInt ierr;
 
   CeedVectorDestroy(&data->qdata);
+  CeedVectorDestroy(&data->gradu);
   CeedVectorDestroy(&data->xceed);
   CeedVectorDestroy(&data->yceed);
   CeedBasisDestroy(&data->basisx);
@@ -283,6 +285,8 @@ static PetscErrorCode CeedDataDestroy(CeedInt i, CeedData data) {
   CeedElemRestrictionDestroy(&data->Erestrictqdi);
   CeedQFunctionDestroy(&data->qf_apply);
   CeedOperatorDestroy(&data->op_apply);
+  CeedQFunctionDestroy(&data->qf_jacob);
+  CeedOperatorDestroy(&data->op_jacob);
   if (i > 0) {
     CeedOperatorDestroy(&data->op_interp);
     CeedBasisDestroy(&data->basisctof);
@@ -392,11 +396,11 @@ ierr = VecRestoreArrayRead(coords, &coordArray); CHKERRQ(ierr);
 CeedInt nqpts;
 CeedBasisGetNumQuadraturePoints(basisu, &nqpts);
 CeedVectorCreate(ceed, qdatasize*nelem*nqpts, &qdata);
+CeedVectorCreate(ceed, Ulocsz, &gradu);
 CeedVectorCreate(ceed, Ulocsz, &xceed);
 CeedVectorCreate(ceed, Ulocsz, &yceed);
 
-// Create the Q-function that builds the operator (i.e. computes its
-// quadrature data) and set its context data
+// Create the QFunction and Operator that computes the quadrature data
 // qdata returns dXdx_i,j and w * det.
 CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].setupgeo,problemOptions[problemChoice].setupgeofname,
                             &qf_setupgeo);
@@ -408,19 +412,34 @@ CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, CEED_NOTRANSPOSE, basisx, xc
 CeedOperatorSetField(op_setupgeo, "weight", Erestrictx, CEED_NOTRANSPOSE, basisx, CEED_VECTOR_NONE);
 CeedOperatorSetField(op_setupgeo, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
 
+// Create the QFunction and Operator that evaluates the residual
 CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].apply,problemOptions[problemChoice].applyfname, &qf_apply);
 CeedQFunctionAddInput(qf_apply, "du", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_apply, "qdata", qdatasize, CEED_EVAL_NONE);
 CeedQFunctionAddOutput(qf_apply, "dv", ncompu*dim, CEED_EVAL_GRAD);
+CeedQFunctionAddOutput(qf_apply, "gradu", ncompu*dim, CEED_EVAL_NONE);
 CeedQFunctionSetContext(qf_apply, &phys, sizeof(phys));
 CeedOperatorCreate(ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_apply);
-CeedOperatorSetField(op_apply, "dv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
-CeedOperatorSetField(op_apply, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
 CeedOperatorSetField(op_apply, "du", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+CeedOperatorSetField(op_apply, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
+CeedOperatorSetField(op_apply, "dv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+CeedOperatorSetField(op_apply, "gradu", Erestrictui, CEED_NOTRANSPOSE, basisu, gradu);
 
+// Create the QFunction and Operator that calculates the Jacobian
+CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].jacob,problemOptions[problemChoice].applyfname, &qf_apply);
+CeedQFunctionAddInput(qf_jacob, "gradu", ncompu*dim, CEED_EVAL_NONE);
+CeedQFunctionAddInput(qf_jacob, "deltadu", ncompu*dim, CEED_EVAL_GRAD);
+CeedQFunctionAddInput(qf_jacob, "qdata", qdatasize, CEED_EVAL_NONE);
+CeedQFunctionAddOutput(qf_jacob, "deltadv", ncompu*dim, CEED_EVAL_GRAD);
+CeedQFunctionSetContext(qf_jacob, &phys, sizeof(phys));
+CeedOperatorCreate(ceed, qf_jacob, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_jacob);
+CeedOperatorSetField(op_jacob, "deltadu", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+CeedOperatorSetField(op_jacob, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
+CeedOperatorSetField(op_jacob, "deltadv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+CeedOperatorSetField(op_jacob, "gradu", Erestrictui, CEED_NOTRANSPOSE, basisu, gradu);
+
+// Compute the quadrature data
 CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
-
-
 
   // Cleanup
   CeedQFunctionDestroy(&qf_setupgeo);
@@ -437,7 +456,10 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
   data->Erestrictqdi = Erestrictqdi;
   data->qf_apply = qf_apply;
   data->op_apply = op_apply;
+  data->qf_apply = qf_jacob;
+  data->op_apply = op_jacob;
   data->qdata = qdata;
+  data->qdata = gradu;
   data->xceed = xceed;
   data->yceed = yceed;
 

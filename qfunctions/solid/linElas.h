@@ -7,14 +7,17 @@
       PetscScalar   E;       //Young's Modulus
     };
 
-
 // -----------------------------------------------------------------------------
-CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out) {
+CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out) {
+   // *INDENT-OFF*
    // Inputs
-   const CeedScalar *ug = in[0], *qdata = in[1];
+   const CeedScalar (*ug)[3][Q] = (CeedScalar(*)[3][Q])in[0],
+                    (*qdata)[Q] = (CeedScalar(*)[Q])in[1];
 
    // Outputs
-   CeedScalar *vg = out[0];
+   CeedScalar (*vg)[3][Q] = (CeedScalar(*)[3][Q])out[0],
+              (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
+   // *INDENT-ON*
 
    // Context
    const Physics context = ctx;
@@ -25,52 +28,56 @@ CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedS
      CeedPragmaSIMD
      for (CeedInt i=0; i<Q; i++) {
        // Read spatial derivatives of u
-       const CeedScalar du[3][3]   = {{ug[i+(0+0*3)*Q],
-                                       ug[i+(0+1*3)*Q],
-                                       ug[i+(0+2*3)*Q]},
-                                      {ug[i+(1+0*3)*Q],
-                                       ug[i+(1+1*3)*Q],
-                                       ug[i+(1+2*3)*Q]},
-                                      {ug[i+(2+0*3)*Q],
-                                       ug[i+(2+1*3)*Q],
-                                       ug[i+(2+2*3)*Q]}
-                                     };
-       // -- Qdata
-       const CeedScalar wJ         =    qdata[0*Q+i];
        // *INDENT-OFF*
-       const CeedScalar dXdx[3][3] =  {{qdata[1*Q+i],
-                                        qdata[2*Q+i],
-                                        qdata[3*Q+i]},
-                                       {qdata[4*Q+i],
-                                        qdata[5*Q+i],
-                                        qdata[6*Q+i]},
-                                       {qdata[7*Q+i],
-                                        qdata[8*Q+i],
-                                        qdata[9*Q+i]}
+       const CeedScalar du[3][3]   = {{ug[0][0][i],
+                                       ug[0][1][i],
+                                       ug[0][2][i]},
+                                      {ug[1][0][i],
+                                       ug[1][1][i],
+                                       ug[1][2][i]},},
+                                      {ug[2][0][i],
+                                       ug[2][1][i],
+                                       ug[2][2][i]}}
+                                     };
+
+       // -- Qdata
+       const CeedScalar wJ         =    qdata[0][i];
+       const CeedScalar dXdx[3][3] =  {{qdata[1][i],
+                                        qdata[2][i],
+                                        qdata[3][i]},
+                                       {qdata[4][i],
+                                        qdata[5][i],
+                                        qdata[6][i]},
+                                       {qdata[7][i],
+                                        qdata[8][i],
+                                        qdata[9][i]}
                                       };
+     // *INDENT-ON*
 
      //Compute gradu
      // Apply dXdx^-1 to du = gradu
-     CeedScalar gradu[3][3];
      for (int j=0; j<3; j++)
        for (int k=0; k<3; k++) {
-         gradu[j][k] = 0;
+         gradu[j][k][i] = 0;
          for (int m=0; m<3; m++)
-           gradu[j][k] += dXdx[j][m]*du[k][m];
+           gradu[j][k][i] += dXdx[j][m]*du[k][m];
        }
 
      // Compute Strain : e (epsilon)
      // e = 1/2 (grad u + (grad u)^T)
-     const CeedScalar e[3][3]     =  {{(gradu[0][0] + gradu[0][0])*0.5,
-                                       (gradu[0][1] + gradu[1][0])*0.5,
-                                       (gradu[0][2] + gradu[2][0])*0.5},
-                                      {(gradu[1][0] + gradu[0][1])*0.5,
-                                       (gradu[1][1] + gradu[1][1])*0.5,
-                                       (gradu[1][2] + gradu[2][1])*0.5},
-                                      {(gradu[2][0] + gradu[0][2])*0.5,
-                                       (gradu[2][1] + gradu[1][2])*0.5,
-                                       (gradu[2][2] + gradu[2][2])*0.5}
+     // *INDENT-OFF*
+     const CeedScalar e[3][3]     =  {{(gradu[0][0][i] + gradu[0][0][i])*0.5,
+                                       (gradu[0][1][i] + gradu[1][0][i])*0.5,
+                                       (gradu[0][2][i] + gradu[2][0][i])*0.5},
+                                      {(gradu[1][0][i] + gradu[0][1][i])*0.5,
+                                       (gradu[1][1][i] + gradu[1][1][i])*0.5,
+                                       (gradu[1][2][i] + gradu[2][1][i])*0.5},
+                                      {(gradu[2][0][i] + gradu[0][2][i])*0.5,
+                                       (gradu[2][1][i] + gradu[1][2][i])*0.5,
+                                       (gradu[2][2][i] + gradu[2][2][i])*0.5}
                                      };
+
+    // *INDENT-ON*
     //strain (epsilon)
     //    and
     //stress (sigma) in Voigt notation:
@@ -97,14 +104,121 @@ CEED_QFUNCTION(LinElas)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedS
         {ss*(1-2*nu)*e[3][1]/2, ss*(1-2*nu)*e[3][2]/2, ss*(nu*e[1][1] + nu*e[2][2] +(1-nu)*e[3][3])}
       };
 
+     // Apply dXdx^-T and weight
+     for (int j=0; j<3; j++)
+       for (int k=0; k<3; k++) {
+         vg[j][k][i] = 0;
+         for (int m=0; m<3; m++)
+           vg[j][k][i] += dXdx[m][j] * sigma[k][m] * wJ;
+       }
+     } // End of Quadrature Point Loop
+
+   return 0;
+}
+
+// -----------------------------------------------------------------------------
+CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out) {
+   // *INDENT-OFF*
+   // Inputs
+   const CeedScalar (*deltaug)[3][Q] = (CeedScalar(*)[3][Q])in[0],
+                    (*qdata)[Q] = (CeedScalar(*)[Q])in[1],
+                    (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
+
+   // Outputs
+   CeedScalar (*deltavg)[3][Q] = (CeedScalar(*)[3][Q])out[0];
+   // *INDENT-ON*
+
+   // Context
+   const Physics context = ctx;
+   const CeedScalar E  = context->E;
+   const CeedScalar nu = context->nu;
+
+   // Quadrature Point Loop
+     CeedPragmaSIMD
+     for (CeedInt i=0; i<Q; i++) {
+       // Read spatial derivatives of u
+       // *INDENT-OFF*
+       const CeedScalar deltadu[3][3] = {{deltaug[0][0][i],
+                                          deltaug[0][1][i],
+                                          deltaug[0][2][i]},
+                                         {deltaug[1][0][i],
+                                          deltaug[1][1][i],
+                                          deltaug[1][2][i]},},
+                                         {deltaug[2][0][i],
+                                          deltaug[2][1][i],
+                                          deltaug[2][2][i]}}
+                                        };
+       // -- Qdata
+       const CeedScalar wJ         =    qdata[0][i];
+       const CeedScalar dXdx[3][3] =  {{qdata[1][i],
+                                        qdata[2][i],
+                                        qdata[3][i]},
+                                       {qdata[4][i],
+                                        qdata[5][i],
+                                        qdata[6][i]},
+                                       {qdata[7][i],
+                                        qdata[8][i],
+                                        qdata[9][i]}
+                                      };
      // *INDENT-ON*
+
+     //Compute gradeltadu
+     // Apply dXdx^-1 to deltadu = gradeltadu
+     CeedScalar graddeltadu[3][3];
+     for (int j=0; j<3; j++)
+       for (int k=0; k<3; k++) {
+         gradeltadu[j][k] = 0;
+         for (int m=0; m<3; m++)
+           gradeltadu[j][k] += dXdx[j][m]*deltadu[k][m];
+       }
+
+     // Compute Strain : e (epsilon)
+     // e = 1/2 (grad u + (grad u)^T)
+     // *INDENT-OFF*
+     const CeedScalar e[3][3]     =  {{(gradeltadu[0][0] + gradeltadu[0][0])*0.5,
+                                       (gradeltadu[0][1] + gradeltadu[1][0])*0.5,
+                                       (gradeltadu[0][2] + gradeltadu[2][0])*0.5},
+                                      {(gradeltadu[1][0] + gradeltadu[0][1])*0.5,
+                                       (gradeltadu[1][1] + gradeltadu[1][1])*0.5,
+                                       (gradeltadu[1][2] + gradeltadu[2][1])*0.5},
+                                      {(gradeltadu[2][0] + gradeltadu[0][2])*0.5,
+                                       (gradeltadu[2][1] + gradeltadu[1][2])*0.5,
+                                       (gradeltadu[2][2] + gradeltadu[2][2])*0.5}
+                                     };
+
+    // *INDENT-ON*
+    //strain (epsilon)
+    //    and
+    //stress (sigma) in Voigt notation:
+    //           [e11]              [sigma11]
+    //           [e22]              [sigma22]
+    // epsilon = [e33]  ,   sigma = [sigma33]
+    //           [e23]              [sigma23]
+    //           [e13]              [sigma13]
+    //           [e12]              [sigma12]
+    //
+    // Sigma = S * epsilon
+    //                         [1-nu   nu    nu                                    ]
+    //                         [ nu   1-nu   nu                                    ]
+    //                         [ nu    nu   1-nu                                   ]
+    // S = E/((1+nu)*(1-2*nu)) [                  (1-2*nu)/2                       ]
+    //                         [                             (1-2*nu)/2            ]
+    //                         [                                        (1-2*nu)/2 ]
+
+    //Above Voigt Notation is placed in a 3x3 matrix:
+     const CeedScalar ss          =  E/((1+nu)*(1-2*nu));
+     const CeedScalar sigma[3][3] =
+      { {ss*((1-nu)*e[1][1] + nu*e[2][2] +nu*e[3][3]), ss*(1-2*nu)*e[1][2]/2, ss*(1-2*nu)*e[1][3]/2},
+        {ss*(1-2*nu)*e[2][1]/2, ss*(nu*e[1][1] + (1-nu)*e[2][2] +nu*e[3][3]), ss*(1-2*nu)*e[2][3]/2},
+        {ss*(1-2*nu)*e[3][1]/2, ss*(1-2*nu)*e[3][2]/2, ss*(nu*e[1][1] + nu*e[2][2] +(1-nu)*e[3][3])}
+      };
 
      // Apply dXdx^-T and weight
      for (int j=0; j<3; j++)
        for (int k=0; k<3; k++) {
-         vg[i+(j*3+k)*Q] = 0;
+         deltavg[j][k][i] = 0;
          for (int m=0; m<3; m++)
-           vg[i+(j*3+k)*Q] += dXdx[m][j] * sigma[k][m] * wJ;
+           deltavg[j][k][i] += dXdx[m][j] * sigma[k][m] * wJ;
        }
      } // End of Quadrature Point Loop
 
