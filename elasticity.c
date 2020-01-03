@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 
   // Set up libCEED
   CeedInit(ceedresource, &ceed);
-  ierr = PetscMalloc1(1, &ceeddata); CHKERRQ(ierr);
+  ierr = PetscCalloc1(1, &ceeddata); CHKERRQ(ierr);
   ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz,Ulocsz);CHKERRQ(ierr);
   ierr = SNESCreate(comm, &snes); CHKERRQ(ierr);
   ierr = PetscMalloc1(1, &userMult); CHKERRQ(ierr);
@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
   userMult->yceed = ceeddata->yceed;
   userMult->op = ceeddata->op_apply;
   userMult->ceed = ceed;
-  // function that computes the residual
+  //function that computes the residual
   ierr = SNESSetFunction(snes, R, FormResidual_Ceed,userMult); CHKERRQ(ierr);
   //Form Action of Jacobian on delta_u
   ierr = MatCreateShell(comm, Ulsz,Ulsz,Ugsz,Ugsz,userMult,&mat); CHKERRQ(ierr);
@@ -92,13 +92,14 @@ int main(int argc, char **argv) {
 
 
    //Free objects
-  ierr = DMDestroy(&dm); CHKERRQ(ierr);
+
   ierr = VecDestroy(&U); CHKERRQ(ierr);
   ierr = VecDestroy(&Uloc); CHKERRQ(ierr);
   ierr = VecDestroy(&R); CHKERRQ(ierr);
   ierr = VecDestroy(&Rloc); CHKERRQ(ierr);
-  //ierr = VecDestroy(&userMult->Yloc); CHKERRQ(ierr);
+  ierr = VecDestroy(&userMult->Yloc); CHKERRQ(ierr);
   ierr = MatDestroy(&mat); CHKERRQ(ierr);
+  ierr = DMDestroy(&dm); CHKERRQ(ierr);
   ierr = PetscFree(userMult); CHKERRQ(ierr);
 
   ierr = PetscFree(phys);CHKERRQ(ierr);

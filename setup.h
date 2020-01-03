@@ -95,7 +95,7 @@ typedef struct CeedData_private *CeedData;
 struct CeedData_private {
   Ceed                ceed;
   CeedBasis           basisx, basisu, basisctof;
-  CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui, Erestrictqdi;
+  CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui, Erestrictqdi, ErestrictGradui;
   CeedQFunction       qf_apply, qf_jacob;
   CeedOperator        op_apply, op_jacob, op_restrict, op_interp;
   CeedVector          qdata, gradu, xceed, yceed;
@@ -254,12 +254,12 @@ static int SetupDMByDegree(DM dm, AppCtx *appCtx, PetscInt ncompu){
   // Setup DM
   ierr = DMSetFromOptions(dm); CHKERRQ(ierr);
   ierr = DMAddField(dm, NULL, (PetscObject)fe); CHKERRQ(ierr);
-  ierr = DMCreateDS(dm); CHKERRQ(ierr);
+  //ierr = DMCreateDS(dm); CHKERRQ(ierr);
   // Add Dirichlet (Essential) boundray
   ierr = DMGetLabelIdIS(dm, name, &faceSetIS);CHKERRQ(ierr);
   ierr = ISGetLocalSize(faceSetIS,&numFaceSet);
   ierr = ISGetIndices(faceSetIS, &faceSetIds);CHKERRQ(ierr);
-  ierr = DMAddBoundary(dm,DM_BC_ESSENTIAL,"wall","Face Sets",0,0,NULL,
+  ierr = DMAddBoundary(dm,DM_BC_ESSENTIAL,NULL,"Face Sets",0,0,NULL,
                  (void(*)(void))problemOptions[appCtx->problemChoice].bcs_func,numFaceSet,faceSetIds,NULL);CHKERRQ(ierr);
   ierr = ISRestoreIndices(faceSetIS, &faceSetIds);CHKERRQ(ierr);
   ierr = ISDestroy(&faceSetIS);CHKERRQ(ierr);
@@ -282,6 +282,7 @@ static PetscErrorCode CeedDataDestroy(CeedInt i, CeedData data) {
   CeedElemRestrictionDestroy(&data->Erestrictu);
   CeedElemRestrictionDestroy(&data->Erestrictx);
   CeedElemRestrictionDestroy(&data->Erestrictui);
+  CeedElemRestrictionDestroy(&data->ErestrictGradui);
   CeedElemRestrictionDestroy(&data->Erestrictxi);
   CeedElemRestrictionDestroy(&data->Erestrictqdi);
   CeedQFunctionDestroy(&data->qf_apply);
@@ -352,7 +353,7 @@ CeedInt      P, Q;
 CeedInt      dim, ncompx;
 CeedBasis    basisx, basisu;
 DM           dmcoord;
-CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui, Erestrictqdi;
+CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui, Erestrictqdi, ErestrictGradui;
 CeedInt      cStart, cEnd, nelem;
 Vec          coords;
 const PetscScalar *coordArray;
@@ -383,6 +384,7 @@ nelem = cEnd - cStart;
 CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, ncompu, &Erestrictui); CHKERRQ(ierr);
 CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, qdatasize, &Erestrictqdi); CHKERRQ(ierr);
 CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, ncompx, &Erestrictxi); CHKERRQ(ierr);
+CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, dim* ncompu, &ErestrictGradui); CHKERRQ(ierr);
 
 // Element coordinates
 ierr = DMGetCoordinatesLocal(dm, &coords); CHKERRQ(ierr);
@@ -397,7 +399,7 @@ ierr = VecRestoreArrayRead(coords, &coordArray); CHKERRQ(ierr);
 CeedInt nqpts;
 CeedBasisGetNumQuadraturePoints(basisu, &nqpts);
 CeedVectorCreate(ceed, qdatasize*nelem*nqpts, &qdata);
-CeedVectorCreate(ceed, Ulocsz, &gradu);
+CeedVectorCreate(ceed, dim*ncompu*nelem*nqpts, &gradu);
 CeedVectorCreate(ceed, Ulocsz, &xceed);
 CeedVectorCreate(ceed, Ulocsz, &yceed);
 
@@ -424,20 +426,20 @@ CeedOperatorCreate(ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op
 CeedOperatorSetField(op_apply, "du", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 CeedOperatorSetField(op_apply, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
 CeedOperatorSetField(op_apply, "dv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
-CeedOperatorSetField(op_apply, "gradu", Erestrictui, CEED_NOTRANSPOSE, basisu, gradu);
+CeedOperatorSetField(op_apply, "gradu", ErestrictGradui, CEED_NOTRANSPOSE, basisu, gradu);
 
 // Create the QFunction and Operator that calculates the Jacobian
 CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].jacob,problemOptions[problemChoice].jacobfname, &qf_jacob);
-CeedQFunctionAddInput(qf_jacob, "gradu", ncompu*dim, CEED_EVAL_NONE);
 CeedQFunctionAddInput(qf_jacob, "deltadu", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_jacob, "qdata", qdatasize, CEED_EVAL_NONE);
+CeedQFunctionAddInput(qf_jacob, "gradu", ncompu*dim, CEED_EVAL_NONE);
 CeedQFunctionAddOutput(qf_jacob, "deltadv", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionSetContext(qf_jacob, &phys, sizeof(phys));
 CeedOperatorCreate(ceed, qf_jacob, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_jacob);
 CeedOperatorSetField(op_jacob, "deltadu", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 CeedOperatorSetField(op_jacob, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
 CeedOperatorSetField(op_jacob, "deltadv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
-CeedOperatorSetField(op_jacob, "gradu", Erestrictui, CEED_NOTRANSPOSE, basisu, gradu);
+CeedOperatorSetField(op_jacob, "gradu", ErestrictGradui, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, gradu);
 
 // Compute the quadrature data
 CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
@@ -455,12 +457,13 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
   data->Erestrictxi = Erestrictxi;
   data->Erestrictui = Erestrictui;
   data->Erestrictqdi = Erestrictqdi;
+  data->ErestrictGradui = ErestrictGradui;
   data->qf_apply = qf_apply;
   data->op_apply = op_apply;
-  data->qf_apply = qf_jacob;
-  data->op_apply = op_jacob;
+  data->qf_jacob = qf_jacob;
+  data->op_jacob = op_jacob;
   data->qdata = qdata;
-  data->qdata = gradu;
+  data->gradu = gradu;
   data->xceed = xceed;
   data->yceed = yceed;
 
