@@ -5,7 +5,7 @@ at finite strain formulation is Total Lagrangian. This code was tested in valgri
 following options: `--track-origins=yes` `--leak-check=full` `--show-leak-kinds=all`
 
 ### Valgrind Errors for this branch:
-Valgrind says 7 error, in-direct memory loss through libCEED functions. Check as you update.
+Valgrind says 7 error, indirect memory loss through libCEED functions. Check as you update.
 
 `valgrind --track-origins=yes --leak-check=full --show-leak-kinds=all ./elasticity -mesh ./meshes/beamss16.exo -degree 2 -nu .3 -E 10e6`
 

@@ -202,12 +202,12 @@ static int SetupDMByDegree(DM dm, AppCtx *appCtx, PetscInt ncompu){
  PetscFE         fe;
  PetscInt        quadPointsPerEdge;
  PetscQuadrature q;  //quadrature points
- PetscQuadrature fq; //face quadrature points
+ PetscQuadrature fq; //face quadrature points (For future: Nuemman boundary)
  // For Dirichlet (Essential) Boundary
- IS              faceSetIS;        //Index Set for Face Sets
- const char     *name="Face Sets"; //PETSc internal requirement
- PetscInt        numFaceSet;       //Number of FaceSets in faceSetIS
- const PetscInt *faceSetIds;       //id of each FaceSet
+ IS              faceSetIS;         //Index Set for Face Sets
+ const char      *name="Face Sets"; //PETSc internal requirement
+ PetscInt        numFaceSet;        //Number of FaceSets in faceSetIS
+ const PetscInt  *faceSetIds;       //id of each FaceSet
 
  PetscFunctionBeginUser;
 
@@ -420,8 +420,79 @@ CeedOperatorSetField(op_apply, "du", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_
 
 CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
 
+
+
+  // Cleanup
+  CeedQFunctionDestroy(&qf_setupgeo);
+  CeedOperatorDestroy(&op_setupgeo);
+  CeedVectorDestroy(&xcoord);
+
+  // Save libCEED data required for level
+  data->basisx = basisx;
+  data->basisu = basisu;
+  data->Erestrictx = Erestrictx;
+  data->Erestrictu = Erestrictu;
+  data->Erestrictxi = Erestrictxi;
+  data->Erestrictui = Erestrictui;
+  data->Erestrictqdi = Erestrictqdi;
+  data->qf_apply = qf_apply;
+  data->op_apply = op_apply;
+  data->qdata = qdata;
+  data->xceed = xceed;
+  data->yceed = yceed;
+
 PetscFunctionReturn(0);
 }
 
+static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user){
+
+    PetscErrorCode ierr;
+    PetscScalar *x, *y;
+
+    PetscFunctionBeginUser;
+    ierr = DMGlobalToLocalBegin(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
+    ierr = DMGlobalToLocalEnd(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
+    ierr = VecZeroEntries(user->Yloc); CHKERRQ(ierr);
+
+    // Setup CEED vectors
+    ierr = VecGetArrayRead(user->Xloc, (const PetscScalar **)&x); CHKERRQ(ierr);
+    ierr = VecGetArray(user->Yloc, &y); CHKERRQ(ierr);
+    CeedVectorSetArray(user->xceed, CEED_MEM_HOST, CEED_USE_POINTER, x);
+    CeedVectorSetArray(user->yceed, CEED_MEM_HOST, CEED_USE_POINTER, y);
+
+    // Apply CEED operator
+    CeedOperatorApply(user->op, user->xceed, user->yceed, CEED_REQUEST_IMMEDIATE);
+    CeedVectorSyncArray(user->yceed, CEED_MEM_HOST);
+
+    // Restore PETSc vectors
+    ierr = VecRestoreArrayRead(user->Xloc, (const PetscScalar **)&x); CHKERRQ(ierr);
+    ierr = VecRestoreArray(user->Yloc, &y); CHKERRQ(ierr);
+
+    // Local-to-global
+    ierr = VecZeroEntries(Y); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalBegin(user->dm, user->Yloc, ADD_VALUES, Y); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalEnd(user->dm, user->Yloc, ADD_VALUES, Y); CHKERRQ(ierr);
+    PetscFunctionReturn(0);
+}
+
+static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ptr) {
+  PetscErrorCode ierr;
+  UserMult user = (UserMult)ptr;
+
+  PetscFunctionBeginUser;
+  ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
+
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ApplyJacobian_Ceed(Mat A, Vec X, Vec Y){
+    PetscErrorCode ierr;
+    UserMult user;
+
+    PetscFunctionBeginUser;
+    ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
+    ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
+    PetscFunctionReturn(0);
+}
 
 #endif
