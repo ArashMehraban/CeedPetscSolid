@@ -507,6 +507,9 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ptr) {
 
   PetscFunctionBeginUser;
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
+  ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+  PetscPrintf(PETSC_COMM_WORLD, "\n\n X: \n\n");
+  ierr = VecView(Y,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
 }
@@ -518,6 +521,24 @@ static PetscErrorCode ApplyJacobian_Ceed(Mat A, Vec X, Vec Y){
     PetscFunctionBeginUser;
     ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
     ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
+    PetscFunctionReturn(0);
+}
+
+static PetscErrorCode CreateMatrixFreeCtx(MPI_Comm comm, DM dm, Vec vloc, CeedData ceeddata, Ceed ceed, UserMult residualCtx, UserMult jacobianCtx){
+
+    PetscErrorCode ierr;
+
+    PetscFunctionBeginUser;
+    residualCtx->comm = comm;
+    residualCtx->dm = dm;
+    residualCtx->Xloc = vloc;
+    ierr = VecDuplicate(vloc, &residualCtx->Yloc);CHKERRQ(ierr);
+    residualCtx->xceed = ceeddata->xceed;
+    residualCtx->yceed = ceeddata->yceed;
+    residualCtx->op = ceeddata->op_apply;
+    residualCtx->ceed = ceed;
+    ierr = PetscMemcpy(jacobianCtx, residualCtx, sizeof(*residualCtx)); CHKERRQ(ierr);
+    jacobianCtx->op = ceeddata->op_jacob;
     PetscFunctionReturn(0);
 }
 

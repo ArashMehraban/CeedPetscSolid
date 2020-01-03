@@ -7,6 +7,8 @@ const char help[] = "Solve solid Problems with CEED and PETSc DMPlex\n";
 #include <ceed.h>
 #include "setup.h"
 
+static int dummyFun(){ PetscFunctionBeginUser;  PetscFunctionReturn(0);}
+
 int main(int argc, char **argv) {
   PetscInt    ierr;
   MPI_Comm    comm;
@@ -16,7 +18,7 @@ int main(int argc, char **argv) {
   PetscInt    ncompu = 3;        // 3 dofs in 3D
   Vec         U, Uloc, R, Rloc;  // loc: Local R:Residual
   PetscInt    Ugsz,Ulsz,Ulocsz;  // g:global, sz: size
-  UserMult    userMult;          // Shell Matrix context
+  UserMult    resCtx, jacobCtx;;
   Mat         mat;
   //Ceed constituents
   char        ceedresource[PETSC_MAX_PATH_LEN] = "/cpu/self";
@@ -58,21 +60,17 @@ int main(int argc, char **argv) {
   ierr = PetscCalloc1(1, &ceeddata); CHKERRQ(ierr);
   ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz,Ulocsz);CHKERRQ(ierr);
   ierr = SNESCreate(comm, &snes); CHKERRQ(ierr);
-  ierr = PetscMalloc1(1, &userMult); CHKERRQ(ierr);
-  userMult->comm = comm;
-  userMult->dm = dm;
-  userMult->Xloc = Uloc;
-  ierr = VecDuplicate(Uloc, &userMult->Yloc);CHKERRQ(ierr);
-  userMult->xceed = ceeddata->xceed;
-  userMult->yceed = ceeddata->yceed;
-  userMult->op = ceeddata->op_apply;
-  userMult->ceed = ceed;
+  ierr = PetscMalloc1(1, &resCtx); CHKERRQ(ierr);
+  // Jacobian context
+  ierr = PetscMalloc1(1, &jacobCtx);CHKERRQ(ierr);
+  ierr =  CreateMatrixFreeCtx(comm, dm, Uloc, ceeddata, ceed, resCtx, jacobCtx);CHKERRQ(ierr);
   //function that computes the residual
-  ierr = SNESSetFunction(snes, R, FormResidual_Ceed,userMult); CHKERRQ(ierr);
+  ierr = SNESSetFunction(snes, R, FormResidual_Ceed,resCtx); CHKERRQ(ierr);
   //Form Action of Jacobian on delta_u
-  ierr = MatCreateShell(comm, Ulsz,Ulsz,Ugsz,Ugsz,userMult,&mat); CHKERRQ(ierr);
+  ierr = MatCreateShell(comm, Ulsz,Ulsz,Ugsz,Ugsz,jacobCtx,&mat); CHKERRQ(ierr);
   ierr = MatShellSetOperation(mat, MATOP_MULT, (void (*)(void))ApplyJacobian_Ceed);CHKERRQ(ierr);
-  ierr = SNESSetJacobian(snes, mat, mat, NULL, NULL);CHKERRQ(ierr);
+
+  ierr = SNESSetJacobian(snes, mat, mat, dummyFun, NULL);CHKERRQ(ierr);
   {
     PC pc;
     KSP ksp;
@@ -84,7 +82,21 @@ int main(int argc, char **argv) {
     ierr = KSPSetFromOptions(ksp);
   }
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
-  ierr = SNESSolve(snes,NULL,U); CHKERRQ(ierr);
+
+  //begin delete
+  Vec Delme;
+  ierr = VecDuplicate(U, &Delme); CHKERRQ(ierr);
+  ierr = VecSet(Delme,1.0);CHKERRQ(ierr);
+  ierr = VecSet(U,1.0);CHKERRQ(ierr);
+  //end delete
+
+  ierr = SNESSolve(snes,Delme,U); CHKERRQ(ierr);
+
+ //begin delete
+   ierr = VecDestroy(&Delme); CHKERRQ(ierr);
+ //end delete
+
+ ierr = VecView(U,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 
 
 
@@ -97,10 +109,11 @@ int main(int argc, char **argv) {
   ierr = VecDestroy(&Uloc); CHKERRQ(ierr);
   ierr = VecDestroy(&R); CHKERRQ(ierr);
   ierr = VecDestroy(&Rloc); CHKERRQ(ierr);
-  ierr = VecDestroy(&userMult->Yloc); CHKERRQ(ierr);
+  ierr = VecDestroy(&resCtx->Yloc); CHKERRQ(ierr);
   ierr = MatDestroy(&mat); CHKERRQ(ierr);
   ierr = DMDestroy(&dm); CHKERRQ(ierr);
-  ierr = PetscFree(userMult); CHKERRQ(ierr);
+  ierr = PetscFree(resCtx); CHKERRQ(ierr);
+  ierr = PetscFree(jacobCtx); CHKERRQ(ierr);
 
   ierr = PetscFree(phys);CHKERRQ(ierr);
   ierr = CeedDataDestroy(0, ceeddata); CHKERRQ(ierr);

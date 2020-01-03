@@ -1,0 +1,1062 @@
+==27707== Memcheck, a memory error detector
+==27707== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==27707== Using Valgrind-3.13.0 and LibVEX; rerun with -h for copyright info
+==27707== Command: ./elasticity -mesh ./meshes/beamss16.exo -degree 2 -nu .3 -E 10e6
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x7784EB8: sqrt (w_sqrt_compat.c:30)
+==27707==    by 0x541FDED: VecNorm_Seq (bvec2.c:229)
+==27707==    by 0x54809E0: VecNorm (rvector.c:226)
+==27707==    by 0x67CCEA1: SNESSolve_NEWTONLS (ls.c:179)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x67CB325: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x67CCF0E: SNESSolve_NEWTONLS (ls.c:180)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x67CB33B: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x67CCF0E: SNESSolve_NEWTONLS (ls.c:180)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x674A0CA: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x6751CC5: SNESConvergedDefault (snesut.c:667)
+==27707==    by 0x67CD3F6: SNESSolve_NEWTONLS (ls.c:188)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x674A0E0: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x6751CC5: SNESConvergedDefault (snesut.c:667)
+==27707==    by 0x67CD3F6: SNESSolve_NEWTONLS (ls.c:188)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x6751D62: SNESConvergedDefault (snesut.c:670)
+==27707==    by 0x67CD3F6: SNESSolve_NEWTONLS (ls.c:188)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E5D34: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x64E7BDE: KSPSolve_CG (cg.c:135)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E5D4A: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x64E7BDE: KSPSolve_CG (cg.c:135)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x664861F: KSPConvergedDefault (iterativ.c:725)
+==27707==    by 0x64E8AA2: KSPSolve_CG (cg.c:156)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x663FDDB: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x66487A9: KSPConvergedDefault (iterativ.c:730)
+==27707==    by 0x64E8AA2: KSPSolve_CG (cg.c:156)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x663FDF1: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x66487A9: KSPConvergedDefault (iterativ.c:730)
+==27707==    by 0x64E8AA2: KSPSolve_CG (cg.c:156)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x6648A76: KSPConvergedDefault (iterativ.c:744)
+==27707==    by 0x64E8AA2: KSPSolve_CG (cg.c:156)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x6648CC4: KSPConvergedDefault (iterativ.c:756)
+==27707==    by 0x64E8AA2: KSPSolve_CG (cg.c:156)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E5D34: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x64E5D7C: PetscIsInfOrNanScalar (petscmath.h:782)
+==27707==    by 0x64E8DB3: KSPSolve_CG (cg.c:164)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E5D4A: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x64E5D7C: PetscIsInfOrNanScalar (petscmath.h:782)
+==27707==    by 0x64E8DB3: KSPSolve_CG (cg.c:164)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E9184: KSPSolve_CG (cg.c:170)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E9192: KSPSolve_CG (cg.c:170)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E5D34: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x64E5D7C: PetscIsInfOrNanScalar (petscmath.h:782)
+==27707==    by 0x64E9670: KSPSolve_CG (cg.c:196)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E5D4A: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x64E5D7C: PetscIsInfOrNanScalar (petscmath.h:782)
+==27707==    by 0x64E9670: KSPSolve_CG (cg.c:196)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E9A2E: KSPSolve_CG (cg.c:199)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E9A38: KSPSolve_CG (cg.c:199)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x5485B18: VecAXPY (rvector.c:593)
+==27707==    by 0x64E9C95: KSPSolve_CG (cg.c:207)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x5485C77: VecAXPY (rvector.c:593)
+==27707==    by 0x64E9C95: KSPSolve_CG (cg.c:207)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x542915F: VecAXPY_Seq (bvec1.c:78)
+==27707==    by 0x5485F35: VecAXPY (rvector.c:598)
+==27707==    by 0x64E9C95: KSPSolve_CG (cg.c:207)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x5429169: VecAXPY_Seq (bvec1.c:78)
+==27707==    by 0x5485F35: VecAXPY (rvector.c:598)
+==27707==    by 0x64E9C95: KSPSolve_CG (cg.c:207)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x6BB35E2: daxpy_ (daxpy.f:77)
+==27707==    by 0x5429385: VecAXPY_Seq (bvec1.c:81)
+==27707==    by 0x5485F35: VecAXPY (rvector.c:598)
+==27707==    by 0x64E9C95: KSPSolve_CG (cg.c:207)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x6BB35EC: daxpy_ (daxpy.f:77)
+==27707==    by 0x5429385: VecAXPY_Seq (bvec1.c:81)
+==27707==    by 0x5485F35: VecAXPY (rvector.c:598)
+==27707==    by 0x64E9C95: KSPSolve_CG (cg.c:207)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x5485B18: VecAXPY (rvector.c:593)
+==27707==    by 0x64E9D17: KSPSolve_CG (cg.c:208)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x5485C77: VecAXPY (rvector.c:593)
+==27707==    by 0x64E9D17: KSPSolve_CG (cg.c:208)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x542915F: VecAXPY_Seq (bvec1.c:78)
+==27707==    by 0x5485F35: VecAXPY (rvector.c:598)
+==27707==    by 0x64E9D17: KSPSolve_CG (cg.c:208)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x5429169: VecAXPY_Seq (bvec1.c:78)
+==27707==    by 0x5485F35: VecAXPY (rvector.c:598)
+==27707==    by 0x64E9D17: KSPSolve_CG (cg.c:208)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x6BB35E2: daxpy_ (daxpy.f:77)
+==27707==    by 0x5429385: VecAXPY_Seq (bvec1.c:81)
+==27707==    by 0x5485F35: VecAXPY (rvector.c:598)
+==27707==    by 0x64E9D17: KSPSolve_CG (cg.c:208)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x6BB35EC: daxpy_ (daxpy.f:77)
+==27707==    by 0x5429385: VecAXPY_Seq (bvec1.c:81)
+==27707==    by 0x5485F35: VecAXPY (rvector.c:598)
+==27707==    by 0x64E9D17: KSPSolve_CG (cg.c:208)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x7784EB8: sqrt (w_sqrt_compat.c:30)
+==27707==    by 0x541FDED: VecNorm_Seq (bvec2.c:229)
+==27707==    by 0x54809E0: VecNorm (rvector.c:226)
+==27707==    by 0x64E9E39: KSPSolve_CG (cg.c:211)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E5D34: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x64E9EB2: KSPSolve_CG (cg.c:212)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E5D4A: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x64E9EB2: KSPSolve_CG (cg.c:212)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x663FDDB: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x66487A9: KSPConvergedDefault (iterativ.c:730)
+==27707==    by 0x64EAD73: KSPSolve_CG (cg.c:228)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x663FDF1: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x66487A9: KSPConvergedDefault (iterativ.c:730)
+==27707==    by 0x64EAD73: KSPSolve_CG (cg.c:228)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x6648A76: KSPConvergedDefault (iterativ.c:744)
+==27707==    by 0x64EAD73: KSPSolve_CG (cg.c:228)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x6648CC4: KSPConvergedDefault (iterativ.c:756)
+==27707==    by 0x64EAD73: KSPSolve_CG (cg.c:228)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E5D34: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x64E5D7C: PetscIsInfOrNanScalar (petscmath.h:782)
+==27707==    by 0x64EAF86: KSPSolve_CG (cg.c:236)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E5D4A: PetscIsInfOrNanReal (petscmath.h:779)
+==27707==    by 0x64E5D7C: PetscIsInfOrNanScalar (petscmath.h:782)
+==27707==    by 0x64EAF86: KSPSolve_CG (cg.c:236)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E924F: KSPSolve_CG (cg.c:175)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x54891DF: VecAYPX (rvector.c:729)
+==27707==    by 0x64E94CF: KSPSolve_CG (cg.c:191)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x548933E: VecAYPX (rvector.c:729)
+==27707==    by 0x64E94CF: KSPSolve_CG (cg.c:191)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x5430334: VecAYPX_Seq (dvec2.c:636)
+==27707==    by 0x548952F: VecAYPX (rvector.c:732)
+==27707==    by 0x64E94CF: KSPSolve_CG (cg.c:191)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x543033F: VecAYPX_Seq (dvec2.c:636)
+==27707==    by 0x548952F: VecAYPX (rvector.c:732)
+==27707==    by 0x64E94CF: KSPSolve_CG (cg.c:191)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x54303BA: VecAYPX_Seq (dvec2.c:638)
+==27707==    by 0x548952F: VecAYPX (rvector.c:732)
+==27707==    by 0x64E94CF: KSPSolve_CG (cg.c:191)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x54303CD: VecAYPX_Seq (dvec2.c:638)
+==27707==    by 0x548952F: VecAYPX (rvector.c:732)
+==27707==    by 0x64E94CF: KSPSolve_CG (cg.c:191)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x5430455: VecAYPX_Seq (dvec2.c:640)
+==27707==    by 0x548952F: VecAYPX (rvector.c:732)
+==27707==    by 0x64E94CF: KSPSolve_CG (cg.c:191)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x5430468: VecAYPX_Seq (dvec2.c:640)
+==27707==    by 0x548952F: VecAYPX (rvector.c:732)
+==27707==    by 0x64E94CF: KSPSolve_CG (cg.c:191)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E9A5B: KSPSolve_CG (cg.c:199)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E9A97: KSPSolve_CG (cg.c:199)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+==27707== Conditional jump or move depends on uninitialised value(s)
+==27707==    at 0x64E9ACF: KSPSolve_CG (cg.c:199)
+==27707==    by 0x6623132: KSPSolve (itfunc.c:760)
+==27707==    by 0x67CE28E: SNESSolve_NEWTONLS (ls.c:225)
+==27707==    by 0x673B2DB: SNESSolve (snes.c:4461)
+==27707==    by 0x1144C4: main (elasticity.c:93)
+==27707== 
+Vec Object: 1 MPI processes
+  type: seq
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+1.
+==27707== 
+==27707== HEAP SUMMARY:
+==27707==     in use at exit: 0 bytes in 0 blocks
+==27707==   total heap usage: 10,825 allocs, 10,825 frees, 11,699,978 bytes allocated
+==27707== 
+==27707== All heap blocks were freed -- no leaks are possible
+==27707== 
+==27707== For counts of detected and suppressed errors, rerun with: -v
+==27707== ERROR SUMMARY: 274 errors from 54 contexts (suppressed: 0 from 0)
