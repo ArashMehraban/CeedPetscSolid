@@ -35,8 +35,8 @@ typedef struct{
 // Problem specific data
 typedef struct {
   CeedInt           qdatasize;
-  CeedQFunctionUser setupgeo, apply, error;
-  const char        *setupgeofname, *applyfname, *errorfname;
+  CeedQFunctionUser setupgeo, apply, jacob, error;
+  const char        *setupgeofname, *applyfname, *jacobfname, *errorfname;
   CeedQuadMode      qmode;
   PetscErrorCode    (*bcs_func)(PetscInt, PetscReal, const PetscReal *, PetscInt, PetscScalar *, void *);
 }problemData;
@@ -45,7 +45,8 @@ problemData problemOptions[3] = {
   [ELAS_LIN] = {
       .qdatasize = 10, // For linear Elasticty we could do 6
       .setupgeo = SetupGeo,
-      .apply = LinElas,
+      .apply = LinElasF,
+      .jacob = LinElasdF,
       .error = Error,
       .setupgeofname = SetupGeo_loc,
       .applyfname = LinElasF_loc,
@@ -356,9 +357,9 @@ CeedInt      cStart, cEnd, nelem;
 Vec          coords;
 const PetscScalar *coordArray;
 PetscSection section;
-CeedVector   xcoord, qdata, xceed, yceed;
-CeedQFunction qf_setupgeo, qf_apply;
-CeedOperator op_setupgeo, op_apply;
+CeedVector   xcoord, qdata, gradu, xceed, yceed;
+CeedQFunction qf_setupgeo, qf_apply, qf_jacob;
+CeedOperator op_setupgeo, op_apply, op_jacob;
 
 PetscFunctionBeginUser;
 
@@ -426,7 +427,7 @@ CeedOperatorSetField(op_apply, "dv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_
 CeedOperatorSetField(op_apply, "gradu", Erestrictui, CEED_NOTRANSPOSE, basisu, gradu);
 
 // Create the QFunction and Operator that calculates the Jacobian
-CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].jacob,problemOptions[problemChoice].applyfname, &qf_apply);
+CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].jacob,problemOptions[problemChoice].jacobfname, &qf_jacob);
 CeedQFunctionAddInput(qf_jacob, "gradu", ncompu*dim, CEED_EVAL_NONE);
 CeedQFunctionAddInput(qf_jacob, "deltadu", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_jacob, "qdata", qdatasize, CEED_EVAL_NONE);
