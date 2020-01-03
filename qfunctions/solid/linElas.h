@@ -163,28 +163,28 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Cee
                                       };
      // *INDENT-ON*
 
-     //Compute graddeltadu
-     // Apply dXdx^-1 to deltadu = graddeltadu
-     CeedScalar graddeltadu[3][3];
+     //Compute graddeltau
+     // Apply dXdx^-1 to deltadu = graddeltau
+     CeedScalar graddeltau[3][3];
      for (int j=0; j<3; j++)
        for (int k=0; k<3; k++) {
-         graddeltadu[j][k] = 0;
+         graddeltau[j][k] = 0;
          for (int m=0; m<3; m++)
-           graddeltadu[j][k] += dXdx[j][m]*deltadu[k][m];
+           graddeltau[j][k] += dXdx[j][m]*deltadu[k][m];
        }
 
      // Compute Strain : e (epsilon)
      // e = 1/2 (grad u + (grad u)^T)
      // *INDENT-OFF*
-     const CeedScalar e[3][3]     =  {{(graddeltadu[0][0] + graddeltadu[0][0])*0.5,
-                                       (graddeltadu[0][1] + graddeltadu[1][0])*0.5,
-                                       (graddeltadu[0][2] + graddeltadu[2][0])*0.5},
-                                      {(graddeltadu[1][0] + graddeltadu[0][1])*0.5,
-                                       (graddeltadu[1][1] + graddeltadu[1][1])*0.5,
-                                       (graddeltadu[1][2] + graddeltadu[2][1])*0.5},
-                                      {(graddeltadu[2][0] + graddeltadu[0][2])*0.5,
-                                       (graddeltadu[2][1] + graddeltadu[1][2])*0.5,
-                                       (graddeltadu[2][2] + graddeltadu[2][2])*0.5}
+     const CeedScalar e[3][3]     =  {{(graddeltau[0][0] + graddeltau[0][0])*0.5,
+                                       (graddeltau[0][1] + graddeltau[1][0])*0.5,
+                                       (graddeltau[0][2] + graddeltau[2][0])*0.5},
+                                      {(graddeltau[1][0] + graddeltau[0][1])*0.5,
+                                       (graddeltau[1][1] + graddeltau[1][1])*0.5,
+                                       (graddeltau[1][2] + graddeltau[2][1])*0.5},
+                                      {(graddeltau[2][0] + graddeltau[0][2])*0.5,
+                                       (graddeltau[2][1] + graddeltau[1][2])*0.5,
+                                       (graddeltau[2][2] + graddeltau[2][2])*0.5}
                                      };
 
     // *INDENT-ON*
