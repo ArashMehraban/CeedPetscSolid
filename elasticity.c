@@ -111,7 +111,7 @@ int main(int argc, char **argv) {
   ierr = VecSet(U,1.0);CHKERRQ(ierr);
   //end delete
 
-  ierr = SNESSolve(snes,Delme,U); CHKERRQ(ierr);
+  ierr = SNESSolve(snes,F,U); CHKERRQ(ierr);
 
  //begin delete
    ierr = VecDestroy(&Delme); CHKERRQ(ierr);
