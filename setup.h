@@ -154,6 +154,7 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx){
   appCtx->problemChoice = ELAS_LIN; //-problem = Linear Elasticity if not given
   appCtx->degree = 0;
   appCtx->boundaryChoice = BDRY_WALL;
+  appCtx->forcingChoice = FORCE_NONE;
 
   PetscFunctionBeginUser;
 
