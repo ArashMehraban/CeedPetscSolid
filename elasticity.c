@@ -120,12 +120,7 @@ int main(int argc, char **argv) {
  //ierr = VecView(U,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 
 
-
-
-
-
-   //Free objects
-
+  //Free objects
   ierr = VecDestroy(&U); CHKERRQ(ierr);
   ierr = VecDestroy(&Uloc); CHKERRQ(ierr);
   ierr = VecDestroy(&R); CHKERRQ(ierr);

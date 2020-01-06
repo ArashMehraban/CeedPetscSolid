@@ -57,7 +57,6 @@ typedef struct {
   CeedQFunctionUser setupgeo, apply, jacob, error;
   const char        *setupgeofname, *applyfname, *jacobfname, *errorfname;
   CeedQuadMode      qmode;
-  PetscErrorCode    (*bcs_func)(PetscInt, PetscReal, const PetscReal *, PetscInt, PetscScalar *, void *);
 }problemData;
 
 problemData problemOptions[3] = {
@@ -71,8 +70,7 @@ problemData problemOptions[3] = {
       .applyfname = LinElasF_loc,
       .jacobfname = LinElasdF_loc,
       .errorfname = Error_loc,
-      .qmode = CEED_GAUSS,
-      .bcs_func = NULL // Drichlet of all 1's
+      .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_SS] = {
      // .qdatasize = 10,
@@ -83,7 +81,6 @@ problemData problemOptions[3] = {
      // .applyfname = HyperSS_loc,
      // .errorfname = Error_loc,
      // .qmode = CEED_GAUSS,
-     //  .bcs_func = NULL // Drichlet of all 1's
   },
   [ELAS_HYPER_FS] = {
      // .qdatasize = 10,
@@ -93,8 +90,7 @@ problemData problemOptions[3] = {
      // .setupgeofname = SetupGeo_loc,
      // .applyfname = HyperFS_loc,
      // .errorfname = Error_loc,
-     // .qmode = CEED_GAUSS,
-     //  .bcs_func = NULL // Drichlet of all 1's
+     // .qmode = CEED_GAUSS
     }
 };
 
@@ -310,6 +306,7 @@ static int SetupDMByDegree(DM dm, AppCtx *appCtx, PetscInt ncompu){
   //ierr = DMCreateDS(dm); CHKERRQ(ierr);
 
   // Add Dirichlet (Essential) boundray
+  ierr = DMCreateDS(dm); CHKERRQ(ierr);
   ierr = DMGetLabelIdIS(dm, name, &faceSetIS);CHKERRQ(ierr);
   ierr = ISGetLocalSize(faceSetIS,&numFaceSets);
   ierr = ISGetIndices(faceSetIS, &faceSetIds);CHKERRQ(ierr);
@@ -572,6 +569,7 @@ static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user){
     PetscFunctionBeginUser;
     ierr = DMGlobalToLocalBegin(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
     ierr = DMGlobalToLocalEnd(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
+    ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0,NULL,NULL,NULL); CHKERRQ(ierr);
     ierr = VecZeroEntries(user->Yloc); CHKERRQ(ierr);
 
     // Setup CEED vectors
@@ -636,7 +634,27 @@ static PetscErrorCode CreateMatrixFreeCtx(MPI_Comm comm, DM dm, Vec vloc, CeedDa
     PetscFunctionReturn(0);
 }
 
-//boundary Functions
+// boundary Functions
+//
+/* BCMMS boundary function explanation
+ss : (sideset)
+MMS: Boundary corresponding to the Method of Manufactured Solutions
+Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
+Also check ..\meshes\cyl-hol.8.jou
+
+ left: sideset 999
+ right: sideset 998
+ outer: sideset 997
+ inner: sideset 996
+  / \-------------------\              y
+ /   \                   \             |
+(  O  )                   )      x ____|
+ \   /                   /              \
+  \ /-------------------/                \ z
+
+ values on all points of the mesh is set beased on given solution below
+ on u[0], u[1], u[2]
+*/
 PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
                        PetscInt ncompu, PetscScalar *u, void *ctx) {
 
@@ -646,12 +664,29 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
 
   PetscFunctionBeginUser;
 
-  u[1]= exp(2*x)*sin(3*y)*cos(4*z);
-  u[2]= exp(3*y)*sin(4*z)*cos(2*x);
-  u[3]= exp(4*z)*sin(2*x)*cos(3*y);
+  u[0]= exp(2*x)*sin(3*y)*cos(4*z);
+  u[1]= exp(3*y)*sin(4*z)*cos(2*x);
+  u[2]= exp(4*z)*sin(2*x)*cos(3*y);
 
   PetscFunctionReturn(0);
 }
+/*BCBend2_ss boundary function explanation
+ss : (sideset)
+2_ss : two sides of the geometry
+Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
+Also check ..\meshes\cyl-hol.8.jou
+
+ left: sideset 999
+ right: sideset 998
+  / \-------------------\              y
+ /   \                   \             |
+(  O  )                   )      x ____|
+ \   /                   /              \
+  \ /-------------------/                \ z
+
+  0 values on the left side of the cyl-hole (sideset 999)
+ -1 values on y direction of the right side of the cyl-hole (sideset 999)
+*/
 PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time, const PetscReal coords[],
                        PetscInt ncompu, PetscScalar *u, void *ctx) {
 
@@ -659,30 +694,46 @@ PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time, const PetscReal coords[]
   PetscFunctionBeginUser;
 
   switch (*faceID){
-  case 999: //left of the cyl-hol
+  case 999: // left side of the cyl-hol
+    u[0]= 0;
     u[1]= 0;
     u[2]= 0;
-    u[3]= 0;
     break;
-   case 998:
-    u[1]= 1;
-    u[2]= 1;
-    u[3]= 1;
+   case 998: //right side of the cyl-hol
+    u[0]= 0;
+    u[1]= -1; //bend in the -y direction
+    u[2]= 0;
    break;
 }
   PetscFunctionReturn(0);
 }
+/*BCBend1_ss boundary function explanation
+ss : (sideset)
+1_ss : 1 side (left side) of the geometry
+Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
+Also check ..\meshes\cyl-hol.8.jou
+
+ left: sideset 999
+
+  / \-------------------\              y
+ /   \                   \             |
+(  O  )                   )      x ____|
+ \   /                   /              \
+  \ /-------------------/                \ z
+
+  0 values on the left side of the cyl-hole (sideset 999)
+*/
 PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time, const PetscReal coords[],
                        PetscInt ncompu, PetscScalar *u, void *ctx) {
 
   PetscFunctionBeginUser;
 
+  u[0]= 0;
   u[1]= 0;
   u[2]= 0;
-  u[3]= 0;
 
   PetscFunctionReturn(0);
 }
 
 
-#endif
+#endif setup_h
