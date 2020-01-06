@@ -18,6 +18,14 @@ typedef enum {  //SmallStrain      FiniteStrain
 } problemType;
 static const char *const problemTypes[] = {"linElas","hyperSS","hyperFS", "problemType","ELAS_",0};
 
+typedef enum{
+   BDRY_WALL = 0, BDRY_WALL_FORCE = 1 , BDRY_MMS = 2
+}boundaryType;
+static const char *const boundaryTypes[] = {"wall","force","mms", "boundaryType","BDRY_",0};
+
+typedef PetscErrorCode BCFunc(PetscInt, PetscReal, const PetscReal*, PetscInt, PetscScalar*, void*);
+BCFunc BCBend1_ss, BCBend2_ss, BCMMS;
+BCFunc* boundaryOptions[] = {BCBend1_ss, BCBend2_ss, BCMMS};
 // -----------------------------------------------------------------------------
 // Structs
 // -----------------------------------------------------------------------------
@@ -26,6 +34,7 @@ typedef struct{
   char          meshFile[PETSC_MAX_PATH_LEN]; // exodusII mesh file
   problemType   problemChoice;
   PetscInt      degree;
+  boundaryType  boundaryChoice;
 }AppCtx;
 
 
@@ -109,8 +118,10 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx){
   PetscErrorCode ierr;
   PetscBool meshFileFlag = PETSC_FALSE;
   PetscBool degreeFalg = PETSC_FALSE;
+  PetscBool boundaryFlag = PETSC_FALSE;
   appCtx->problemChoice = ELAS_LIN; //-problem = Linear Elasticity if not given
   appCtx->degree = 0;
+  appCtx->boundaryChoice = BDRY_WALL;
 
   PetscFunctionBeginUser;
 
@@ -129,6 +140,9 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx){
                           (PetscEnum)appCtx->problemChoice,(PetscEnum *)&appCtx->problemChoice, NULL); CHKERRQ(ierr);
 
 
+ ierr = PetscOptionsEnum("-boundary", "Set Dirichlet (Essential) Boundary option", NULL, boundaryTypes,
+                (PetscEnum)appCtx->boundaryChoice,(PetscEnum *)&appCtx->boundaryChoice, &boundaryFlag); CHKERRQ(ierr);
+
   ierr = PetscOptionsEnd(); CHKERRQ(ierr);//End of setting AppCtx
   if(!degreeFalg){
       ierr = PetscPrintf(comm, "-degree option needed\n\n");CHKERRQ(ierr);
@@ -138,7 +152,10 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx){
       ierr = PetscPrintf(comm, "-mesh option needed (file)\n\n");CHKERRQ(ierr);
       SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
   }
-
+  if(!boundaryFlag){
+      ierr = PetscPrintf(comm, "-boundary option needed\n\n");CHKERRQ(ierr);
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
+  }
 PetscFunctionReturn(0);
 }
 
@@ -208,7 +225,7 @@ static int SetupDMByDegree(DM dm, AppCtx *appCtx, PetscInt ncompu){
  // For Dirichlet (Essential) Boundary
  IS              faceSetIS;         //Index Set for Face Sets
  const char      *name="Face Sets"; //PETSc internal requirement
- PetscInt        numFaceSet;        //Number of FaceSets in faceSetIS
+ PetscInt        numFaceSets;        //Number of FaceSets in faceSetIS
  const PetscInt  *faceSetIds;       //id of each FaceSet
 
  PetscFunctionBeginUser;
@@ -255,12 +272,16 @@ static int SetupDMByDegree(DM dm, AppCtx *appCtx, PetscInt ncompu){
   ierr = DMSetFromOptions(dm); CHKERRQ(ierr);
   ierr = DMAddField(dm, NULL, (PetscObject)fe); CHKERRQ(ierr);
   //ierr = DMCreateDS(dm); CHKERRQ(ierr);
+
   // Add Dirichlet (Essential) boundray
   ierr = DMGetLabelIdIS(dm, name, &faceSetIS);CHKERRQ(ierr);
-  ierr = ISGetLocalSize(faceSetIS,&numFaceSet);
+  ierr = ISGetLocalSize(faceSetIS,&numFaceSets);
   ierr = ISGetIndices(faceSetIS, &faceSetIds);CHKERRQ(ierr);
-  ierr = DMAddBoundary(dm,DM_BC_ESSENTIAL,NULL,"Face Sets",0,0,NULL,
-                 (void(*)(void))problemOptions[appCtx->problemChoice].bcs_func,numFaceSet,faceSetIds,NULL);CHKERRQ(ierr);
+
+  for (PetscInt i=0; i<numFaceSets; i++){
+    ierr = DMAddBoundary(dm,DM_BC_ESSENTIAL,NULL,"Face Sets",0,0,NULL,
+        (void(*)(void))boundaryOptions[appCtx->boundaryChoice],1,&faceSetIds[i],(void *)(&faceSetIds[i]));CHKERRQ(ierr);
+   }
   ierr = ISRestoreIndices(faceSetIS, &faceSetIds);CHKERRQ(ierr);
   ierr = ISDestroy(&faceSetIS);CHKERRQ(ierr);
   ierr = DMPlexSetClosurePermutationTensor(dm, PETSC_DETERMINE, NULL); CHKERRQ(ierr);
@@ -507,9 +528,9 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ptr) {
 
   PetscFunctionBeginUser;
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
-  ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
-  PetscPrintf(PETSC_COMM_WORLD, "\n\n X: \n\n");
-  ierr = VecView(Y,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+  // ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+  // PetscPrintf(PETSC_COMM_WORLD, "\n\n X: \n\n");
+  // ierr = VecView(Y,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
 }
@@ -541,5 +562,54 @@ static PetscErrorCode CreateMatrixFreeCtx(MPI_Comm comm, DM dm, Vec vloc, CeedDa
     jacobianCtx->op = ceeddata->op_jacob;
     PetscFunctionReturn(0);
 }
+
+//boundary Functions
+PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
+                       PetscInt ncompu, PetscScalar *u, void *ctx) {
+
+  PetscScalar x = coords[0];
+  PetscScalar y = coords[1];
+  PetscScalar z = coords[2];
+
+  PetscFunctionBeginUser;
+
+  u[1]= exp(2*x)*sin(3*y)*cos(4*z);
+  u[2]= exp(3*y)*sin(4*z)*cos(2*x);
+  u[3]= exp(4*z)*sin(2*x)*cos(3*y);
+
+  PetscFunctionReturn(0);
+}
+PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time, const PetscReal coords[],
+                       PetscInt ncompu, PetscScalar *u, void *ctx) {
+
+  PetscInt* faceID = (PetscInt*)ctx;
+  PetscFunctionBeginUser;
+
+  switch (*faceID){
+  case 999: //left of the cyl-hol
+    u[1]= 0;
+    u[2]= 0;
+    u[3]= 0;
+    break;
+   case 998:
+    u[1]= 1;
+    u[2]= 1;
+    u[3]= 1;
+   break;
+}
+  PetscFunctionReturn(0);
+}
+PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time, const PetscReal coords[],
+                       PetscInt ncompu, PetscScalar *u, void *ctx) {
+
+  PetscFunctionBeginUser;
+
+  u[1]= 0;
+  u[2]= 0;
+  u[3]= 0;
+
+  PetscFunctionReturn(0);
+}
+
 
 #endif

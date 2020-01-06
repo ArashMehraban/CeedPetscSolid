@@ -1,0 +1,32 @@
+[
+ {
+  "directory": "/home/arash/math/libCEED/examples/solid-mechanic", 
+  "arguments": [
+   "mpicc", 
+   "-std=c99", 
+   "-fPIC", 
+   "-Wall", 
+   "-Wwrite-strings", 
+   "-Wno-strict-aliasing", 
+   "-Wno-unknown-pragmas", 
+   "-fstack-protector", 
+   "-fvisibility=hidden", 
+   "-g3", 
+   "-D__DIR__=\"/home/arash/math/libCEED/examples/solid-mechanic/\"", 
+   "-I/home/arash/math/petsc-3.12/petsc/arch-linux2-c-debug/include", 
+   "-I/home/arash/math/petsc-3.12/petsc/include", 
+   "-I/home/arash/math/libCEED/include", 
+   "-L/home/arash/math/petsc-3.12/petsc/arch-linux2-c-debug/lib", 
+   "-L/home/arash/math/libCEED/lib", 
+   "-Wl,-rpath,/home/arash/math/petsc-3.12/petsc/arch-linux2-c-debug/lib", 
+   "-Wl,-rpath,/home/arash/math/libCEED/lib", 
+   "/home/arash/math/libCEED/examples/solid-mechanic/elasticity.c", 
+   "-o", 
+   "elasticity", 
+   "-lpetsc", 
+   "-lceed", 
+   "-lm"
+  ], 
+  "file": "/home/arash/math/libCEED/examples/solid-mechanic/elasticity.c"
+ }
+]
