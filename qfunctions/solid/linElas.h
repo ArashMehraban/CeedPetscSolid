@@ -1,11 +1,14 @@
 #ifndef __LIN_ELAS__H
 #define __LIN_ELAS__H
 
-    typedef struct Physics_private *Physics;
-    struct Physics_private{
-      PetscScalar   nu;      //Poisson's ratio
-      PetscScalar   E;       //Young's Modulus
-    };
+#ifndef PHYSICS_STRUCT
+#define PHYSICS_STRUCT
+typedef struct Physics_private *Physics;
+struct Physics_private{
+  PetscScalar   nu;      //Poisson's ratio
+  PetscScalar   E;       //Young's Modulus
+};
+#endif
 
 // -----------------------------------------------------------------------------
 CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out) {

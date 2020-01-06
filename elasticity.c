@@ -15,9 +15,9 @@ int main(int argc, char **argv) {
   AppCtx      appCtx; //contains polinomial basis degree, problem choice & mesh filename
   Physics     phys;   //contains nu and E
   DM          dm;
-  PetscInt    ncompu = 3;        // 3 dofs in 3D
-  Vec         U, Uloc, R, Rloc;  // loc: Local R:Residual
-  PetscInt    Ugsz,Ulsz,Ulocsz;  // g:global, sz: size
+  PetscInt    ncompu = 3;                 // 3 dofs in 3D
+  Vec         U, Uloc, R, Rloc, F, Floc;  // loc: Local R:Residual
+  PetscInt    Ugsz, Ulsz, Ulocsz;         // g:global, sz: size
   UserMult    resCtx, jacobCtx;;
   Mat         mat;
   //Ceed constituents
@@ -52,13 +52,34 @@ int main(int argc, char **argv) {
   ierr = VecGetSize(Uloc, &Ulocsz); CHKERRQ(ierr); //For libCeed
 
   ierr = VecDuplicate(U, &R); CHKERRQ(ierr);
+  ierr = VecDuplicate(U, &F); CHKERRQ(ierr);
+  ierr = VecZeroEntries(Uloc); CHKERRQ(ierr);
   ierr = VecDuplicate(Uloc, &Rloc); CHKERRQ(ierr);
-  ierr = VecZeroEntries(Rloc); CHKERRQ(ierr);
 
   // Set up libCEED
   CeedInit(ceedresource, &ceed);
   ierr = PetscCalloc1(1, &ceeddata); CHKERRQ(ierr);
-  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz,Ulocsz);CHKERRQ(ierr);
+  // Create local forcing vector
+  CeedVector forceceed;
+  CeedScalar *f;
+  if (appCtx.forcingChoice != FORCE_NONE) {
+    ierr = VecDuplicate(Uloc, &Floc); CHKERRQ(ierr);
+    CeedVectorCreate(ceed, Ulocsz, &forceceed);
+    ierr = VecGetArray(Floc, &f); CHKERRQ(ierr);
+    CeedVectorSetArray(forceceed, CEED_MEM_HOST, CEED_USE_POINTER, f);
+  }
+  // libCEED objects setup
+  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz, Ulocsz, forceceed);CHKERRQ(ierr);
+  // Setup global forcing vector
+  ierr = VecZeroEntries(F); CHKERRQ(ierr);
+  if (appCtx.forcingChoice != FORCE_NONE) {
+    ierr = VecRestoreArray(Floc, &f); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalBegin(dm, Floc, ADD_VALUES, F); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalEnd(dm, Floc, ADD_VALUES, F); CHKERRQ(ierr);
+    CeedVectorDestroy(&forceceed);
+    ierr = VecDestroy(&Floc); CHKERRQ(ierr);
+  }
+  // Setup SNES
   ierr = SNESCreate(comm, &snes); CHKERRQ(ierr);
   ierr = PetscMalloc1(1, &resCtx); CHKERRQ(ierr);
   // Jacobian context
@@ -109,6 +130,7 @@ int main(int argc, char **argv) {
   ierr = VecDestroy(&Uloc); CHKERRQ(ierr);
   ierr = VecDestroy(&R); CHKERRQ(ierr);
   ierr = VecDestroy(&Rloc); CHKERRQ(ierr);
+  ierr = VecDestroy(&F); CHKERRQ(ierr);
   ierr = VecDestroy(&resCtx->Yloc); CHKERRQ(ierr);
   ierr = MatDestroy(&mat); CHKERRQ(ierr);
   ierr = DMDestroy(&dm); CHKERRQ(ierr);

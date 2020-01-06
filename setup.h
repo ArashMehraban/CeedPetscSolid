@@ -11,12 +11,20 @@
 #include "qfunctions/solid/linElas.h" //Linear Elasticity
 #include "qfunctions/solid/hyperSS.h" //Hyperelasticity Small SmallStrain
 #include "qfunctions/solid/hyperFS.h" //Hyperelasticity Small FiniteStrain
+#include "qfunctions/solid/constantForce.h"     // Constant forcing function
+#include "qfunctions/solid/manufacturedForce.h" // Manufactured solution
 
 // Problem options
 typedef enum {  //SmallStrain      FiniteStrain
   ELAS_LIN = 0, ELAS_HYPER_SS = 1, ELAS_HYPER_FS = 2
 } problemType;
 static const char *const problemTypes[] = {"linElas","hyperSS","hyperFS", "problemType","ELAS_",0};
+
+// Forcing function options
+typedef enum {
+  FORCE_NONE = 0, FORCE_CONST = 1, FORCE_MMS = 2
+} forcingType;
+static const char *const forcingTypes[] = {"none","constant","manufactured","FORCE_",0};
 
 // -----------------------------------------------------------------------------
 // Structs
@@ -25,6 +33,7 @@ static const char *const problemTypes[] = {"linElas","hyperSS","hyperFS", "probl
 typedef struct{
   char          meshFile[PETSC_MAX_PATH_LEN]; // exodusII mesh file
   problemType   problemChoice;
+  forcingType   forcingChoice;
   PetscInt      degree;
 }AppCtx;
 
@@ -79,6 +88,28 @@ problemData problemOptions[3] = {
     }
 };
 
+// Forcing function data
+
+typedef struct{
+  CeedQFunctionUser setupforcing;
+  const char        *setupforcingfname;
+}forcingData;
+
+forcingData forcingOptions[3] = {
+  [FORCE_NONE] = {
+      .setupforcing = NULL,
+      .setupforcingfname = NULL
+  },
+  [FORCE_CONST] = {
+      .setupforcing = SetupConstantForce,
+      .setupforcingfname = SetupConstantForce_loc
+  },
+  [FORCE_MMS] = {
+      .setupforcing = SetupMMSForce,
+      .setupforcingfname = SetupMMSForce_loc
+  }
+};
+
 // Data for PETSc Matshell
 typedef struct UserMult_private *UserMult;
 struct UserMult_private {
@@ -98,7 +129,7 @@ struct CeedData_private {
   CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui, Erestrictqdi, ErestrictGradui;
   CeedQFunction       qf_apply, qf_jacob;
   CeedOperator        op_apply, op_jacob, op_restrict, op_interp;
-  CeedVector          qdata, gradu, xceed, yceed;
+  CeedVector          qdata, gradu, xceed, yceed, truesolution;
 };
 
 // -----------------------------------------------------------------------------
@@ -127,6 +158,9 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx){
 
   ierr = PetscOptionsEnum("-problem", "Solves Elasticity & Hyperelasticity Problems", NULL, problemTypes,
                           (PetscEnum)appCtx->problemChoice,(PetscEnum *)&appCtx->problemChoice, NULL); CHKERRQ(ierr);
+
+  ierr = PetscOptionsEnum("-forcing", "Set forcing function option", NULL, forcingTypes,
+                          (PetscEnum)appCtx->forcingChoice,(PetscEnum *)&appCtx->forcingChoice, NULL); CHKERRQ(ierr);
 
 
   ierr = PetscOptionsEnd(); CHKERRQ(ierr);//End of setting AppCtx
@@ -277,6 +311,7 @@ static PetscErrorCode CeedDataDestroy(CeedInt i, CeedData data) {
   CeedVectorDestroy(&data->gradu);
   CeedVectorDestroy(&data->xceed);
   CeedVectorDestroy(&data->yceed);
+  CeedVectorDestroy(&data->truesolution);
   CeedBasisDestroy(&data->basisx);
   CeedBasisDestroy(&data->basisu);
   CeedElemRestrictionDestroy(&data->Erestrictu);
@@ -343,11 +378,12 @@ static int CreateRestrictionPlex(Ceed ceed, CeedInt P, CeedInt ncomp, CeedElemRe
 
 //Set up libCEED for a given degree
 static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys, CeedData data, PetscInt ncompu,
-                                PetscInt Ugsz,PetscInt Ulocsz){
+                                PetscInt Ugsz, PetscInt Ulocsz, CeedVector forceceed){
 
 int          ierr;
 CeedInt      degree = appCtx->degree;
 problemType  problemChoice = appCtx->problemChoice;
+forcingType  forcingChoice = appCtx->forcingChoice;
 CeedInt      qdatasize = problemOptions[appCtx->problemChoice].qdatasize;
 CeedInt      P, Q;
 CeedInt      dim, ncompx;
@@ -443,6 +479,41 @@ CeedOperatorSetField(op_jacob, "gradu", ErestrictGradui, CEED_NOTRANSPOSE, CEED_
 
 // Compute the quadrature data
 CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
+
+  // Set up forcing term, if needed
+  if (forcingChoice != FORCE_NONE) {
+    CeedQFunction qf_setupforce;
+    CeedOperator op_setupforce;
+    if (forcingChoice == FORCE_MMS)
+      CeedVectorCreate(ceed, nelem*nqpts*ncompu, &(data->truesolution));
+
+    // Create the q-function that sets up the forcing vector (and true solution for MMS)
+    CeedQFunctionCreateInterior(ceed, 1, forcingOptions[forcingChoice].setupforcing, forcingOptions[forcingChoice].setupforcingfname, &qf_setupforce);
+    CeedQFunctionAddInput(qf_setupforce, "dx", ncompx*dim, CEED_EVAL_GRAD);
+    CeedQFunctionAddInput(qf_setupforce, "weight", 1, CEED_EVAL_WEIGHT);
+    CeedQFunctionAddInput(qf_setupforce, "x", dim, CEED_EVAL_INTERP);
+    CeedQFunctionAddOutput(qf_setupforce, "rhs", ncompu, CEED_EVAL_INTERP);
+    if (forcingChoice == FORCE_MMS)
+      CeedQFunctionAddOutput(qf_setupforce, "true_soln", ncompu, CEED_EVAL_NONE);
+    CeedQFunctionSetContext(qf_setupforce, &phys, sizeof(phys));
+
+    // Create the operator that builds the forcing vector (and true solution for MMS)
+    CeedOperatorCreate(ceed, qf_setupforce, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_setupforce);
+    CeedOperatorSetField(op_setupforce, "dx", Erestrictx, CEED_TRANSPOSE, basisx, CEED_VECTOR_ACTIVE);
+    CeedOperatorSetField(op_setupforce, "weight", Erestrictxi, CEED_NOTRANSPOSE, basisx, CEED_VECTOR_NONE);
+    CeedOperatorSetField(op_setupforce, "x", Erestrictx, CEED_TRANSPOSE, basisx, CEED_VECTOR_ACTIVE);
+    CeedOperatorSetField(op_setupforce, "rhs", Erestrictu, CEED_TRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+    if (forcingChoice == FORCE_MMS)
+      CeedOperatorSetField(op_setupforce, "true_soln", Erestrictui, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, data->truesolution);
+
+    // Setup forcing vector (and true solution, for MMS)
+    CeedOperatorApply(op_setupforce, xcoord, forceceed, CEED_REQUEST_IMMEDIATE);
+    CeedVectorSyncArray(forceceed, CEED_MEM_HOST);
+
+    // Cleanup
+    CeedQFunctionDestroy(&qf_setupforce);
+    CeedOperatorDestroy(&op_setupforce);
+  }
 
   // Cleanup
   CeedQFunctionDestroy(&qf_setupgeo);
