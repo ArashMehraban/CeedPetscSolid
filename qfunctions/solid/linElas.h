@@ -108,6 +108,7 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
       };
 
      // Apply dXdx^-T and weight
+
      for (int j=0; j<3; j++)
        for (int k=0; k<3; k++) {
          vg[j][k][i] = 0;

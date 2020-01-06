@@ -117,7 +117,7 @@ int main(int argc, char **argv) {
    ierr = VecDestroy(&Delme); CHKERRQ(ierr);
  //end delete
 
- ierr = VecView(U,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
+ //ierr = VecView(U,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 
 
 
