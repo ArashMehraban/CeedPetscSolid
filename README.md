@@ -20,11 +20,11 @@ To run, `./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -bound
 
 Example: `./elasticity -mesh ./meshes/cyl-hole_632e_4ss_us.exo -degree 2 -nu .3 -E 10e6 -boundary wall -forcing manufactured`
 
-See figure `..\meshes\surface999-9.png`:
+See figure `\meshes\surface999-9.png`:
 
-`4ss` means all 4 sides of surface999-9.png. `manufactured` is used with 4ss
+`4ss` means all 4 sides of `surface999-9.png`. `manufactured` is used with `4ss`
 
-`2ss` means left and right sides of surface999-9.png. `none` could be used with `2ss`
+`2ss` means left and right sides of `surface999-9.png`. `none` or `constant` could be used as forcing functions
 
 
 ### CEED/PETSc Hyperelasticity at small strain problem
@@ -36,9 +36,9 @@ To run, `./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -probl
 Example: `./elasticity -mesh ./meshes/cyl-hole_632e_2ss_us.exo -degree 2 -nu .3 -E 10e6 -problem hyperSS
 -boundary wall -forcing none`
 
-See figure `..\meshes\surface999-9.png`.
+See figure `\meshes\surface999-9.png`.
 
-`2ss` means left and right sides of that mesh. `none` could be used as forcing function  
+`2ss` means left and right sides of `surface999-9.png`. `none` or `constant` could be used as forcing functions  
 
 ### CEED/PETSc Hyperelasticity at finite strain problem
 
@@ -49,6 +49,6 @@ To run, `./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -probl
 Example: `./elasticity -mesh ./meshes/cyl-hole_632e_2ss_us.exo -degree 2 -nu .3 -E 10e6 -problem hyperFS
 -boundary wall -forcing none`
 
-See figure `..\meshes\surface999-9.png`.
+See figure `\meshes\surface999-9.png`.
 
-`1ss` means left side of surface999-9.png. `constant` could be used as forcing function  
+`1ss` means left side of `surface999-9.png`. `none` or `constant` could be used as forcing functions  
