@@ -24,12 +24,12 @@ static const char *const problemTypes[] = {"linElas","hyperSS","hyperFS", "probl
 typedef enum {
   FORCE_NONE = 0, FORCE_CONST = 1, FORCE_MMS = 2
 } forcingType;
-static const char *const forcingTypes[] = {"none","constant","manufactured","FORCE_",0};
+static const char *const forcingTypes[] = {"none","constant","mms","forcingType","FORCE_",0};
 
 typedef enum{
-   BDRY_WALL = 0, BDRY_WALL_FORCE = 1 , BDRY_MMS = 2
+   BDRY_WALL_NONE = 0, BDRY_WALL_WEIGHT = 1 , BDRY_MMS = 2
 }boundaryType;
-static const char *const boundaryTypes[] = {"wall","force","mms", "boundaryType","BDRY_",0};
+static const char *const boundaryTypes[] = {"wall_none","wall_weight","mms", "boundaryType","BDRY_",0};
 
 typedef PetscErrorCode BCFunc(PetscInt, PetscReal, const PetscReal*, PetscInt, PetscScalar*, void*);
 BCFunc BCBend1_ss, BCBend2_ss, BCMMS;
@@ -149,7 +149,7 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx){
   PetscBool boundaryFlag = PETSC_FALSE;
   appCtx->problemChoice = ELAS_LIN; //-problem = Linear Elasticity if not given
   appCtx->degree = 0;
-  appCtx->boundaryChoice = BDRY_WALL;
+  appCtx->boundaryChoice = BDRY_WALL_NONE;
   appCtx->forcingChoice = FORCE_NONE;
 
   PetscFunctionBeginUser;
@@ -578,12 +578,9 @@ static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user){
 
     PetscFunctionBeginUser;
     ierr = DMGlobalToLocalBegin(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
-    //ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);
-    ierr = DMGlobalToLocalEnd(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
-    ierr = VecView(user->Xloc,PETSC_VIEWER_STDOUT_WORLD);
 
-    PetscPrintf(PETSC_COMM_WORLD, "user->Xloc after boundary:\n\n");
-    //ierr = VecView(user->Xloc,PETSC_VIEWER_STDOUT_WORLD);
+    ierr = DMGlobalToLocalEnd(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
+
     ierr = VecZeroEntries(user->Yloc); CHKERRQ(ierr);
 
     // Setup CEED vectors
@@ -614,9 +611,6 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ptr) {
   PetscFunctionBeginUser;
   ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0,NULL,NULL,NULL); CHKERRQ(ierr);
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
-  // ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
-  // PetscPrintf(PETSC_COMM_WORLD, "\n\n X: \n\n");
-  // ierr = VecView(Y,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
 }

@@ -27,9 +27,6 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
    const CeedScalar E  = context->E;
    const CeedScalar nu = context->nu;
 
-   PetscPrintf(PETSC_COMM_WORLD, "nu in LinElasF(): %g\n", nu);
-   PetscPrintf(PETSC_COMM_WORLD, "E in LinElasF(): %g\n", E);
-
    // Quadrature Point Loop
      CeedPragmaSIMD
      for (CeedInt i=0; i<Q; i++) {
@@ -104,9 +101,9 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
     //Above Voigt Notation is placed in a 3x3 matrix:
      const CeedScalar ss          =  E/((1+nu)*(1-2*nu));
      const CeedScalar sigma[3][3] =
-      { {ss*((1-nu)*e[1][1] + nu*e[2][2] +nu*e[3][3]), ss*(1-2*nu)*e[1][2]/2, ss*(1-2*nu)*e[1][3]/2},
-        {ss*(1-2*nu)*e[2][1]/2, ss*(nu*e[1][1] + (1-nu)*e[2][2] +nu*e[3][3]), ss*(1-2*nu)*e[2][3]/2},
-        {ss*(1-2*nu)*e[3][1]/2, ss*(1-2*nu)*e[3][2]/2, ss*(nu*e[1][1] + nu*e[2][2] +(1-nu)*e[3][3])}
+      { {ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]), ss*(1-2*nu)*e[0][1]/2, ss*(1-2*nu)*e[0][2]/2},
+        {ss*(1-2*nu)*e[1][0]/2, ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]), ss*(1-2*nu)*e[1][2]/2},
+        {ss*(1-2*nu)*e[2][0]/2, ss*(1-2*nu)*e[2][1]/2, ss*(nu*e[0][0] + nu*e[1][1] +(1-nu)*e[2][2])}
       };
 
      // Apply dXdx^-T and weight
@@ -214,10 +211,10 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Cee
     //Above Voigt Notation is placed in a 3x3 matrix:
      const CeedScalar ss          =  E/((1+nu)*(1-2*nu));
      const CeedScalar sigma[3][3] =
-      { {ss*((1-nu)*e[1][1] + nu*e[2][2] +nu*e[3][3]), ss*(1-2*nu)*e[1][2]/2, ss*(1-2*nu)*e[1][3]/2},
-        {ss*(1-2*nu)*e[2][1]/2, ss*(nu*e[1][1] + (1-nu)*e[2][2] +nu*e[3][3]), ss*(1-2*nu)*e[2][3]/2},
-        {ss*(1-2*nu)*e[3][1]/2, ss*(1-2*nu)*e[3][2]/2, ss*(nu*e[1][1] + nu*e[2][2] +(1-nu)*e[3][3])}
-      };
+     { {ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]), ss*(1-2*nu)*e[0][1]/2, ss*(1-2*nu)*e[0][2]/2},
+       {ss*(1-2*nu)*e[1][0]/2, ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]), ss*(1-2*nu)*e[1][2]/2},
+       {ss*(1-2*nu)*e[2][0]/2, ss*(1-2*nu)*e[2][1]/2, ss*(nu*e[0][0] + nu*e[1][1] +(1-nu)*e[2][2])}
+     };
 
      // Apply dXdx^-T and weight
      for (int j=0; j<3; j++)

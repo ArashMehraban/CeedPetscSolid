@@ -18,7 +18,7 @@ To build, run `make`
 
 To run, `./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -boundary [boundary] -forcing [forcing]`
 
-Example: `./elasticity -mesh ./meshes/cyl-hole_632e_4ss_us.exo -degree 2 -nu .3 -E 10e6 -boundary wall -forcing manufactured`
+Example: `./elasticity -mesh ./meshes/cyl-hole_632e_4ss_us.exo -degree 2 -nu .3 -E 1e6 -boundary wall -forcing manufactured`
 
 See figure `\meshes\surface999-9.png`:
 
@@ -33,7 +33,7 @@ To build, run `make`
 
 To run, `./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -problem [hyperSS] -boundary [boundary] -forcing [forcing]`
 
-Example: `./elasticity -mesh ./meshes/cyl-hole_632e_2ss_us.exo -degree 2 -nu .3 -E 10e6 -problem hyperSS
+Example: `./elasticity -mesh ./meshes/cyl-hole_632e_2ss_us.exo -degree 2 -nu .3 -E 1e6 -problem hyperSS
 -boundary wall -forcing none`
 
 See figure `\meshes\surface999-9.png`.
@@ -46,7 +46,7 @@ To build, run `make`
 
 To run, `./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -problem [hyperFS] -boundary [boundary] -forcing [forcing]`
 
-Example: `./elasticity -mesh ./meshes/cyl-hole_632e_2ss_us.exo -degree 2 -nu .3 -E 10e6 -problem hyperFS
+Example: `./elasticity -mesh ./meshes/cyl-hole_632e_2ss_us.exo -degree 2 -nu .3 -E 1e6 -problem hyperFS
 -boundary wall -forcing none`
 
 See figure `\meshes\surface999-9.png`.

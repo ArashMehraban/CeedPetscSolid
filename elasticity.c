@@ -97,27 +97,12 @@ int main(int argc, char **argv) {
     KSP ksp;
     ierr = SNESGetKSP(snes,&ksp); CHKERRQ(ierr);
     ierr = KSPSetType(ksp, KSPCG); CHKERRQ(ierr);
-    //ierr = KSPSetOperators(ksp,mat,mat);CHKERRQ(ierr);
     ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
     ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr); //For Now No Preconditioner
     ierr = KSPSetFromOptions(ksp);
   }
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
-
-  //begin delete
-  Vec Delme;
-  ierr = VecDuplicate(U, &Delme); CHKERRQ(ierr);
-  ierr = VecSet(Delme,1.0);CHKERRQ(ierr);
-  ierr = VecSet(U,1.0);CHKERRQ(ierr);
-  //end delete
-
   ierr = SNESSolve(snes,F,U); CHKERRQ(ierr);
-
- //begin delete
-   ierr = VecDestroy(&Delme); CHKERRQ(ierr);
- //end delete
-
- //ierr = VecView(U,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
 
 
   //Free objects
