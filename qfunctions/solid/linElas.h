@@ -3,11 +3,11 @@
 
 #ifndef PHYSICS_STRUCT
 #define PHYSICS_STRUCT
-typedef struct Physics_private *Physics;
-struct Physics_private{
-  PetscScalar   nu;      //Poisson's ratio
-  PetscScalar   E;       //Young's Modulus
-};
+    typedef struct Physics_private *Physics;
+    struct Physics_private{
+      PetscScalar   nu;      //Poisson's ratio
+      PetscScalar   E;       //Young's Modulus
+    };
 #endif
 
 // -----------------------------------------------------------------------------
@@ -27,6 +27,9 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
    const CeedScalar E  = context->E;
    const CeedScalar nu = context->nu;
 
+   PetscPrintf(PETSC_COMM_WORLD, "nu in LinElasF(): %g\n", nu);
+   PetscPrintf(PETSC_COMM_WORLD, "E in LinElasF(): %g\n", E);
+
    // Quadrature Point Loop
      CeedPragmaSIMD
      for (CeedInt i=0; i<Q; i++) {
@@ -42,7 +45,6 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
                                        ug[2][1][i],
                                        ug[2][2][i]}
                                      };
-
        // -- Qdata
        const CeedScalar wJ         =    qdata[0][i];
        const CeedScalar dXdx[3][3] =  {{qdata[1][i],
@@ -108,7 +110,6 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
       };
 
      // Apply dXdx^-T and weight
-
      for (int j=0; j<3; j++)
        for (int k=0; k<3; k++) {
          vg[j][k][i] = 0;

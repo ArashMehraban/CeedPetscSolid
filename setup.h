@@ -467,7 +467,9 @@ CeedQFunctionAddInput(qf_setupgeo, "dx", ncompx*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_setupgeo, "weight", 1, CEED_EVAL_WEIGHT);
 CeedQFunctionAddOutput(qf_setupgeo, "qdata", qdatasize, CEED_EVAL_NONE);
 CeedOperatorCreate(ceed, qf_setupgeo, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_setupgeo);
-CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, CEED_NOTRANSPOSE, basisx, xcoord);
+//anything read from PETSc we use CEED_TRANSPOSE ([node][compu] in PETSc is considered transpose of [node][compu] in CEED )
+//field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
+CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, CEED_TRANSPOSE, basisx, xcoord);
 CeedOperatorSetField(op_setupgeo, "weight", Erestrictx, CEED_NOTRANSPOSE, basisx, CEED_VECTOR_NONE);
 CeedOperatorSetField(op_setupgeo, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
 
@@ -477,11 +479,13 @@ CeedQFunctionAddInput(qf_apply, "du", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_apply, "qdata", qdatasize, CEED_EVAL_NONE);
 CeedQFunctionAddOutput(qf_apply, "dv", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddOutput(qf_apply, "gradu", ncompu*dim, CEED_EVAL_NONE);
-CeedQFunctionSetContext(qf_apply, &phys, sizeof(phys));
+CeedQFunctionSetContext(qf_apply, phys, sizeof(phys));
 CeedOperatorCreate(ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_apply);
-CeedOperatorSetField(op_apply, "du", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+//field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
+CeedOperatorSetField(op_apply, "du", Erestrictu, CEED_TRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 CeedOperatorSetField(op_apply, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
-CeedOperatorSetField(op_apply, "dv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+//field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
+CeedOperatorSetField(op_apply, "dv", Erestrictu, CEED_TRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 CeedOperatorSetField(op_apply, "gradu", ErestrictGradui, CEED_NOTRANSPOSE, basisu, gradu);
 
 // Create the QFunction and Operator that calculates the Jacobian
@@ -490,15 +494,21 @@ CeedQFunctionAddInput(qf_jacob, "deltadu", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_jacob, "qdata", qdatasize, CEED_EVAL_NONE);
 CeedQFunctionAddInput(qf_jacob, "gradu", ncompu*dim, CEED_EVAL_NONE);
 CeedQFunctionAddOutput(qf_jacob, "deltadv", ncompu*dim, CEED_EVAL_GRAD);
-CeedQFunctionSetContext(qf_jacob, &phys, sizeof(phys));
+CeedQFunctionSetContext(qf_jacob, phys, sizeof(phys));
 CeedOperatorCreate(ceed, qf_jacob, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_jacob);
-CeedOperatorSetField(op_jacob, "deltadu", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+//field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
+CeedOperatorSetField(op_jacob, "deltadu", Erestrictu, CEED_TRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 CeedOperatorSetField(op_jacob, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
-CeedOperatorSetField(op_jacob, "deltadv", Erestrictu, CEED_NOTRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
+//field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
+CeedOperatorSetField(op_jacob, "deltadv", Erestrictu, CEED_TRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 CeedOperatorSetField(op_jacob, "gradu", ErestrictGradui, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, gradu);
 
 // Compute the quadrature data
 CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
+
+//deme start
+//CeedVectorView(qdata, "%12.8f", stdout);
+//deme end
 
   // Set up forcing term, if needed
   if (forcingChoice != FORCE_NONE) {
@@ -515,7 +525,7 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
     CeedQFunctionAddOutput(qf_setupforce, "rhs", ncompu, CEED_EVAL_INTERP);
     if (forcingChoice == FORCE_MMS)
       CeedQFunctionAddOutput(qf_setupforce, "true_soln", ncompu, CEED_EVAL_NONE);
-    CeedQFunctionSetContext(qf_setupforce, &phys, sizeof(phys));
+    CeedQFunctionSetContext(qf_setupforce, phys, sizeof(phys));
 
     // Create the operator that builds the forcing vector (and true solution for MMS)
     CeedOperatorCreate(ceed, qf_setupforce, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_setupforce);
@@ -568,8 +578,12 @@ static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user){
 
     PetscFunctionBeginUser;
     ierr = DMGlobalToLocalBegin(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
+    //ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);
     ierr = DMGlobalToLocalEnd(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
-    ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0,NULL,NULL,NULL); CHKERRQ(ierr);
+    ierr = VecView(user->Xloc,PETSC_VIEWER_STDOUT_WORLD);
+
+    PetscPrintf(PETSC_COMM_WORLD, "user->Xloc after boundary:\n\n");
+    //ierr = VecView(user->Xloc,PETSC_VIEWER_STDOUT_WORLD);
     ierr = VecZeroEntries(user->Yloc); CHKERRQ(ierr);
 
     // Setup CEED vectors
@@ -598,6 +612,7 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ptr) {
   UserMult user = (UserMult)ptr;
 
   PetscFunctionBeginUser;
+  ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0,NULL,NULL,NULL); CHKERRQ(ierr);
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
   // ierr = VecView(X,PETSC_VIEWER_STDOUT_WORLD);CHKERRQ(ierr);
   // PetscPrintf(PETSC_COMM_WORLD, "\n\n X: \n\n");
@@ -612,6 +627,7 @@ static PetscErrorCode ApplyJacobian_Ceed(Mat A, Vec X, Vec Y){
 
     PetscFunctionBeginUser;
     ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
+    ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
     ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
     PetscFunctionReturn(0);
 }
@@ -736,4 +752,4 @@ PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time, const PetscReal coords[]
 }
 
 
-#endif setup_h
+#endif //setup_h
