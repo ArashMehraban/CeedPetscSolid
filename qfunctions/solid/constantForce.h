@@ -33,11 +33,11 @@ CEED_QFUNCTION(SetupConstantForce)(void *ctx, const CeedInt Q,
 
     // Forcing function
     // -- Component 1
-    force[i+0*Q] = det * w[i];
+    force[i+0*Q] = 0;
     // -- Component 2
-    force[i+1*Q] = force[i+0*Q];
+    force[i+1*Q] = det * w[i];
     // -- Component 3
-    force[i+2*Q] = force[i+0*Q];
+    force[i+2*Q] = 0;
   } // End of Quadrature Point Loop
 
   return 0;
