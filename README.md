@@ -6,14 +6,14 @@ following options: `--track-origins=yes` `--leak-check=full` `--show-leak-kinds=
 
 **Boundary:**
 
-Setting boundary is mesh dependent in every FEM problem. As a result, the examples we have provided here depend on the  mesh files in `\mesh\` folder. However, this code is capable of importing any structred or unstructred ExodusII (.exo) mesh file. In such cases, the user is responsible for providing boundary functions in `setup.h`. We have used Trelis/Cubit software to generate mesh. The *journal file*, `.jou` file is provided in the `\meshes\` directory. We have employed the `sideset` feature from Trelis\Cubit software to choose different regions of the geometry. These regions are utilized in the boundary functions in `setup.h` to place *essential* (Dirichlet) boundary values in the sollution vector. `nodeset` must be avoided for the puposes of choosing boundary regions in the mesh as this code runs with high-order polynomials. Everything else about the code is general:
+Setting boundary is mesh dependent in every FEM problem. As a result, the examples we have provided here depend on the  mesh files in `meshes\` folder. However, this code is capable of importing any structured or structured ExodusII (.exo) mesh file. In such cases, the user is responsible for providing boundary functions in `setup.h`. We have used Trelis/Cubit software to generate meshes. The journal file (`.jou`) is provided in the `meshes\` directory. We have employed the `sideset` feature from Trelis\Cubit software to choose different regions of the geometry. These regions are utilized in the boundary functions in `setup.h` to place *essential* (Dirichlet) boundary values in the solution vector. `nodeset` must be avoided for the purposes of choosing boundary regions in the mesh as this code runs with high-order polynomials. Everything else about the code is general.
 
 ![Image of finger](pictures/finger.png)
 
-**General Notes about mesh naming convention:**
+**General Notes about mesh file names in `meshes\` folder:**
 
 `mms` stands for Method of Manufactured Solutions.\
-In cyl-hole_632e_4ss_us.exo file name:\
+As an example, in `cyl-hole_632e_4ss_us.exo` file name:\
    `_4ss` refers to the left, right, inner and outer *walls* of the image above.\
    `_2ss` refers to the left and right *walls* of the image above.\
    `_1ss` refers to the left *wall* of the image above.\
@@ -36,28 +36,28 @@ In our case `mms` is based on the following contrived solution:
 `u[2] = exp(4z)sin(2x)cos(3y)`
 
 **Note 1:** For the `mms` to work correctly, you must use: \
-            mesh files with `_4ss_` in their name from `\meshes` directory.\
+            mesh files with `_4ss_` in their name from `meshes\` directory.\
             `-boundary mms` and `-forcing mms` options.
 
 Example:\
  `./elasticity -mesh ./meshes/cyl-hole_632e_4ss_us.exo -degree 2 -nu .3 -E 1e6 -boundary mms -forcing mms`
 
-**Note 2:** Two other boundary and forcing functions may be used with this mesh files provided in `\meshes\`:
+**Note 2:** Two other boundary and forcing functions may be used with this mesh files provided in `meshes\`:
 
-**1)** left side of the cyl-hol object is attached to a wall:\
+**1)** left side of the `cyl-hol` object (finger) is attached to a wall:\
        mesh files with `_1ss` must be used.\
        `-boundary wall_none` must be used.\
-       forcing function on that could be `none` (no force) or `constant` (constant force in `-y` direction)
+       forcing function on that could be `none` (no force) or `constant` (constant force in `-y` direction. u[1] = -1)
 
-Example:
+Example:\
  `./elasticity -mesh ./meshes/cyl-hole_632e_1ss_us.exo -degree 2 -nu .3 -E 1e6 -boundary wall_none -forcing constant`
 
-**2)** left side of the cyl-hol object is attached to a wall **and** the right side of cyl-hole object has a dead wight hanging off it:\
+**2)** left side of the `cyl-hol` object (finger) is attached to a wall **and** the right side of it has a dead wight hanging off of it:\
    mesh files with `_2ss` must be used.\
    `-boundary wall_weight` must be used.\
-   forcing function on that could be `none` (no force) or `constant` (constant force in `-y` direction)
+   forcing function on that could be `none` (no force) or `constant` (constant force in `-y` direction. u[1] = -1)
 
-Example:
+Example:\
  `./elasticity -mesh ./meshes/cyl-hole_632e_2ss_us.exo -degree 2 -nu .3 -E 1e6 -boundary wall_weight -forcing constant`
 
 ### CEED/PETSc Hyperelasticity at small strain problem
