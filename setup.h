@@ -478,7 +478,8 @@ CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].apply,problem
 CeedQFunctionAddInput(qf_apply, "du", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_apply, "qdata", qdatasize, CEED_EVAL_NONE);
 CeedQFunctionAddOutput(qf_apply, "dv", ncompu*dim, CEED_EVAL_GRAD);
-CeedQFunctionAddOutput(qf_apply, "gradu", ncompu*dim, CEED_EVAL_NONE);
+if (problemChoice != ELAS_LIN)
+  CeedQFunctionAddOutput(qf_apply, "gradu", ncompu*dim, CEED_EVAL_NONE);
 CeedQFunctionSetContext(qf_apply, phys, sizeof(phys));
 CeedOperatorCreate(ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_apply);
 //field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
@@ -486,13 +487,15 @@ CeedOperatorSetField(op_apply, "du", Erestrictu, CEED_TRANSPOSE, basisu, CEED_VE
 CeedOperatorSetField(op_apply, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
 //field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
 CeedOperatorSetField(op_apply, "dv", Erestrictu, CEED_TRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
-CeedOperatorSetField(op_apply, "gradu", ErestrictGradui, CEED_NOTRANSPOSE, basisu, gradu);
+if (problemChoice != ELAS_LIN)
+  CeedOperatorSetField(op_apply, "gradu", ErestrictGradui, CEED_NOTRANSPOSE, basisu, gradu);
 
 // Create the QFunction and Operator that calculates the Jacobian
 CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].jacob,problemOptions[problemChoice].jacobfname, &qf_jacob);
 CeedQFunctionAddInput(qf_jacob, "deltadu", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionAddInput(qf_jacob, "qdata", qdatasize, CEED_EVAL_NONE);
-CeedQFunctionAddInput(qf_jacob, "gradu", ncompu*dim, CEED_EVAL_NONE);
+if (problemChoice != ELAS_LIN)
+  CeedQFunctionAddInput(qf_jacob, "gradu", ncompu*dim, CEED_EVAL_NONE);
 CeedQFunctionAddOutput(qf_jacob, "deltadv", ncompu*dim, CEED_EVAL_GRAD);
 CeedQFunctionSetContext(qf_jacob, phys, sizeof(phys));
 CeedOperatorCreate(ceed, qf_jacob, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_jacob);
@@ -501,7 +504,8 @@ CeedOperatorSetField(op_jacob, "deltadu", Erestrictu, CEED_TRANSPOSE, basisu, CE
 CeedOperatorSetField(op_jacob, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
 //field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
 CeedOperatorSetField(op_jacob, "deltadv", Erestrictu, CEED_TRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
-CeedOperatorSetField(op_jacob, "gradu", ErestrictGradui, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, gradu);
+if (problemChoice != ELAS_LIN)
+  CeedOperatorSetField(op_jacob, "gradu", ErestrictGradui, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, gradu);
 
 // Compute the quadrature data
 CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);

@@ -18,8 +18,9 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
                     (*qdata)[Q] = (CeedScalar(*)[Q])in[1];
 
    // Outputs
-   CeedScalar (*vg)[3][Q] = (CeedScalar(*)[3][Q])out[0],
-              (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
+   CeedScalar (*vg)[3][Q] = (CeedScalar(*)[3][Q])out[0];
+              // gradu not used for linear elasticity
+              // (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
    // *INDENT-ON*
 
    // Context
@@ -58,25 +59,26 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
 
      //Compute gradu
      // Apply dXdx^-1 to du = gradu
+     CeedScalar gradu[3][3];
      for (int j=0; j<3; j++)
        for (int k=0; k<3; k++) {
-         gradu[j][k][i] = 0;
+         gradu[j][k] = 0;
          for (int m=0; m<3; m++)
-           gradu[j][k][i] += dXdx[j][m]*du[k][m];
+           gradu[j][k] += dXdx[j][m]*du[k][m];
        }
 
      // Compute Strain : e (epsilon)
      // e = 1/2 (grad u + (grad u)^T)
      // *INDENT-OFF*
-     const CeedScalar e[3][3]     =  {{(gradu[0][0][i] + gradu[0][0][i])*0.5,
-                                       (gradu[0][1][i] + gradu[1][0][i])*0.5,
-                                       (gradu[0][2][i] + gradu[2][0][i])*0.5},
-                                      {(gradu[1][0][i] + gradu[0][1][i])*0.5,
-                                       (gradu[1][1][i] + gradu[1][1][i])*0.5,
-                                       (gradu[1][2][i] + gradu[2][1][i])*0.5},
-                                      {(gradu[2][0][i] + gradu[0][2][i])*0.5,
-                                       (gradu[2][1][i] + gradu[1][2][i])*0.5,
-                                       (gradu[2][2][i] + gradu[2][2][i])*0.5}
+     const CeedScalar e[3][3]     =  {{(gradu[0][0] + gradu[0][0])*0.5,
+                                       (gradu[0][1] + gradu[1][0])*0.5,
+                                       (gradu[0][2] + gradu[2][0])*0.5},
+                                      {(gradu[1][0] + gradu[0][1])*0.5,
+                                       (gradu[1][1] + gradu[1][1])*0.5,
+                                       (gradu[1][2] + gradu[2][1])*0.5},
+                                      {(gradu[2][0] + gradu[0][2])*0.5,
+                                       (gradu[2][1] + gradu[1][2])*0.5,
+                                       (gradu[2][2] + gradu[2][2])*0.5}
                                      };
 
     // *INDENT-ON*
@@ -99,11 +101,17 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
     //                         [                                        (1-2*nu)/2 ]
 
     //Above Voigt Notation is placed in a 3x3 matrix:
-     const CeedScalar ss          =  E/((1+nu)*(1-2*nu));
+     const CeedScalar ss      =  E/((1+nu)*(1-2*nu));
+     const CeedScalar sigma00 = ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]),
+                      sigma11 = ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]),
+                      sigma22 = ss*(nu*e[0][0] + nu*e[1][1] +(1-nu)*e[2][2]),
+                      sigma12 = ss*(1-2*nu)*e[1][2]/2,
+                      sigma02 = ss*(1-2*nu)*e[0][2]/2,
+                      sigma01 = ss*(1-2*nu)*e[0][1]/2;
      const CeedScalar sigma[3][3] =
-      { {ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]), ss*(1-2*nu)*e[0][1]/2, ss*(1-2*nu)*e[0][2]/2},
-        {ss*(1-2*nu)*e[1][0]/2, ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]), ss*(1-2*nu)*e[1][2]/2},
-        {ss*(1-2*nu)*e[2][0]/2, ss*(1-2*nu)*e[2][1]/2, ss*(nu*e[0][0] + nu*e[1][1] +(1-nu)*e[2][2])}
+      { {sigma00, sigma01, sigma02},
+        {sigma01, sigma11, sigma12},
+        {sigma02, sigma12, sigma22}
       };
 
      // Apply dXdx^-T and weight
