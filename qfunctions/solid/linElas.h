@@ -85,12 +85,12 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
     //strain (epsilon)
     //    and
     //stress (sigma) in Voigt notation:
+    //           [e00]              [sigma00]
     //           [e11]              [sigma11]
-    //           [e22]              [sigma22]
-    // epsilon = [e33]  ,   sigma = [sigma33]
-    //           [e23]              [sigma23]
-    //           [e13]              [sigma13]
+    // epsilon = [e22]  ,   sigma = [sigma22]
     //           [e12]              [sigma12]
+    //           [e02]              [sigma02]
+    //           [e01]              [sigma01]
     //
     // Sigma = S * epsilon
     //                         [1-nu   nu    nu                                    ]
@@ -105,9 +105,9 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
      const CeedScalar sigma00 = ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]),
                       sigma11 = ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]),
                       sigma22 = ss*(nu*e[0][0] + nu*e[1][1] +(1-nu)*e[2][2]),
-                      sigma12 = ss*(1-2*nu)*e[1][2]/2,
-                      sigma02 = ss*(1-2*nu)*e[0][2]/2,
-                      sigma01 = ss*(1-2*nu)*e[0][1]/2;
+                      sigma12 = ss*(1-2*nu)*e[1][2]*0.5,
+                      sigma02 = ss*(1-2*nu)*e[0][2]*0.5,
+                      sigma01 = ss*(1-2*nu)*e[0][1]*0.5;
      const CeedScalar sigma[3][3] =
       { {sigma00, sigma01, sigma02},
         {sigma01, sigma11, sigma12},
