@@ -16,7 +16,7 @@ As an example, consider `cyl-hole_632e_4ss_us.exo`, `cyl-hole_632e_2ss_us.exo` a
    `_4ss` refers to the left, right, inner and outer *walls* of the image above.\
    `_2ss` refers to the left and right *walls* of the image above.\
    `_1ss` refers to the left *wall* of the image above.\
-   `_632e` in the mesh file name means `632` elements.\
+   `_632e` in the mesh file name means 632 elements.\
    `_us` means `unstructured mesh`
 
 
@@ -44,7 +44,7 @@ Example:\
 
 **Note 2:** Two other boundary and forcing functions may be used with this mesh files provided in `meshes\`:
 
-**1)** left side of the `cyl-hol` object (finger) is attached to a wall:\
+**1)** left side of the `cyl-hol` object (one finger of a glove) is attached to a wall (hand):\
        mesh files with `_1ss` must be used.\
        `-boundary wall_none` must be used.\
        forcing function on that could be `none` (no force) or `constant` (constant force in `-y` direction. u[1] = -1)
@@ -52,7 +52,7 @@ Example:\
 Example:\
  `./elasticity -mesh ./meshes/cyl-hole_632e_1ss_us.exo -degree 2 -nu .3 -E 1e6 -boundary wall_none -forcing constant`
 
-**2)** left side of the `cyl-hol` object (finger) is attached to a wall **and** the right side of it has a dead wight hanging off of it:\
+**2)** left side of the `cyl-hol` object (one finger of a glove) is attached to a wall (hand) **and** the right side of it has a dead wight hanging off of it:\
    mesh files with `_2ss` must be used.\
    `-boundary wall_weight` must be used.\
    forcing function on that could be `none` (no force) or `constant` (constant force in `-y` direction. u[1] = -1)
