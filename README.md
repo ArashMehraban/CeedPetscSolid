@@ -8,12 +8,12 @@ following options: `--track-origins=yes` `--leak-check=full` `--show-leak-kinds=
 
 Setting boundary is mesh dependent in every FEM problem. As a result, the examples we have provided here depend on the  mesh files in `\mesh\` folder. However, this code is capable of importing any structred or unstructred ExodusII (.exo) mesh file. In such cases, the user is responsible for providing boundary functions in `setup.h`. We have used Trelis/Cubit software to generate mesh. The *journal file*, `.jou` file is provided in the `\meshes\` directory. We have employed the `sideset` feature from Trelis\Cubit software to choose different regions of the geometry. These regions are utilized in the boundary functions in `setup.h` to place *essential* (Dirichlet) boundary values in the sollution vector. `nodeset` must be avoided for the puposes of choosing boundary regions in the mesh as this code runs with high-order polynomials. Everything else about the code is general:
 
-![Image of Finger](https://github.com/ArashMehraban/CeedPetscSolid/pictures/finger.png)
+![Image of finger](https://github.com/ArashMehraban/CeedPetscSolid/pictures/finger.png)
 
 **General Notes about mesh naming convention:**
 
-**1:** `mms` stands for Method of Manufactured Solutions.\
-**2:** In cyl-hole_632e_4ss_us.exo file name:\
+`mms` stands for Method of Manufactured Solutions.\
+In cyl-hole_632e_4ss_us.exo file name:\
    `_4ss` refers to the left, right, inner and outer *walls* of the image above.\
    `_2ss` refers to the left and right *walls* of the image above.\
    `_1ss` refers to the left *wall* of the image above.\
@@ -26,7 +26,7 @@ To build, run `make`
 
 To run:\
  `./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -boundary [boundary] -forcing [forcing]`\
- or
+ or\
   `mpirun -n [n] ./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -boundary [boundary] -forcing [forcing]`
 
 In our case `mms` is based on the following contrived solution:
