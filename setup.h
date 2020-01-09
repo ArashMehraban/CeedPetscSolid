@@ -440,7 +440,8 @@ nelem = cEnd - cStart;
 CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, ncompu, &Erestrictui); CHKERRQ(ierr);
 CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, qdatasize, &Erestrictqdi); CHKERRQ(ierr);
 CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, ncompx, &Erestrictxi); CHKERRQ(ierr);
-CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, dim* ncompu, &ErestrictGradui); CHKERRQ(ierr);
+if (problemChoice != ELAS_LIN)
+  CeedElemRestrictionCreateIdentity(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, dim* ncompu, &ErestrictGradui); CHKERRQ(ierr);
 
 // Element coordinates
 ierr = DMGetCoordinatesLocal(dm, &coords); CHKERRQ(ierr);
@@ -455,7 +456,8 @@ ierr = VecRestoreArrayRead(coords, &coordArray); CHKERRQ(ierr);
 CeedInt nqpts;
 CeedBasisGetNumQuadraturePoints(basisu, &nqpts);
 CeedVectorCreate(ceed, qdatasize*nelem*nqpts, &qdata);
-CeedVectorCreate(ceed, dim*ncompu*nelem*nqpts, &gradu);
+if (problemChoice != ELAS_LIN)
+  CeedVectorCreate(ceed, dim*ncompu*nelem*nqpts, &gradu);
 CeedVectorCreate(ceed, Ulocsz, &xceed);
 CeedVectorCreate(ceed, Ulocsz, &yceed);
 
@@ -562,13 +564,15 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
   data->Erestrictxi = Erestrictxi;
   data->Erestrictui = Erestrictui;
   data->Erestrictqdi = Erestrictqdi;
-  data->ErestrictGradui = ErestrictGradui;
+  if (problemChoice != ELAS_LIN)
+    data->ErestrictGradui = ErestrictGradui;
   data->qf_apply = qf_apply;
   data->op_apply = op_apply;
   data->qf_jacob = qf_jacob;
   data->op_jacob = op_jacob;
   data->qdata = qdata;
-  data->gradu = gradu;
+  if (problemChoice != ELAS_LIN)
+    data->gradu = gradu;
   data->xceed = xceed;
   data->yceed = yceed;
 
