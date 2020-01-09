@@ -12,7 +12,7 @@ Setting boundary is mesh dependent in every FEM problem. As a result, the exampl
 
 **General Notes about mesh file naming conventions in `meshes\` folder:**
 
-As an example, in `cyl-hole_632e_4ss_us.exo` file name:\
+As an example, consider `cyl-hole_632e_4ss_us.exo`, `cyl-hole_632e_2ss_us.exo` and `cyl-hole_632e_1ss_us.exo` file names:\
    `_4ss` refers to the left, right, inner and outer *walls* of the image above.\
    `_2ss` refers to the left and right *walls* of the image above.\
    `_1ss` refers to the left *wall* of the image above.\
@@ -69,7 +69,7 @@ To run, `./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -probl
 Example: `./elasticity -mesh ./meshes/cyl-hole_632e_2ss_us.exo -degree 2 -nu .3 -E 1e6 -problem hyperSS
 -boundary wall -forcing none`
 
-See figure `\meshes\surface999-9.png`.
+See figure `\pictures\gloveFinger.png`.
 
 details will be updated when ready.
 
@@ -79,6 +79,6 @@ To build, run `make`
 
 To run, `./elasticity -mesh [.exo file]  -degree [degree] -nu [nu] -E [E] -problem [hyperFS] -boundary [boundary] -forcing [forcing]`
 
-See figure `\meshes\surface999-9.png`.
+See figure `\pictures\gloveFinger.png`.
 
 details will be updated when ready.
