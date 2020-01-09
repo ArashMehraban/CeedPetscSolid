@@ -8,7 +8,7 @@ following options: `--track-origins=yes` `--leak-check=full` `--show-leak-kinds=
 
 Setting boundary is mesh dependent in every FEM problem. As a result, the examples we have provided here depend on the  mesh files in `\mesh\` folder. However, this code is capable of importing any structred or unstructred ExodusII (.exo) mesh file. In such cases, the user is responsible for providing boundary functions in `setup.h`. We have used Trelis/Cubit software to generate mesh. The *journal file*, `.jou` file is provided in the `\meshes\` directory. We have employed the `sideset` feature from Trelis\Cubit software to choose different regions of the geometry. These regions are utilized in the boundary functions in `setup.h` to place *essential* (Dirichlet) boundary values in the sollution vector. `nodeset` must be avoided for the puposes of choosing boundary regions in the mesh as this code runs with high-order polynomials. Everything else about the code is general:
 
-![Image of finger](https://github.com/ArashMehraban/CeedPetscSolid/pictures/finger.png)
+![Image of finger](pictures/finger.png)
 
 **General Notes about mesh naming convention:**
 
