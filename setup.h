@@ -73,14 +73,16 @@ problemData problemOptions[3] = {
       .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_SS] = {
-     // .qdatasize = 10,
-     // .setupgeo = SetupGeo,
-     // .apply = HyperSS,
-     // .error = Error,
-     // .setupgeofname = SetupGeo_loc,
-     // .applyfname = HyperSS_loc,
-     // .errorfname = Error_loc,
-     // .qmode = CEED_GAUSS,
+     .qdatasize = 10,
+     .setupgeo = SetupGeo,
+     .apply = HyperSSF,
+     .jacob = HyperSSdF,
+     .error = Error,
+     .setupgeofname = SetupGeo_loc,
+     .applyfname = HyperSSF_loc,
+     .jacobfname = HyperSSdF_loc,
+     .errorfname = Error_loc,
+     .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_FS] = {
      // .qdatasize = 10,

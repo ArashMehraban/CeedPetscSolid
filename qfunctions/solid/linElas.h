@@ -28,6 +28,9 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
    const CeedScalar E  = context->E;
    const CeedScalar nu = context->nu;
 
+
+//PetscPrintf(PETSC_COMM_WORLD, "LinElasF in F\n");
+
    // Quadrature Point Loop
      CeedPragmaSIMD
      for (CeedInt i=0; i<Q; i++) {
@@ -58,13 +61,13 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
      // *INDENT-ON*
 
      //Compute gradu
-     // Apply dXdx^-1 to du = gradu
+     // Apply dXdx^-T to du = gradu
      CeedScalar gradu[3][3];
      for (int j=0; j<3; j++)
        for (int k=0; k<3; k++) {
          gradu[j][k] = 0;
          for (int m=0; m<3; m++)
-           gradu[j][k] += dXdx[j][m]*du[k][m];
+           gradu[j][k] += dXdx[j][m]*du[m][k];
        }
 
      // Compute Strain : e (epsilon)
@@ -114,12 +117,12 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
         {sigma02, sigma12, sigma22}
       };
 
-     // Apply dXdx^-T and weight
+     // Apply dXdx^-1 and weight
      for (int j=0; j<3; j++)
        for (int k=0; k<3; k++) {
          vg[j][k][i] = 0;
          for (int m=0; m<3; m++)
-           vg[j][k][i] += dXdx[m][j] * sigma[k][m] * wJ;
+           vg[j][k][i] += dXdx[m][j] * sigma[m][k] * wJ;
        }
      } // End of Quadrature Point Loop
 
@@ -133,7 +136,10 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Cee
    const CeedScalar (*deltaug)[3][Q] = (CeedScalar(*)[3][Q])in[0],
                     (*qdata)[Q] = (CeedScalar(*)[Q])in[1];
                     // gradu not used for linear elasticity
-                    // (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
+                    // (*gradu)[3][Q] = (CeedScalar(*)[3][Q])in[2];
+
+
+//PetscPrintf(PETSC_COMM_WORLD, "LinElasdF in dF\n");
 
    // Outputs
    CeedScalar (*deltavg)[3][Q] = (CeedScalar(*)[3][Q])out[0];
@@ -180,7 +186,7 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Cee
        for (int k=0; k<3; k++) {
          graddeltau[j][k] = 0;
          for (int m=0; m<3; m++)
-           graddeltau[j][k] += dXdx[j][m]*deltadu[k][m];
+           graddeltau[j][k] += dXdx[j][m]*deltadu[m][k];
        }
 
      // Compute Strain : e (epsilon)
@@ -217,11 +223,17 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Cee
     //                         [                                        (1-2*nu)/2 ]
 
     //Above Voigt Notation is placed in a 3x3 matrix:
-     const CeedScalar ss          =  E/((1+nu)*(1-2*nu));
-     const CeedScalar sigma[3][3] =
-     { {ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]), ss*(1-2*nu)*e[0][1]/2, ss*(1-2*nu)*e[0][2]/2},
-       {ss*(1-2*nu)*e[1][0]/2, ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]), ss*(1-2*nu)*e[1][2]/2},
-       {ss*(1-2*nu)*e[2][0]/2, ss*(1-2*nu)*e[2][1]/2, ss*(nu*e[0][0] + nu*e[1][1] +(1-nu)*e[2][2])}
+    const CeedScalar ss      =  E/((1+nu)*(1-2*nu));
+    const CeedScalar sigma00 = ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]),
+                     sigma11 = ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]),
+                     sigma22 = ss*(nu*e[0][0] + nu*e[1][1] +(1-nu)*e[2][2]),
+                     sigma12 = ss*(1-2*nu)*e[1][2]/2,
+                     sigma02 = ss*(1-2*nu)*e[0][2]/2,
+                     sigma01 = ss*(1-2*nu)*e[0][1]/2;
+    const CeedScalar sigma[3][3] =
+     { {sigma00, sigma01, sigma02},
+       {sigma01, sigma11, sigma12},
+       {sigma02, sigma12, sigma22}
      };
 
      // Apply dXdx^-T and weight
@@ -229,7 +241,7 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Cee
        for (int k=0; k<3; k++) {
          deltavg[j][k][i] = 0;
          for (int m=0; m<3; m++)
-           deltavg[j][k][i] += dXdx[m][j] * sigma[k][m] * wJ;
+           deltavg[j][k][i] += dXdx[m][j] * sigma[m][k] * wJ;
        }
      } // End of Quadrature Point Loop
 

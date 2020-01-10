@@ -39,12 +39,13 @@ CEED_QFUNCTION(SetupMMSForce)(void *ctx, const CeedInt Q,
 
     // Forcing function
     CeedScalar rho = det * w[i];
-    // -- Component 1
-    force[i+0*Q] = rho*(E*(cos(x*2)*cos(y*3)*exp(z*4)*4-cos(z*4)*sin(y*3)*exp(x*2)*8)*(nu-1/2))/((nu*2-1)*(nu+1))+(E*(cos(z*4)*sin(y*3)*exp(x*2)*(9/2)+sin(x*2)*sin(z*4)*exp(y*3)*3)*(nu-1/2))/((nu*2-1)*(nu+1))+(E*nu*cos(x*2)*cos(y*3)*exp(z*4)*8)/((nu*2-1)*(nu+1))-(E*nu*sin(x*2)*sin(z*4)*exp(y*3)*6)/((nu*2-1)*(nu+1))-(E*cos(z*4)*sin(y*3)*exp(x*2)*(nu-1)*4)/((nu*2-1)*(nu+1));
-    // -- Component 2
-    force[i+1*Q] =rho*(E*(cos(y*3)*cos(z*4)*exp(x*2)*3-cos(x*2)*sin(z*4)*exp(y*3)*2)*(nu-1/2))/((nu*2-1)*(nu+1))+(E*(cos(x*2)*sin(z*4)*exp(y*3)*8+sin(x*2)*sin(y*3)*exp(z*4)*6)*(nu-1/2))/((nu*2-1)*(nu+1))+(E*nu*cos(y*3)*cos(z*4)*exp(x*2)*6)/((nu*2-1)*(nu+1))-(E*nu*sin(x*2)*sin(y*3)*exp(z*4)*1.2e1)/((nu*2-1)*(nu+1))-(E*cos(x*2)*sin(z*4)*exp(y*3)*(nu-1)*9)/((nu*2-1)*(nu+1));
-    // -- Component 3
-    force[i+2*Q] = rho*(E*(cos(x*2)*cos(z*4)*exp(y*3)*6-cos(y*3)*sin(x*2)*exp(z*4)*(9/2))*(nu-1/2))/((nu*2-1)*(nu+1))+(E*(cos(y*3)*sin(x*2)*exp(z*4)*2+sin(y*3)*sin(z*4)*exp(x*2)*4)*(nu-1/2))/((nu*2-1)*(nu+1))+(E*nu*cos(x*2)*cos(z*4)*exp(y*3)*1.2e1)/((nu*2-1)*(nu+1))-(E*nu*sin(y*3)*sin(z*4)*exp(x*2)*8)/((nu*2-1)*(nu+1))-(E*cos(y*3)*sin(x*2)*exp(z*4)*(nu-1)*1.6e1)/((nu*2-1)*(nu+1));
+
+    force[i+0*Q]=rho*((E*(cos(x*2.0)*cos(y*3.0)*exp(z*4.0)*4.0-cos(z*4.0)*sin(y*3.0)*exp(x*2.0)*8.0)*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*(cos(z*4.0)*sin(y*3.0)*exp(x*2.0)*(9.0/2.0)+sin(x*2.0)*sin(z*4.0)*exp(y*3.0)*3.0)*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*nu*cos(x*2.0)*cos(y*3.0)*exp(z*4.0)*8.0)/((nu*2.0-1.0)*(nu+1.0))-(E*nu*sin(x*2.0)*sin(z*4.0)*exp(y*3.0)*6.0)/((nu*2.0-1.0)*(nu+1.0))-(E*cos(z*4.0)*sin(y*3.0)*exp(x*2.0)*(nu-1.0)*4.0)/((nu*2.0-1.0)*(nu+1.0)));
+        force[i+1*Q]=rho*((E*(cos(y*3.0)*cos(z*4.0)*exp(x*2.0)*3.0-cos(x*2.0)*sin(z*4.0)*exp(y*3.0)*2.0)*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*(cos(x*2.0)*sin(z*4.0)*exp(y*3.0)*8.0+sin(x*2.0)*sin(y*3.0)*exp(z*4.0)*6.0)*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*nu*cos(y*3.0)*cos(z*4.0)*exp(x*2.0)*6.0)/((nu*2.0-1.0)*(nu+1.0))-(E*nu*sin(x*2.0)*sin(y*3.0)*exp(z*4.0)*1.2e1)/((nu*2.0-1.0)*(nu+1.0))-(E*cos(x*2.0)*sin(z*4.0)*exp(y*3.0)*(nu-1.0)*9.0)/((nu*2.0-1.0)*(nu+1.0)));
+        force[i+2*Q]=rho*((E*(cos(x*2.0)*cos(z*4.0)*exp(y*3.0)*6.0-cos(y*3.0)*sin(x*2.0)*exp(z*4.0)*(9.0/2.0))*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*(cos(y*3.0)*sin(x*2.0)*exp(z*4.0)*2.0+sin(y*3.0)*sin(z*4.0)*exp(x*2.0)*4.0)*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*nu*cos(x*2.0)*cos(z*4.0)*exp(y*3.0)*1.2e1)/((nu*2.0-1.0)*(nu+1.0))-(E*nu*sin(y*3.0)*sin(z*4.0)*exp(x*2.0)*8.0)/((nu*2.0-1.0)*(nu+1.0))-(E*cos(y*3.0)*sin(x*2.0)*exp(z*4.0)*(nu-1.0)*1.6e1)/((nu*2.0-1.0)*(nu+1.0)));
+
+
+
 
     // True solution
     // -- Component 1
