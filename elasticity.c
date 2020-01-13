@@ -7,12 +7,13 @@ const char help[] = "Solve solid Problems with CEED and PETSc DMPlex\n";
 #include <ceed.h>
 #include "setup.h"
 
-static int dummyFun(){ PetscFunctionBeginUser;  PetscFunctionReturn(0);}
+static int dummyFun() { PetscFunctionBeginUser;  PetscFunctionReturn(0);}
 
 int main(int argc, char **argv) {
   PetscInt    ierr;
   MPI_Comm    comm;
-  AppCtx      appCtx; //contains polinomial basis degree, problem choice & mesh filename
+  AppCtx
+  appCtx; //contains polinomial basis degree, problem choice & mesh filename
   Physics     phys;   //contains nu and E
   DM          dm;
   PetscInt    ncompu = 3;                 // 3 dofs in 3D
@@ -30,16 +31,16 @@ int main(int argc, char **argv) {
 
   ierr = PetscInitialize(&argc, &argv, NULL, help);
   if(ierr)
-      return ierr;
+    return ierr;
 
   comm = PETSC_COMM_WORLD;
   //set mesh-file, polynomial degree, problem type
-  ierr = processCommandLineOptions(comm, &appCtx);CHKERRQ(ierr);
+  ierr = processCommandLineOptions(comm, &appCtx); CHKERRQ(ierr);
   //set Poison's ratio, Young's Modulus
   ierr = PetscMalloc1(1, &phys); CHKERRQ(ierr);
-  ierr = processPhysics(comm, phys);CHKERRQ(ierr);
+  ierr = processPhysics(comm, phys); CHKERRQ(ierr);
   //create distributed DM from mesh file (interpolate if polynomial degree > 1)
-  ierr = createDistributedDM(comm, &appCtx, &dm);CHKERRQ(ierr);
+  ierr = createDistributedDM(comm, &appCtx, &dm); CHKERRQ(ierr);
   //setup DM by polinomial degree
   ierr = SetupDMByDegree(dm, &appCtx, ncompu);
 
@@ -69,7 +70,8 @@ int main(int argc, char **argv) {
     CeedVectorSetArray(forceceed, CEED_MEM_HOST, CEED_USE_POINTER, f);
   }
   // libCEED objects setup
-  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz, Ulocsz, forceceed);CHKERRQ(ierr);
+  ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz,
+                              Ulocsz, forceceed); CHKERRQ(ierr);
 
   // Setup global forcing vector
   ierr = VecZeroEntries(F); CHKERRQ(ierr);
@@ -85,15 +87,18 @@ int main(int argc, char **argv) {
   ierr = SNESCreate(comm, &snes); CHKERRQ(ierr);
   ierr = PetscMalloc1(1, &resCtx); CHKERRQ(ierr);
   // Jacobian context
-  ierr = PetscMalloc1(1, &jacobCtx);CHKERRQ(ierr);
-  ierr =  CreateMatrixFreeCtx(comm, dm, Uloc, ceeddata, ceed, resCtx, jacobCtx);CHKERRQ(ierr);
+  ierr = PetscMalloc1(1, &jacobCtx); CHKERRQ(ierr);
+  ierr =  CreateMatrixFreeCtx(comm, dm, Uloc, ceeddata, ceed, resCtx, jacobCtx);
+  CHKERRQ(ierr);
   resCtx->force = F;
   // Function that computes the residual
   ierr = SNESSetFunction(snes, R, FormResidual_Ceed, resCtx); CHKERRQ(ierr);
   // Form Action of Jacobian on delta_u
-  ierr = MatCreateShell(comm, Ulsz, Ulsz, Ugsz, Ugsz, jacobCtx, &mat); CHKERRQ(ierr);
-  ierr = MatShellSetOperation(mat, MATOP_MULT, (void (*)(void))ApplyJacobian_Ceed);CHKERRQ(ierr);
-  ierr = SNESSetJacobian(snes, mat, mat, dummyFun, NULL);CHKERRQ(ierr);
+  ierr = MatCreateShell(comm, Ulsz, Ulsz, Ugsz, Ugsz, jacobCtx, &mat);
+  CHKERRQ(ierr);
+  ierr = MatShellSetOperation(mat, MATOP_MULT,
+                              (void (*)(void))ApplyJacobian_Ceed); CHKERRQ(ierr);
+  ierr = SNESSetJacobian(snes, mat, mat, dummyFun, NULL); CHKERRQ(ierr);
   // Set KSP options
   {
     PC pc;
@@ -115,15 +120,15 @@ int main(int argc, char **argv) {
 
 // Testing Only - Use KSP in place of SNES
 /*
-    PC pc;
-    KSP ksp;
-    ierr = SNESGetKSP(snes,&ksp); CHKERRQ(ierr);
-    ierr = KSPSetType(ksp, KSPCG); CHKERRQ(ierr);
-    ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
-    ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr); //For Now No Preconditioner
-    ierr = KSPSetFromOptions(ksp);
-    ierr = KSPSetOperators(ksp, mat, mat); CHKERRQ(ierr);
-    ierr = KSPSolve(ksp, F, U); CHKERRQ(ierr);
+  PC pc;
+  KSP ksp;
+  ierr = SNESGetKSP(snes,&ksp); CHKERRQ(ierr);
+  ierr = KSPSetType(ksp, KSPCG); CHKERRQ(ierr);
+  ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
+  ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr); //For Now No Preconditioner
+  ierr = KSPSetFromOptions(ksp);
+  ierr = KSPSetOperators(ksp, mat, mat); CHKERRQ(ierr);
+  ierr = KSPSolve(ksp, F, U); CHKERRQ(ierr);
 */
 
   // Compute error
@@ -137,8 +142,10 @@ int main(int argc, char **argv) {
     // Global true soltion vector
     CeedVectorGetArrayRead(ceeddata->truesoln, CEED_MEM_HOST, &truearray);
     ierr = VecPlaceArray(resCtx->Yloc, truearray); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec);
+    CHKERRQ(ierr);
+    ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec);
+    CHKERRQ(ierr);
     ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
     CeedVectorRestoreArrayRead(ceeddata->truesoln, &truearray);
 
@@ -180,7 +187,7 @@ int main(int argc, char **argv) {
   ierr = PetscFree(resCtx); CHKERRQ(ierr);
   ierr = PetscFree(jacobCtx); CHKERRQ(ierr);
 
-  ierr = PetscFree(phys);CHKERRQ(ierr);
+  ierr = PetscFree(phys); CHKERRQ(ierr);
   ierr = CeedDataDestroy(0, ceeddata); CHKERRQ(ierr);
   CeedDestroy(&ceed);
   SNESDestroy(&snes);

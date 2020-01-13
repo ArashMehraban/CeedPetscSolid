@@ -8,9 +8,9 @@
 #ifndef PHYSICS_STRUCT
 #define PHYSICS_STRUCT
 typedef struct Physics_private *Physics;
-struct Physics_private{
-  PetscScalar   nu;      //Poisson's ratio
-  PetscScalar   E;       //Young's Modulus
+struct Physics_private {
+  PetscScalar   nu;      // Poisson's ratio
+  PetscScalar   E;       // Young's Modulus
 };
 #endif
 
