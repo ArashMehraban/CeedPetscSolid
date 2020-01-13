@@ -28,9 +28,6 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
    const CeedScalar E  = context->E;
    const CeedScalar nu = context->nu;
 
-
-//PetscPrintf(PETSC_COMM_WORLD, "LinElasF in F\n");
-
    // Quadrature Point Loop
      CeedPragmaSIMD
      for (CeedInt i=0; i<Q; i++) {
@@ -137,9 +134,6 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Cee
                     (*qdata)[Q] = (CeedScalar(*)[Q])in[1];
                     // gradu not used for linear elasticity
                     // (*gradu)[3][Q] = (CeedScalar(*)[3][Q])in[2];
-
-
-//PetscPrintf(PETSC_COMM_WORLD, "LinElasdF in dF\n");
 
    // Outputs
    CeedScalar (*deltavg)[3][Q] = (CeedScalar(*)[3][Q])out[0];

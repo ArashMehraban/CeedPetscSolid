@@ -33,9 +33,6 @@ CEED_QFUNCTION(HyperSSF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
    const CeedScalar Kbulk = E/(3*(1-2*nu)); //bulk Modulus
    const CeedScalar lambda = (3*Kbulk-TwoMu)/3;
 
-
-   PetscPrintf(PETSC_COMM_WORLD, "I am HyperSSF\n");
-
    // Quadrature Point Loop
      CeedPragmaSIMD
      for (CeedInt i=0; i<Q; i++) {
@@ -158,11 +155,6 @@ CEED_QFUNCTION(HyperSSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Cee
    const CeedScalar TwoMu = E/(1+nu);
    const CeedScalar Kbulk = E/(3*(1-2*nu)); //bulk Modulus
    const CeedScalar lambda = (3*Kbulk-TwoMu)/3;
-
-
-    PetscPrintf(PETSC_COMM_WORLD, "I am HyperSSdF\n");
-
-
 
    // Quadrature Point Loop
      CeedPragmaSIMD
