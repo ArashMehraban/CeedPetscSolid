@@ -12,7 +12,8 @@
 #include "qfunctions/solid/hyperSS.h" //Hyperelasticity Small SmallStrain
 #include "qfunctions/solid/hyperFS.h" //Hyperelasticity Small FiniteStrain
 #include "qfunctions/solid/constantForce.h"     // Constant forcing function
-#include "qfunctions/solid/manufacturedForce.h" // Manufactured solution
+#include "qfunctions/solid/manufacturedForce.h" // Manufactured solution forcing
+#include "qfunctions/solid/manufacturedTrue.h" // Manufactured true solution
 
 // Problem options
 typedef enum {  //SmallStrain      FiniteStrain
@@ -54,8 +55,8 @@ typedef struct{
 // Problem specific data
 typedef struct {
   CeedInt           qdatasize;
-  CeedQFunctionUser setupgeo, apply, jacob, error;
-  const char        *setupgeofname, *applyfname, *jacobfname, *errorfname;
+  CeedQFunctionUser setupgeo, apply, jacob;
+  const char        *setupgeofname, *applyfname, *jacobfname;
   CeedQuadMode      qmode;
 }problemData;
 
@@ -65,11 +66,9 @@ problemData problemOptions[3] = {
       .setupgeo = SetupGeo,
       .apply = LinElasF,
       .jacob = LinElasdF,
-      .error = Error,
       .setupgeofname = SetupGeo_loc,
       .applyfname = LinElasF_loc,
       .jacobfname = LinElasdF_loc,
-      .errorfname = Error_loc,
       .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_SS] = {
@@ -77,11 +76,9 @@ problemData problemOptions[3] = {
      .setupgeo = SetupGeo,
      .apply = HyperSSF,
      .jacob = HyperSSdF,
-     .error = Error,
      .setupgeofname = SetupGeo_loc,
      .applyfname = HyperSSF_loc,
      .jacobfname = HyperSSdF_loc,
-     .errorfname = Error_loc,
      .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_FS] = {
@@ -135,9 +132,9 @@ struct CeedData_private {
   Ceed                ceed;
   CeedBasis           basisx, basisu, basisctof;
   CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui, Erestrictqdi, ErestrictGradui;
-  CeedQFunction       qf_apply, qf_jacob, qf_error;
-  CeedOperator        op_apply, op_jacob, op_restrict, op_interp, op_error;
-  CeedVector          qdata, gradu, xceed, yceed, truesolution;
+  CeedQFunction       qf_apply, qf_jacob;
+  CeedOperator        op_apply, op_jacob, op_restrict, op_interp;
+  CeedVector          qdata, gradu, xceed, yceed, truesoln;
 };
 
 // -----------------------------------------------------------------------------
@@ -333,7 +330,7 @@ static PetscErrorCode CeedDataDestroy(CeedInt i, CeedData data) {
   CeedVectorDestroy(&data->gradu);
   CeedVectorDestroy(&data->xceed);
   CeedVectorDestroy(&data->yceed);
-  CeedVectorDestroy(&data->truesolution);
+  CeedVectorDestroy(&data->truesoln);
   CeedBasisDestroy(&data->basisx);
   CeedBasisDestroy(&data->basisu);
   CeedElemRestrictionDestroy(&data->Erestrictu);
@@ -346,8 +343,6 @@ static PetscErrorCode CeedDataDestroy(CeedInt i, CeedData data) {
   CeedOperatorDestroy(&data->op_apply);
   CeedQFunctionDestroy(&data->qf_jacob);
   CeedOperatorDestroy(&data->op_jacob);
-  CeedQFunctionDestroy(&data->qf_error);
-  CeedOperatorDestroy(&data->op_error);
   if (i > 0) {
     CeedOperatorDestroy(&data->op_interp);
     CeedBasisDestroy(&data->basisctof);
@@ -419,8 +414,8 @@ Vec          coords;
 const PetscScalar *coordArray;
 PetscSection section;
 CeedVector   xcoord, qdata, gradu, xceed, yceed;
-CeedQFunction qf_setupgeo, qf_apply, qf_jacob, qf_error;
-CeedOperator op_setupgeo, op_apply, op_jacob, op_error;
+CeedQFunction qf_setupgeo, qf_apply, qf_jacob;
+CeedOperator op_setupgeo, op_apply, op_jacob;
 
 PetscFunctionBeginUser;
 
@@ -429,8 +424,8 @@ ncompx = dim;
 // CEED bases (solid problems)
 P = degree + 1;
 Q = P;
-CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompu, P, Q,problemOptions[problemChoice].qmode, &basisu);
-CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompx, 2, Q,problemOptions[problemChoice].qmode, &basisx);
+CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompu, P, Q, problemOptions[problemChoice].qmode, &basisu);
+CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompx, 2, Q, problemOptions[problemChoice].qmode, &basisx);
 
 // CEED restrictions
 ierr = DMGetCoordinateDM(dm, &dmcoord); CHKERRQ(ierr);
@@ -524,8 +519,6 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
   if (forcingChoice != FORCE_NONE) {
     CeedQFunction qf_setupforce;
     CeedOperator op_setupforce;
-    if (forcingChoice == FORCE_MMS)
-      CeedVectorCreate(ceed, nelem*nqpts*ncompu, &(data->truesolution));
 
     // Create the q-function that sets up the forcing vector (and true solution for MMS)
     CeedQFunctionCreateInterior(ceed, 1, forcingOptions[forcingChoice].setupforcing, forcingOptions[forcingChoice].setupforcingfname, &qf_setupforce);
@@ -533,8 +526,6 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
     CeedQFunctionAddInput(qf_setupforce, "weight", 1, CEED_EVAL_WEIGHT);
     CeedQFunctionAddInput(qf_setupforce, "x", dim, CEED_EVAL_INTERP);
     CeedQFunctionAddOutput(qf_setupforce, "rhs", ncompu, CEED_EVAL_INTERP);
-    if (forcingChoice == FORCE_MMS)
-      CeedQFunctionAddOutput(qf_setupforce, "true_soln", ncompu, CEED_EVAL_NONE);
     CeedQFunctionSetContext(qf_setupforce, phys, sizeof(phys));
 
     // Create the operator that builds the forcing vector (and true solution for MMS)
@@ -543,8 +534,6 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
     CeedOperatorSetField(op_setupforce, "weight", Erestrictxi, CEED_NOTRANSPOSE, basisx, CEED_VECTOR_NONE);
     CeedOperatorSetField(op_setupforce, "x", Erestrictx, CEED_TRANSPOSE, basisx, CEED_VECTOR_ACTIVE);
     CeedOperatorSetField(op_setupforce, "rhs", Erestrictu, CEED_TRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
-    if (forcingChoice == FORCE_MMS)
-      CeedOperatorSetField(op_setupforce, "true_soln", Erestrictui, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, data->truesolution);
 
     // Setup forcing vector (and true solution, for MMS)
     CeedOperatorApply(op_setupforce, xcoord, forceceed, CEED_REQUEST_IMMEDIATE);
@@ -555,25 +544,59 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
     CeedOperatorDestroy(&op_setupforce);
   }
 
-  // Setup Error function, for MMS
+  // Setup true solution, for MMS
   if (forcingChoice == FORCE_MMS) {
-    // Create the error Q-function
-    CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].error,
-                                problemOptions[problemChoice].errorfname, &qf_error);
-    CeedQFunctionAddInput(qf_error, "u", ncompu, CEED_EVAL_INTERP);
-    CeedQFunctionAddInput(qf_error, "true_soln", ncompu, CEED_EVAL_NONE);
-    CeedQFunctionAddOutput(qf_error, "error", ncompu, CEED_EVAL_NONE);
+    CeedScalar *truearray;
+    const CeedScalar *multarray;
+    CeedVector evec, multvec;
+    CeedBasis basisxtrue;
+    CeedQFunction qf_true;
+    CeedOperator op_true;
 
-    // Create the error operator
-    CeedOperatorCreate(ceed, qf_error, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
-                       &op_error);
-    CeedOperatorSetField(op_error, "u", Erestrictu, CEED_TRANSPOSE, basisu,
+    // Solution vector
+    CeedVectorCreate(ceed, Ulocsz, &(data->truesoln));
+
+    // Basis
+    CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompx, 2, P, CEED_GAUSS_LOBATTO, &basisxtrue);
+
+
+    // Create the true solution Q-function
+    CeedQFunctionCreateInterior(ceed, 1, MMSTrueSoln, MMSTrueSoln_loc, &qf_true);
+    CeedQFunctionAddInput(qf_true, "x", ncompx, CEED_EVAL_INTERP);
+    CeedQFunctionAddOutput(qf_true, "true_soln", ncompu, CEED_EVAL_NONE);
+
+    // Create the true solution operator
+    CeedOperatorCreate(ceed, qf_true, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
+                       &op_true);
+    CeedOperatorSetField(op_true, "x", Erestrictx, CEED_TRANSPOSE, basisxtrue,
                          CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op_error, "true_soln", Erestrictui, CEED_NOTRANSPOSE,
-                         CEED_BASIS_COLLOCATED, data->truesolution);
-    CeedOperatorSetField(op_error, "error", Erestrictui,
-                         CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED,
-                         CEED_VECTOR_ACTIVE);
+    CeedOperatorSetField(op_true, "true_soln", Erestrictu, CEED_TRANSPOSE,
+                         CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+
+    // Compute true solution
+    CeedOperatorApply(op_true, xcoord, data->truesoln, CEED_REQUEST_IMMEDIATE);
+
+    // Multiplicity calculation
+    CeedElemRestrictionCreateVector(Erestrictu, &multvec, &evec);
+    CeedVectorSetValue(evec, 1.0);
+    CeedElemRestrictionApply(Erestrictu, CEED_TRANSPOSE, CEED_TRANSPOSE, evec, multvec,
+                                    CEED_REQUEST_IMMEDIATE);
+
+    // Multiplicity correction
+    CeedVectorGetArray(data->truesoln, CEED_MEM_HOST, &truearray);
+    CeedVectorGetArrayRead(multvec, CEED_MEM_HOST, &multarray);
+    for (int i = 0; i < Ulocsz; i++)
+      truearray[i] /= multarray[i];
+    CeedVectorRestoreArray(data->truesoln, &truearray);
+    CeedVectorRestoreArrayRead(multvec, &multarray);
+    
+
+    // Cleanup
+    CeedVectorDestroy(&evec);
+    CeedVectorDestroy(&multvec);
+    CeedBasisDestroy(&basisxtrue);
+    CeedQFunctionDestroy(&qf_true);
+    CeedOperatorDestroy(&op_true);
   }
 
   // Cleanup
@@ -595,10 +618,6 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
   data->op_apply = op_apply;
   data->qf_jacob = qf_jacob;
   data->op_jacob = op_jacob;
-  if (forcingChoice == FORCE_MMS) {
-    data->qf_error = qf_error;
-    data->op_error = op_error;
-  }
   data->qdata = qdata;
   if (problemChoice != ELAS_LIN)
     data->gradu = gradu;
@@ -606,53 +625,6 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
   data->yceed = yceed;
 
 PetscFunctionReturn(0);
-}
-
-// This function calculates the error in the final solution
-static PetscErrorCode ComputeErrorL2(UserMult user, CeedData data, Vec X, PetscReal *l2error) {
-  PetscErrorCode ierr;
-  PetscScalar *x, xnorm;
-  CeedVector collocated_error;
-  CeedInt length;
-
-  PetscFunctionBeginUser;
-  CeedVectorGetLength(data->truesolution, &length);
-  CeedVectorCreate(user->ceed, length, &collocated_error);
-
-  // Global-to-local
-  ierr = DMGlobalToLocal(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
-
-  // Setup CEED vector
-  ierr = VecGetArrayRead(user->Xloc, (const PetscScalar **)&x); CHKERRQ(ierr);
-  CeedVectorSetArray(user->xceed, CEED_MEM_HOST, CEED_USE_POINTER, x);
-
-  // Apply CEED operator
-  CeedOperatorApply(data->op_error, user->xceed, collocated_error,
-                    CEED_REQUEST_IMMEDIATE);
-
-  // Restore PETSc vector
-  VecRestoreArrayRead(user->Xloc, (const PetscScalar **)&x); CHKERRQ(ierr);
-
-  // Reduce max error
-  *l2error = 0;
-  const CeedScalar *e;
-  CeedVectorGetArrayRead(collocated_error, CEED_MEM_HOST, &e);
-  for (CeedInt i=0; i<length; i++) {
-    *l2error += PetscAbsScalar(e[i])*PetscAbsScalar(e[i]);
-  }
-  CeedVectorRestoreArrayRead(collocated_error, &e);
-  ierr = MPI_Allreduce(MPI_IN_PLACE, l2error,
-                       1, MPIU_REAL, MPIU_SUM, user->comm); CHKERRQ(ierr);
-
-  // Solution vector norm
-  ierr = VecNorm(X, NORM_2, &xnorm); CHKERRQ(ierr);
-printf("%f %f\n",*l2error,xnorm);
-  *l2error /= xnorm;
-
-  // Cleanup
-  CeedVectorDestroy(&collocated_error);
-
-  PetscFunctionReturn(0);
 }
 
 static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user){
@@ -691,7 +663,6 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ptr) {
 
   PetscFunctionBeginUser;
   ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0, NULL, NULL, NULL); CHKERRQ(ierr);
-VecView(user->Xloc, PETSC_VIEWER_STDOUT_WORLD);
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
@@ -750,9 +721,9 @@ Also check ..\meshes\cyl-hol.8.jou
 PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
                        PetscInt ncompu, PetscScalar *u, void *ctx) {
 
-  PetscScalar x = coords[0]/10;
-  PetscScalar y = coords[1]/10;
-  PetscScalar z = coords[2]/10;
+  PetscScalar x = coords[0];
+  PetscScalar y = coords[1];
+  PetscScalar z = coords[2];
 
   PetscFunctionBeginUser;
 

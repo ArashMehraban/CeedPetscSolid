@@ -115,8 +115,26 @@ int main(int argc, char **argv) {
 
   // Compute error
   if (appCtx.forcingChoice == FORCE_MMS) {
-    PetscScalar l2error;
-    ierr = ComputeErrorL2(resCtx, ceeddata, U, &l2error); CHKERRQ(ierr);
+    CeedScalar l2error, l2Unorm;
+    const CeedScalar *truearray;
+    Vec errorVec, trueVec;
+    ierr = VecDuplicate(U, &errorVec); CHKERRQ(ierr);
+    ierr = VecDuplicate(U, &trueVec); CHKERRQ(ierr);
+
+    // Global true soltion vector
+    CeedVectorGetArrayRead(ceeddata->truesoln, CEED_MEM_HOST, &truearray);
+    ierr = VecPlaceArray(resCtx->Yloc, truearray); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec); CHKERRQ(ierr);
+    ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
+    CeedVectorRestoreArrayRead(ceeddata->truesoln, &truearray);
+
+    // Compute error
+    ierr = VecWAXPY(errorVec, -1.0, U, trueVec); CHKERRQ(ierr);
+    ierr = VecNorm(errorVec, NORM_2, &l2error); CHKERRQ(ierr);
+    ierr = VecNorm(U, NORM_2, &l2Unorm); CHKERRQ(ierr);
+    l2error /= l2Unorm;
+
     ierr = PetscPrintf(comm, "L2 Error: %f\n", l2error); CHKERRQ(ierr);
   }
 

@@ -22,7 +22,7 @@ CEED_QFUNCTION(SetupMMSForce)(void *ctx, const CeedInt Q,
   const CeedScalar *J = in[0], *w = in[1], *coords = in[2];
 
   // Outputs
-  CeedScalar *force = out[0], *true_soln = out[1];
+  CeedScalar *force = out[0];
 
   // Context
   const Physics context = ctx;
@@ -32,7 +32,7 @@ CEED_QFUNCTION(SetupMMSForce)(void *ctx, const CeedInt Q,
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
-    CeedScalar x = coords[i+0*Q]/10, y = coords[i+1*Q]/10, z = coords[i+2*Q]/10;
+    CeedScalar x = coords[i+0*Q], y = coords[i+1*Q], z = coords[i+2*Q];
     const CeedScalar det = (J[i+Q*0]*(J[i+Q*4]*J[i+Q*8] - J[i+Q*5]*J[i+Q*7]) -
                             J[i+Q*1]*(J[i+Q*3]*J[i+Q*8] - J[i+Q*5]*J[i+Q*6]) +
                             J[i+Q*2]*(J[i+Q*3]*J[i+Q*7] - J[i+Q*4]*J[i+Q*6]));
@@ -43,17 +43,6 @@ CEED_QFUNCTION(SetupMMSForce)(void *ctx, const CeedInt Q,
     force[i+0*Q]=rho*((E*(cos(x*2.0)*cos(y*3.0)*exp(z*4.0)*4.0-cos(z*4.0)*sin(y*3.0)*exp(x*2.0)*8.0)*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*(cos(z*4.0)*sin(y*3.0)*exp(x*2.0)*(9.0/2.0)+sin(x*2.0)*sin(z*4.0)*exp(y*3.0)*3.0)*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*nu*cos(x*2.0)*cos(y*3.0)*exp(z*4.0)*8.0)/((nu*2.0-1.0)*(nu+1.0))-(E*nu*sin(x*2.0)*sin(z*4.0)*exp(y*3.0)*6.0)/((nu*2.0-1.0)*(nu+1.0))-(E*cos(z*4.0)*sin(y*3.0)*exp(x*2.0)*(nu-1.0)*4.0)/((nu*2.0-1.0)*(nu+1.0)));
         force[i+1*Q]=rho*((E*(cos(y*3.0)*cos(z*4.0)*exp(x*2.0)*3.0-cos(x*2.0)*sin(z*4.0)*exp(y*3.0)*2.0)*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*(cos(x*2.0)*sin(z*4.0)*exp(y*3.0)*8.0+sin(x*2.0)*sin(y*3.0)*exp(z*4.0)*6.0)*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*nu*cos(y*3.0)*cos(z*4.0)*exp(x*2.0)*6.0)/((nu*2.0-1.0)*(nu+1.0))-(E*nu*sin(x*2.0)*sin(y*3.0)*exp(z*4.0)*1.2e1)/((nu*2.0-1.0)*(nu+1.0))-(E*cos(x*2.0)*sin(z*4.0)*exp(y*3.0)*(nu-1.0)*9.0)/((nu*2.0-1.0)*(nu+1.0)));
         force[i+2*Q]=rho*((E*(cos(x*2.0)*cos(z*4.0)*exp(y*3.0)*6.0-cos(y*3.0)*sin(x*2.0)*exp(z*4.0)*(9.0/2.0))*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*(cos(y*3.0)*sin(x*2.0)*exp(z*4.0)*2.0+sin(y*3.0)*sin(z*4.0)*exp(x*2.0)*4.0)*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0))+(E*nu*cos(x*2.0)*cos(z*4.0)*exp(y*3.0)*1.2e1)/((nu*2.0-1.0)*(nu+1.0))-(E*nu*sin(y*3.0)*sin(z*4.0)*exp(x*2.0)*8.0)/((nu*2.0-1.0)*(nu+1.0))-(E*cos(y*3.0)*sin(x*2.0)*exp(z*4.0)*(nu-1.0)*1.6e1)/((nu*2.0-1.0)*(nu+1.0)));
-
-
-
-
-    // True solution
-    // -- Component 1
-    true_soln[i+0*Q] = exp(2*x)*sin(3*y)*cos(4*z);
-    // -- Component 2
-    true_soln[i+1*Q] = exp(3*y)*sin(4*z)*cos(2*x);
-    // -- Component 3
-    true_soln[i+2*Q] = exp(4*z)*sin(2*x)*cos(3*y);
   } // End of Quadrature Point Loop
 
   return 0;
