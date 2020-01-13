@@ -86,9 +86,9 @@ int main(int argc, char **argv) {
   ierr = PetscMalloc1(1, &jacobCtx);CHKERRQ(ierr);
   ierr =  CreateMatrixFreeCtx(comm, dm, Uloc, ceeddata, ceed, resCtx, jacobCtx);CHKERRQ(ierr);
   //function that computes the residual
-  ierr = SNESSetFunction(snes, R, FormResidual_Ceed,resCtx); CHKERRQ(ierr);
+  ierr = SNESSetFunction(snes, R, FormResidual_Ceed, resCtx); CHKERRQ(ierr);
   //Form Action of Jacobian on delta_u
-  ierr = MatCreateShell(comm, Ulsz,Ulsz,Ugsz,Ugsz,jacobCtx,&mat); CHKERRQ(ierr);
+  ierr = MatCreateShell(comm, Ulsz, Ulsz, Ugsz, Ugsz, jacobCtx, &mat); CHKERRQ(ierr);
   ierr = MatShellSetOperation(mat, MATOP_MULT, (void (*)(void))ApplyJacobian_Ceed);CHKERRQ(ierr);
 
   ierr = SNESSetJacobian(snes, mat, mat, dummyFun, NULL);CHKERRQ(ierr);
@@ -102,8 +102,23 @@ int main(int argc, char **argv) {
     ierr = KSPSetFromOptions(ksp);
   }
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
-  ierr = SNESSolve(snes,F,U); CHKERRQ(ierr);
 
+  // Set up initial guess
+  ierr = VecZeroEntries(U); CHKERRQ(ierr);
+  ierr = VecZeroEntries(resCtx->Xloc); CHKERRQ(ierr);
+  ierr = DMPlexInsertBoundaryValues(resCtx->dm, PETSC_TRUE, resCtx->Xloc, 0, NULL, NULL, NULL); CHKERRQ(ierr);
+  ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Xloc, INSERT_VALUES, U); CHKERRQ(ierr);
+  ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Xloc, INSERT_VALUES, U); CHKERRQ(ierr);
+
+  // Solve
+  ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+
+  // Compute error
+  if (appCtx.forcingChoice == FORCE_MMS) {
+    PetscScalar l2error;
+    ierr = ComputeErrorL2(resCtx, ceeddata, U, &l2error); CHKERRQ(ierr);
+    ierr = PetscPrintf(comm, "L2 Error: %f\n", l2error); CHKERRQ(ierr);
+  }
 
   //Free objects
   ierr = VecDestroy(&U); CHKERRQ(ierr);

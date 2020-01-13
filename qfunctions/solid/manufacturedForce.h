@@ -32,7 +32,7 @@ CEED_QFUNCTION(SetupMMSForce)(void *ctx, const CeedInt Q,
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
-    CeedScalar x = coords[i+0*Q], y = coords[i+1*Q], z = coords[i+2*Q];
+    CeedScalar x = coords[i+0*Q]/10, y = coords[i+1*Q]/10, z = coords[i+2*Q]/10;
     const CeedScalar det = (J[i+Q*0]*(J[i+Q*4]*J[i+Q*8] - J[i+Q*5]*J[i+Q*7]) -
                             J[i+Q*1]*(J[i+Q*3]*J[i+Q*8] - J[i+Q*5]*J[i+Q*6]) +
                             J[i+Q*2]*(J[i+Q*3]*J[i+Q*7] - J[i+Q*4]*J[i+Q*6]));
