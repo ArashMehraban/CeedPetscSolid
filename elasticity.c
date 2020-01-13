@@ -101,16 +101,11 @@ int main(int argc, char **argv) {
     ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr); //For Now No Preconditioner
     ierr = KSPSetFromOptions(ksp);
   }
+  ierr = SNESSetDM(snes, dm); CHKERRQ(ierr);
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
 
-  // Set up initial guess
-  ierr = VecZeroEntries(U); CHKERRQ(ierr);
-  ierr = VecZeroEntries(resCtx->Xloc); CHKERRQ(ierr);
-  ierr = DMPlexInsertBoundaryValues(resCtx->dm, PETSC_TRUE, resCtx->Xloc, 0, NULL, NULL, NULL); CHKERRQ(ierr);
-  ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Xloc, INSERT_VALUES, U); CHKERRQ(ierr);
-  ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Xloc, INSERT_VALUES, U); CHKERRQ(ierr);
-
   // Solve
+  ierr = VecSet(U, 10);
   ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
 
   // Compute error
