@@ -70,6 +70,7 @@ int main(int argc, char **argv) {
   }
   // libCEED objects setup
   ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz, Ulocsz, forceceed);CHKERRQ(ierr);
+
   // Setup global forcing vector
   ierr = VecZeroEntries(F); CHKERRQ(ierr);
   if (appCtx.forcingChoice != FORCE_NONE) {
@@ -79,19 +80,21 @@ int main(int argc, char **argv) {
     CeedVectorDestroy(&forceceed);
     ierr = VecDestroy(&Floc); CHKERRQ(ierr);
   }
+
   // Setup SNES
   ierr = SNESCreate(comm, &snes); CHKERRQ(ierr);
   ierr = PetscMalloc1(1, &resCtx); CHKERRQ(ierr);
   // Jacobian context
   ierr = PetscMalloc1(1, &jacobCtx);CHKERRQ(ierr);
   ierr =  CreateMatrixFreeCtx(comm, dm, Uloc, ceeddata, ceed, resCtx, jacobCtx);CHKERRQ(ierr);
-  //function that computes the residual
+  resCtx->force = F;
+  // Function that computes the residual
   ierr = SNESSetFunction(snes, R, FormResidual_Ceed, resCtx); CHKERRQ(ierr);
-  //Form Action of Jacobian on delta_u
+  // Form Action of Jacobian on delta_u
   ierr = MatCreateShell(comm, Ulsz, Ulsz, Ugsz, Ugsz, jacobCtx, &mat); CHKERRQ(ierr);
   ierr = MatShellSetOperation(mat, MATOP_MULT, (void (*)(void))ApplyJacobian_Ceed);CHKERRQ(ierr);
-
   ierr = SNESSetJacobian(snes, mat, mat, dummyFun, NULL);CHKERRQ(ierr);
+  // Set KSP options
   {
     PC pc;
     KSP ksp;
@@ -104,9 +107,24 @@ int main(int argc, char **argv) {
   ierr = SNESSetDM(snes, dm); CHKERRQ(ierr);
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
 
+  // Initial Guess
+  ierr = VecSet(U, 5.42); CHKERRQ(ierr);
+
   // Solve
-  ierr = VecSet(U, 10);
-  ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+  ierr = SNESSolve(snes, NULL, U); CHKERRQ(ierr);
+
+// Testing Only - Use KSP in place of SNES
+/*
+    PC pc;
+    KSP ksp;
+    ierr = SNESGetKSP(snes,&ksp); CHKERRQ(ierr);
+    ierr = KSPSetType(ksp, KSPCG); CHKERRQ(ierr);
+    ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
+    ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr); //For Now No Preconditioner
+    ierr = KSPSetFromOptions(ksp);
+    ierr = KSPSetOperators(ksp, mat, mat); CHKERRQ(ierr);
+    ierr = KSPSolve(ksp, F, U); CHKERRQ(ierr);
+*/
 
   // Compute error
   if (appCtx.forcingChoice == FORCE_MMS) {
@@ -132,12 +150,25 @@ int main(int argc, char **argv) {
 
     ierr = PetscPrintf(comm, "L2 Error: %f\n", l2error); CHKERRQ(ierr);
 
+// Testing Only, Check residual of true solution
+/*
+    ierr = VecCopy(trueVec, U);
+    ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+
+    // Compute error
+    ierr = VecWAXPY(errorVec, -1.0, U, trueVec); CHKERRQ(ierr);
+    ierr = VecNorm(errorVec, NORM_2, &l2error); CHKERRQ(ierr);
+    ierr = VecNorm(U, NORM_2, &l2Unorm); CHKERRQ(ierr);
+    l2error /= l2Unorm;
+
+    ierr = PetscPrintf(comm, "L2 Error: %f\n", l2error); CHKERRQ(ierr);
+*/
     // Cleanup
     ierr = VecDestroy(&errorVec); CHKERRQ(ierr);
     ierr = VecDestroy(&trueVec); CHKERRQ(ierr);
   }
 
-  //Free objects
+  // Free objects
   ierr = VecDestroy(&U); CHKERRQ(ierr);
   ierr = VecDestroy(&Uloc); CHKERRQ(ierr);
   ierr = VecDestroy(&R); CHKERRQ(ierr);

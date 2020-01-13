@@ -120,7 +120,7 @@ typedef struct UserMult_private *UserMult;
 struct UserMult_private {
   MPI_Comm     comm;
   DM           dm;
-  Vec          Xloc, Yloc, diag;
+  Vec          Xloc, Yloc, diag, force;
   CeedVector   xceed, yceed;
   CeedOperator op;
   Ceed         ceed;
@@ -661,8 +661,10 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ptr) {
   UserMult user = (UserMult)ptr;
 
   PetscFunctionBeginUser;
+  ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
   ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0, NULL, NULL, NULL); CHKERRQ(ierr);
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
+  ierr = VecAXPY(Y, -1.0, user->force); CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
 }
