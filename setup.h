@@ -472,7 +472,7 @@ CeedOperatorCreate(ceed, qf_setupgeo, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, 
 //field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
 CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, CEED_TRANSPOSE, basisx, xcoord);
 CeedOperatorSetField(op_setupgeo, "weight", Erestrictx, CEED_NOTRANSPOSE, basisx, CEED_VECTOR_NONE);
-CeedOperatorSetField(op_setupgeo, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
+CeedOperatorSetField(op_setupgeo, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
 
 // Create the QFunction and Operator that evaluates the residual
 CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].apply,problemOptions[problemChoice].applyfname, &qf_apply);
@@ -522,17 +522,15 @@ CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
 
     // Create the q-function that sets up the forcing vector (and true solution for MMS)
     CeedQFunctionCreateInterior(ceed, 1, forcingOptions[forcingChoice].setupforcing, forcingOptions[forcingChoice].setupforcingfname, &qf_setupforce);
-    CeedQFunctionAddInput(qf_setupforce, "dx", ncompx*dim, CEED_EVAL_GRAD);
-    CeedQFunctionAddInput(qf_setupforce, "weight", 1, CEED_EVAL_WEIGHT);
     CeedQFunctionAddInput(qf_setupforce, "x", dim, CEED_EVAL_INTERP);
+    CeedQFunctionAddInput(qf_setupforce, "qdata", 1, CEED_EVAL_NONE);
     CeedQFunctionAddOutput(qf_setupforce, "rhs", ncompu, CEED_EVAL_INTERP);
     CeedQFunctionSetContext(qf_setupforce, phys, sizeof(phys));
 
     // Create the operator that builds the forcing vector (and true solution for MMS)
     CeedOperatorCreate(ceed, qf_setupforce, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE, &op_setupforce);
-    CeedOperatorSetField(op_setupforce, "dx", Erestrictx, CEED_TRANSPOSE, basisx, CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op_setupforce, "weight", Erestrictxi, CEED_NOTRANSPOSE, basisx, CEED_VECTOR_NONE);
     CeedOperatorSetField(op_setupforce, "x", Erestrictx, CEED_TRANSPOSE, basisx, CEED_VECTOR_ACTIVE);
+    CeedOperatorSetField(op_setupforce, "qdata", Erestrictqdi, CEED_NOTRANSPOSE, CEED_BASIS_COLLOCATED, qdata);
     CeedOperatorSetField(op_setupforce, "rhs", Erestrictu, CEED_TRANSPOSE, basisu, CEED_VECTOR_ACTIVE);
 
     // Setup forcing vector (and true solution, for MMS)
@@ -654,6 +652,7 @@ static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user){
     ierr = VecZeroEntries(Y); CHKERRQ(ierr);
     ierr = DMLocalToGlobalBegin(user->dm, user->Yloc, ADD_VALUES, Y); CHKERRQ(ierr);
     ierr = DMLocalToGlobalEnd(user->dm, user->Yloc, ADD_VALUES, Y); CHKERRQ(ierr);
+
     PetscFunctionReturn(0);
 }
 
@@ -676,6 +675,7 @@ static PetscErrorCode ApplyJacobian_Ceed(Mat A, Vec X, Vec Y){
     ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
     ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
     ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
+
     PetscFunctionReturn(0);
 }
 
@@ -727,9 +727,9 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
 
   PetscFunctionBeginUser;
 
-  u[0]= exp(2*x)*sin(3*y)*cos(4*z);
-  u[1]= exp(3*y)*sin(4*z)*cos(2*x);
-  u[2]= exp(4*z)*sin(2*x)*cos(3*y);
+  u[0] = sin(x)*sin(2*y)*sin(3*z);//exp(2*x)*sin(3*y)*cos(4*z);
+  u[1] = sin(x)*sin(2*y)*sin(3*z);//exp(3*y)*sin(4*z)*cos(2*x);
+  u[2] = sin(x)*sin(2*y)*sin(3*z);//exp(4*z)*sin(2*x)*cos(3*y);
 
   PetscFunctionReturn(0);
 }

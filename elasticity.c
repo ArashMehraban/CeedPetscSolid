@@ -131,6 +131,10 @@ int main(int argc, char **argv) {
     l2error /= l2Unorm;
 
     ierr = PetscPrintf(comm, "L2 Error: %f\n", l2error); CHKERRQ(ierr);
+
+    // Cleanup
+    ierr = VecDestroy(&errorVec); CHKERRQ(ierr);
+    ierr = VecDestroy(&trueVec); CHKERRQ(ierr);
   }
 
   //Free objects
