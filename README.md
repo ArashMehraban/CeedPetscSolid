@@ -17,8 +17,8 @@ As an example, consider `cyl-hole_672e_4ss_us.exo`, `cyl-hole_672e_2ss_us.exo` a
    `_2ss` refers to the left and right *walls* of the image above.\
    `_1ss` refers to the left *wall* of the image above.\
    `_672e` in the mesh file name means 672 elements.\
-   `_us` means `unstructured mesh`
-   `_s` means `structured mesh`
+   `_us` means `unstructured mesh`.\
+   `_s` means `structured mesh`.
 
 
 ### CEED/PETSc Linear Elasticity problem
