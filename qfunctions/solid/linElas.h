@@ -107,7 +107,6 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     //                         [                                        (1-2*nu)/2 ]
 
     //Above Voigt Notation is placed in a 3x3 matrix:
-<<<<<<< HEAD
      const CeedScalar ss      =  E/((1+nu)*(1-2*nu));
      const CeedScalar sigma00 = ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]),
                       sigma11 = ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]),

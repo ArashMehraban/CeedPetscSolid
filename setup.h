@@ -28,14 +28,14 @@ typedef enum {
 static const char *const forcingTypes[] = {"none","constant","mms","forcingType","FORCE_",0};
 
 typedef enum {
-  BDRY_WALL_NONE = 0, BDRY_WALL_WEIGHT = 1, BDRY_MMS = 2
+  BDRY_WALL_NONE = 0, BDRY_WALL_WEIGHT = 1, BDRY_MMS = 2, BDRY_CUBE = 3
 } boundaryType;
-static const char *const boundaryTypes[] = {"wall_none","wall_weight","mms", "boundaryType","BDRY_",0};
+static const char *const boundaryTypes[] = {"wall_none","wall_weight","mms", "cube","boundaryType","BDRY_",0};
 
 typedef PetscErrorCode BCFunc(PetscInt, PetscReal, const PetscReal *, PetscInt,
                               PetscScalar *, void *);
-BCFunc BCBend1_ss, BCBend2_ss, BCMMS;
-BCFunc *boundaryOptions[] = {BCBend1_ss, BCBend2_ss, BCMMS};
+BCFunc BCBend1_ss, BCBend2_ss, BCMMS, BCCube;
+BCFunc *boundaryOptions[] = {BCBend1_ss, BCBend2_ss, BCMMS, BCCube};
 
 // -----------------------------------------------------------------------------
 // Structs
@@ -853,6 +853,19 @@ Also check ..\meshes\cyl-hol.8.jou
   0 values on the left side of the cyl-hole (sideset 999)
 */
 PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time,
+                          const PetscReal coords[],
+                          PetscInt ncompu, PetscScalar *u, void *ctx) {
+
+  PetscFunctionBeginUser;
+
+  u[0]= 0;
+  u[1]= 0;
+  u[2]= 0;
+
+  PetscFunctionReturn(0);
+}
+
+PetscErrorCode BCCube(PetscInt dim, PetscReal time,
                           const PetscReal coords[],
                           PetscInt ncompu, PetscScalar *u, void *ctx) {
 
