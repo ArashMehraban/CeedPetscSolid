@@ -3,15 +3,16 @@
 
 #ifndef PHYSICS_STRUCT
 #define PHYSICS_STRUCT
-    typedef struct Physics_private *Physics;
-    struct Physics_private{
-      PetscScalar   nu;      //Poisson's ratio
-      PetscScalar   E;       //Young's Modulus
-    };
+typedef struct Physics_private *Physics;
+struct Physics_private {
+  PetscScalar   nu;      // Poisson's ratio
+  PetscScalar   E;       // Young's Modulus
+};
 #endif
 
 // -----------------------------------------------------------------------------
-CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out) {
+CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
+                         CeedScalar *const *out) {
    // *INDENT-OFF*
    // Inputs
    const CeedScalar (*ug)[3][Q] = (CeedScalar(*)[3][Q])in[0],
@@ -23,18 +24,15 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
               // (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
    // *INDENT-ON*
 
-   // Context
-   const Physics context = ctx;
-   const CeedScalar E  = context->E;
-   const CeedScalar nu = context->nu;
+  // Context
+  const Physics context = ctx;
+  const CeedScalar E  = context->E;
+  const CeedScalar nu = context->nu;
 
-
-//PetscPrintf(PETSC_COMM_WORLD, "LinElasF in F\n");
-
-   // Quadrature Point Loop
-     CeedPragmaSIMD
-     for (CeedInt i=0; i<Q; i++) {
-       // Read spatial derivatives of u
+  // Quadrature Point Loop
+  CeedPragmaSIMD
+  for (CeedInt i=0; i<Q; i++) {
+    // Read spatial derivatives of u
        // *INDENT-OFF*
        const CeedScalar du[3][3]   = {{ug[0][0][i],
                                        ug[1][0][i],
@@ -75,6 +73,7 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
 
      // Compute Strain : e (epsilon)
      // e = 1/2 (grad u + (grad u)^T)
+
      // *INDENT-OFF*
      const CeedScalar e[3][3]     =  {{(gradu[0][0] + gradu[0][0])*0.5,
                                        (gradu[0][1] + gradu[1][0])*0.5,
@@ -108,6 +107,7 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
     //                         [                                        (1-2*nu)/2 ]
 
     //Above Voigt Notation is placed in a 3x3 matrix:
+<<<<<<< HEAD
      const CeedScalar ss      =  E/((1+nu)*(1-2*nu));
      const CeedScalar sigma00 = ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]),
                       sigma11 = ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]),
@@ -134,7 +134,8 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Ceed
 }
 
 // -----------------------------------------------------------------------------
-CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, CeedScalar *const *out) {
+CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
+                          CeedScalar *const *out) {
    // *INDENT-OFF*
    // Inputs
    const CeedScalar (*deltaug)[3][Q] = (CeedScalar(*)[3][Q])in[0],
@@ -143,21 +144,19 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in, Cee
                     // (*gradu)[3][Q] = (CeedScalar(*)[3][Q])in[2];
 
 
-PetscPrintf(PETSC_COMM_WORLD, "LinElasdF in dF\n");
-
    // Outputs
    CeedScalar (*deltavg)[3][Q] = (CeedScalar(*)[3][Q])out[0];
    // *INDENT-ON*
 
-   // Context
-   const Physics context = ctx;
-   const CeedScalar E  = context->E;
-   const CeedScalar nu = context->nu;
+  // Context
+  const Physics context = ctx;
+  const CeedScalar E  = context->E;
+  const CeedScalar nu = context->nu;
 
-   // Quadrature Point Loop
-     CeedPragmaSIMD
-     for (CeedInt i=0; i<Q; i++) {
-       // Read spatial derivatives of u
+  // Quadrature Point Loop
+  CeedPragmaSIMD
+  for (CeedInt i=0; i<Q; i++) {
+    // Read spatial derivatives of u
        // *INDENT-OFF*
        const CeedScalar deltadu[3][3] = {{deltaug[0][0][i],
                                           deltaug[1][0][i],
