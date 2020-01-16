@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
 
     // Compute error
     ierr = VecWAXPY(errorVec, -1.0, U, trueVec); CHKERRQ(ierr);
-    ierr = VecNorm(errorVec, NORM_2, &l2error); CHKERRQ(ierr);
+    ierr = VecNorm(trueVec, NORM_2, &l2error); CHKERRQ(ierr);
     ierr = VecNorm(U, NORM_2, &l2Unorm); CHKERRQ(ierr);
     l2error /= l2Unorm;
 

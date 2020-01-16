@@ -506,8 +506,8 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
 //anything read from PETSc we use CEED_TRANSPOSE ([node][compu] in PETSc is considered transpose of [node][compu] in CEED )
 //field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
   CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, CEED_TRANSPOSE, basisx,
-                       xcoord);
-  CeedOperatorSetField(op_setupgeo, "weight", Erestrictx, CEED_NOTRANSPOSE,
+                       CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(op_setupgeo, "weight", Erestrictxi, CEED_NOTRANSPOSE,
                        basisx, CEED_VECTOR_NONE);
   CeedOperatorSetField(op_setupgeo, "qdata", Erestrictqdi, CEED_NOTRANSPOSE,
                        CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
@@ -632,9 +632,9 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
     // Multiplicity calculation
     CeedElemRestrictionCreateVector(Erestrictu, &multvec, &evec);
     CeedVectorSetValue(evec, 1.0);
+    CeedVectorSetValue(multvec, 0.0);
     CeedElemRestrictionApply(Erestrictu, CEED_TRANSPOSE, CEED_TRANSPOSE, evec,
-                             multvec,
-                             CEED_REQUEST_IMMEDIATE);
+                             multvec, CEED_REQUEST_IMMEDIATE);
 
     // Multiplicity correction
     CeedVectorGetArray(data->truesoln, CEED_MEM_HOST, &truearray);
