@@ -723,9 +723,11 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ptr) {
   ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0, NULL,
                                     NULL, NULL); CHKERRQ(ierr);
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
+VecView(Y, PETSC_VIEWER_STDOUT_WORLD);
+VecView(user->force, PETSC_VIEWER_STDOUT_WORLD);
   ierr = VecAXPY(Y, -1.0, user->force); CHKERRQ(ierr);
 
-  PetscFunctionReturn(0);
+  PetscFunctionReturn(1);
 }
 
 static PetscErrorCode ApplyJacobian_Ceed(Mat A, Vec X, Vec Y) {
@@ -790,9 +792,9 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
 
   PetscFunctionBeginUser;
 
-  u[0] = sin(x)*sin(2*y)*sin(3*z);//exp(2*x)*sin(3*y)*cos(4*z);
-  u[1] = sin(x)*sin(2*y)*sin(3*z);//exp(3*y)*sin(4*z)*cos(2*x);
-  u[2] = sin(x)*sin(2*y)*sin(3*z);//exp(4*z)*sin(2*x)*cos(3*y);
+  u[0] = exp(2*x)*sin(3*y)*cos(4*z);
+  u[1] = exp(3*y)*sin(4*z)*cos(2*x);
+  u[2] = exp(4*z)*sin(2*x)*cos(3*y);
 
   PetscFunctionReturn(0);
 }

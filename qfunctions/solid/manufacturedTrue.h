@@ -22,11 +22,11 @@ CEED_QFUNCTION(MMSTrueSoln)(void *ctx, const CeedInt Q,
 
     // True solution
     // -- Component 1
-    true_soln[i+0*Q] = sin(x)*sin(2*y)*sin(3*z);//exp(2*x)*sin(3*y)*cos(4*z);
+    true_soln[i+0*Q] = exp(2*x)*sin(3*y)*cos(4*z);
     // -- Component 2
-    true_soln[i+1*Q] = sin(x)*sin(2*y)*sin(3*z);//exp(3*y)*sin(4*z)*cos(2*x);
+    true_soln[i+1*Q] = exp(3*y)*sin(4*z)*cos(2*x);
     // -- Component 3
-    true_soln[i+2*Q] = sin(x)*sin(2*y)*sin(3*z);//exp(4*z)*sin(2*x)*cos(3*y);
+    true_soln[i+2*Q] = exp(4*z)*sin(2*x)*cos(3*y);
   } // End of Quadrature Point Loop
 
   return 0;
