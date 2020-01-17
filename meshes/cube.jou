@@ -31,3 +31,51 @@ sideset 994 surface 4 #left
 
 set idmap on
 export mesh "~/Desktop/cube_1e_1ss_s.exo" dimension 3 overwrite
+
+
+
+----------------------------------------------
+#To Create an unstructured cube with 1 element:  
+      8---------7
+     /|        / |
+    / |       /  |
+ 5 /---------/6  |         
+   |  |      |   |
+   |  |      |   |
+   |  | 4    |   |
+   |  /------|---/3
+   | /       |  / 
+   |/        | /
+   1----------2
+
+
+reset
+create vertex  -1 -1 -1 color #1
+create vertex  1 -1 -1 color  #2
+create vertex  1 -1 1 color   #3
+create vertex  -1 -1 1 color  #4
+create vertex  -0.5 0.5 -0.5 color #5
+create vertex  0.5 0.5 -0.5 color  #6
+create vertex  0.5 0.5 0.5 color   #7
+create vertex  -0.5 0.5 0.5 color  #8
+create surface vertex 1 2 3 4
+create surface vertex 5 6 7 8
+create surface vertex 2 3 7 6
+create surface vertex 1 4 8 5
+create surface vertex 1 2 6 5
+create surface vertex 4 3 7 8
+Create volume surface 1 2 3 4 5 6 heal
+block 1 volume 6
+block 1 element type hex8
+volume 6  interval 1
+mesh volume 6
+sideset 991 surface 1 #bottom
+sideset 992 surface 2 #top
+sideset 993 surface 3 #front
+sideset 994 surface 4 #back 
+sideset 995 surface 5 #right 
+sideset 996 surface 6 #left
+export mesh "~/Desktop/cube_1e_6ss_us.exo" dimension 3 overwrite
+
+
+
