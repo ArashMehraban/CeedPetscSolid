@@ -43,6 +43,7 @@ BCFunc *boundaryOptions[] = {BCBend1_ss, BCBend2_ss, BCMMS, BCCube};
 
 typedef struct {
   char          meshFile[PETSC_MAX_PATH_LEN]; // exodusII mesh file
+  PetscBool     testMode;
   problemType   problemChoice;
   forcingType   forcingChoice;
   PetscInt      degree;
@@ -183,18 +184,28 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
                           (PetscEnum)appCtx->boundaryChoice,(PetscEnum *)&appCtx->boundaryChoice,
                           &boundaryFlag); CHKERRQ(ierr);
 
+  ierr = PetscOptionsBool("-test",
+                          "Testing mode (do not print unless error is large)",
+                          NULL, appCtx->testMode, &(appCtx->testMode), NULL); CHKERRQ(ierr);
+
   ierr = PetscOptionsEnd(); CHKERRQ(ierr);//End of setting AppCtx
-  if(!degreeFalg) {
-    ierr = PetscPrintf(comm, "-degree option needed\n\n"); CHKERRQ(ierr);
-    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
-  }
-  if(!meshFileFlag) {
-    ierr = PetscPrintf(comm, "-mesh option needed (file)\n\n"); CHKERRQ(ierr);
-    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
-  }
-  if(!boundaryFlag) {
-    ierr = PetscPrintf(comm, "-boundary option needed\n\n"); CHKERRQ(ierr);
-    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
+
+  if (!appCtx->testMode) {
+    if(!degreeFalg) {
+      ierr = PetscPrintf(comm, "-degree option needed\n\n"); CHKERRQ(ierr);
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
+    }
+    if(!meshFileFlag) {
+      ierr = PetscPrintf(comm, "-mesh option needed (file)\n\n"); CHKERRQ(ierr);
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
+    }
+    if(!boundaryFlag) {
+      ierr = PetscPrintf(comm, "-boundary option needed\n\n"); CHKERRQ(ierr);
+      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "AppCtx ERROR!");
+    }
+  } else {
+    appCtx->boundaryChoice = BDRY_MMS;
+    appCtx->forcingChoice = FORCE_MMS;
   }
   PetscFunctionReturn(0);
 }
@@ -231,15 +242,21 @@ static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
 
   PetscErrorCode  ierr;
   const char      *filename = ctx->meshFile;
-  PetscBool       interpolate = PETSC_FALSE;
+  PetscBool       interpolate = PETSC_TRUE;
   DM              distributedMesh = NULL;
   PetscPartitioner part;
 
   PetscFunctionBeginUser;
-  if(ctx->degree >= 2)
+  if (ctx->degree >= 2)
     interpolate = PETSC_TRUE;
 
-  ierr = DMPlexCreateFromFile(comm, filename, interpolate, dm); CHKERRQ(ierr);
+  if (ctx->testMode) {
+    PetscInt dim = 3, cells[3] = {3, 3, 3};
+    ierr = DMPlexCreateBoxMesh(comm, dim, PETSC_FALSE, cells, NULL,
+                               NULL, NULL, interpolate, dm); CHKERRQ(ierr);
+  } else {
+    ierr = DMPlexCreateFromFile(comm, filename, interpolate, dm); CHKERRQ(ierr);
+  }
   ierr = DMPlexGetPartitioner(*dm, &part); CHKERRQ(ierr);
   ierr = PetscPartitionerSetFromOptions(part); CHKERRQ(ierr);
   ierr = DMPlexDistribute(*dm, 0, NULL, &distributedMesh); CHKERRQ(ierr);
@@ -251,8 +268,22 @@ static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
 }
 
 // -----------------------------------------------------------------------------
-// Problem Option Data
+// Setup DM
 // -----------------------------------------------------------------------------
+static PetscErrorCode CreateBCLabel(DM dm, const char name[]) {
+  int ierr;
+  DMLabel label;
+
+  PetscFunctionBeginUser;
+
+  ierr = DMCreateLabel(dm, name); CHKERRQ(ierr);
+  ierr = DMGetLabel(dm, name, &label); CHKERRQ(ierr);
+  ierr = DMPlexMarkBoundaryFaces(dm, 1, label); CHKERRQ(ierr);
+  ierr = DMPlexLabelComplete(dm, label); CHKERRQ(ierr);
+
+  PetscFunctionReturn(0);
+}
+
 static int SetupDMByDegree(DM dm, AppCtx *appCtx, PetscInt ncompu) {
 
   PetscErrorCode  ierr;
@@ -318,21 +349,34 @@ static int SetupDMByDegree(DM dm, AppCtx *appCtx, PetscInt ncompu) {
   // Setup DM
   ierr = DMSetFromOptions(dm); CHKERRQ(ierr);
   ierr = DMAddField(dm, NULL, (PetscObject)fe); CHKERRQ(ierr);
-  //ierr = DMCreateDS(dm); CHKERRQ(ierr);
 
   // Add Dirichlet (Essential) boundray
   ierr = DMCreateDS(dm); CHKERRQ(ierr);
-  ierr = DMGetLabelIdIS(dm, name, &faceSetIS); CHKERRQ(ierr);
-  ierr = ISGetLocalSize(faceSetIS,&numFaceSets);
-  ierr = ISGetIndices(faceSetIS, &faceSetIds); CHKERRQ(ierr);
+  if (appCtx->testMode) {
+    // Test mode - box mesh
+    PetscBool hasLabel;
+    PetscInt marker_ids[1] = {1};
+    DMHasLabel(dm, "marker", &hasLabel);
+    if (!hasLabel)
+      CreateBCLabel(dm, "marker");
+    ierr = DMAddBoundary(dm, DM_BC_ESSENTIAL, "wall", "marker", 0, 0, NULL,
+                         (void(*)(void))boundaryOptions[appCtx->boundaryChoice],
+                         1, marker_ids, NULL);
+    CHKERRQ(ierr);
+  } else {
+    // ExodusII mesh
+    ierr = DMGetLabelIdIS(dm, name, &faceSetIS); CHKERRQ(ierr);
+    ierr = ISGetLocalSize(faceSetIS,&numFaceSets);
+    ierr = ISGetIndices(faceSetIS, &faceSetIds); CHKERRQ(ierr);
 
-  for (PetscInt i=0; i<numFaceSets; i++) {
-    ierr = DMAddBoundary(dm,DM_BC_ESSENTIAL,NULL,"Face Sets",0,0,NULL,
-                         (void(*)(void))boundaryOptions[appCtx->boundaryChoice],1,&faceSetIds[i],
-                         (void *)(&faceSetIds[i])); CHKERRQ(ierr);
+    for (PetscInt i=0; i<numFaceSets; i++) {
+      ierr = DMAddBoundary(dm,DM_BC_ESSENTIAL,NULL,"Face Sets",0,0,NULL,
+                           (void(*)(void))boundaryOptions[appCtx->boundaryChoice],1,&faceSetIds[i],
+                           (void *)(&faceSetIds[i])); CHKERRQ(ierr);
+    }
+    ierr = ISRestoreIndices(faceSetIS, &faceSetIds); CHKERRQ(ierr);
+    ierr = ISDestroy(&faceSetIS); CHKERRQ(ierr);
   }
-  ierr = ISRestoreIndices(faceSetIS, &faceSetIds); CHKERRQ(ierr);
-  ierr = ISDestroy(&faceSetIS); CHKERRQ(ierr);
   ierr = DMPlexSetClosurePermutationTensor(dm, PETSC_DETERMINE, NULL);
   CHKERRQ(ierr);
   ierr = PetscFEDestroy(&fe); CHKERRQ(ierr);
