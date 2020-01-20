@@ -66,12 +66,11 @@ CEED_QFUNCTION(HyperSSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // Compute gradu
     // dXdx = (dx/dX)^(-1)
     // Apply dXdx to du = gradu
-    CeedScalar gradu[3][3];
     for (int j=0; j<3; j++)     // Component
       for (int k=0; k<3; k++) { // Derivative
-        gradu[j][k] = 0;
+        gradu[j][k][i] = 0;
         for (int m=0; m<3; m++)
-          gradu[j][k] += dXdx[m][k] * du[j][m];
+          gradu[j][k][i] += dXdx[m][k] * du[j][m];
       }
 
     // Compute Strain : e (epsilon)

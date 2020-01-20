@@ -184,6 +184,7 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
                           (PetscEnum)appCtx->boundaryChoice,(PetscEnum *)&appCtx->boundaryChoice,
                           &boundaryFlag); CHKERRQ(ierr);
 
+  appCtx->testMode = PETSC_FALSE;
   ierr = PetscOptionsBool("-test",
                           "Testing mode (do not print unless error is large)",
                           NULL, appCtx->testMode, &(appCtx->testMode), NULL); CHKERRQ(ierr);
