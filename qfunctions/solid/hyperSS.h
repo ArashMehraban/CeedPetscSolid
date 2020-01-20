@@ -149,7 +149,7 @@ CEED_QFUNCTION(HyperSSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
   const CeedScalar (*gradu)[3][Q] = (CeedScalar(*)[3][Q])in[2];
 
   // Outputs
-  CeedScalar (*deltavg)[3][Q] = (CeedScalar(*)[3][Q])out[0];
+  CeedScalar (*deltadvdX)[3][Q] = (CeedScalar(*)[3][Q])out[0];
   // *INDENT-ON*
 
   // Context
@@ -251,9 +251,9 @@ CEED_QFUNCTION(HyperSSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // Apply dXdx^-T and weight
     for (int j=0; j<3; j++)     // Component
       for (int k=0; k<3; k++) { // Derivative
-        deltavg[k][j][i] = 0;
+        deltadvdX[k][j][i] = 0;
         for (int m=0; m<3; m++)
-          deltavg[k][j][i] += dXdx[k][m] * dsigma[j][m] * wJ;
+          deltadvdX[k][j][i] += dXdx[k][m] * dsigma[j][m] * wJ;
       }
   } // End of Quadrature Point Loop
 
