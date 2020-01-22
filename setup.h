@@ -84,12 +84,14 @@ problemData problemOptions[3] = {
     .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_FS] = {
-    // .qdatasize = 10,
-    // .setupgeo = SetupGeo,
-    // .apply = HyperFS,
-    // .setupgeofname = SetupGeo_loc,
-    // .applyfname = HyperFS_loc,
-    // .qmode = CEED_GAUSS
+     .qdatasize = 10,
+     .setupgeo = SetupGeo,
+     .apply = HyperFSF,
+     .jacob = HyperFSdF,
+     .setupgeofname = SetupGeo_loc,
+     .applyfname = HyperFSF_loc,
+     .jacobfname = HyperFSdF_loc,
+     .qmode = CEED_GAUSS
   }
 };
 

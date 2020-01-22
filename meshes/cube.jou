@@ -20,6 +20,8 @@ volume 1  interval 1
 
 #5) mesh the created volume
 mesh volume 1
+#if 27-noded element wanted:
+block 1 element type hex27
 
 #6)select nodesets
 #sideset 991 surface 1 #front
@@ -29,8 +31,8 @@ sideset 994 surface 4 #left
 #sideset 995 surface 5 #top
 #sideset 996 surface 6 #bottom
 
-set idmap on
-export mesh "~/Desktop/cube_1e_1ss_s.exo" dimension 3 overwrite
+#set idmap on
+export mesh "~/Matlab-fem/cube27_1e_1ss_s.exo" dimension 3 overwrite
 
 
 
