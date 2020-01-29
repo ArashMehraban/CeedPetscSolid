@@ -2,7 +2,7 @@
 #How to run this file       #
 #playback '~/cylinder8.jou' #
 ######                 #####
-
+reset
 #1) Create a Cylinder: volume 1
 create Cylinder height 10 radius 1 
 
@@ -19,9 +19,9 @@ block 1 volume 1
 block 1 element type hex8 
 
 #6) Refine mesh size if needed
-#    factor:  7    6    5    4.5    4 
-#  elem num: 110  368  1176  1635  4180
-volume 1 size auto factor 6
+#    factor:  7    6    5    4.5    4      3.1     2.5
+#  elem num: 110  368  1176  1635  4180  12400  17670
+volume 1 size auto factor 2.4
 
 #7) Mesh the volume created
 mesh volume 1
@@ -29,10 +29,14 @@ mesh volume 1
 #Choose nodesets and sidesets from Boundary conditions
 
 #8) Create a sidesets. Call it Dirch for Dirichlet (inner wall of the cylinder)
-sideset 999 surface 9 #left
-sideset 998 surface 8 #right
-sideset 997 surface 1  #outer
-sideset 996 surface 7  #inner
+#sideset 999 surface 9 #left
+#sideset 998 surface 8 #right
+#sideset 997 surface 1  #outer
+#sideset 996 surface 7  #inner
+nodeset 999 surface 9 #left
+nodeset 998 surface 8 #right
+nodeset 997 surface 1  #outer
+nodeset 996 surface 7  #inner
 
 #9) Create a nodeset.
 #sideset 1 surface 1
@@ -42,5 +46,6 @@ sideset 996 surface 7  #inner
 
 #print(cubit.get_quad_count())
 #11) export the mesh
+export mesh "~/fem-elasticity/mesh_Dirich_only/cylinder8_e_4ss_us.exo" dimension 3 overwrite
 export mesh "~/Desktop/Arash-mesh/cyl-hole_632e_4ss_us.exo" dimension 3 overwrite
 

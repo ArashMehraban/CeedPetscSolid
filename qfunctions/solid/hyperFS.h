@@ -174,8 +174,8 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
   // Inputs
   const CeedScalar (*deltaug)[3][Q] = (CeedScalar(*)[3][Q])in[0],
                    (*qdata)[Q] = (CeedScalar(*)[Q])in[1];
-                   // gradu not used for linear elasticity
-                   // (*gradu)[3][Q] = (CeedScalar(*)[3][Q])in[2];
+
+    const CeedScalar (*gradu)[3][Q] = (CeedScalar(*)[3][Q])in[2];
 
 
   // Outputs
@@ -187,14 +187,14 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
   const CeedScalar E  = context->E;
   const CeedScalar nu = context->nu;
   const CeedScalar TwoMu = E/(1+nu);
-  const CeedScalar mu = TwoMu /2;
+  const CeedScalar mu = TwoMu/2;
   const CeedScalar Kbulk = E/(3*(1-2*nu)); //bulk Modulus
   const CeedScalar lambda = (3*Kbulk-TwoMu)/3;
 
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
-    // Read spatial derivatives of u
+    // Read spatial derivatives of delta_u
     // *INDENT-OFF*
     const CeedScalar deltadu[3][3] = {{deltaug[0][0][i],
                                        deltaug[1][0][i],
@@ -217,73 +217,114 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                                     {qdata[7][i],
                                      qdata[8][i],
                                      qdata[9][i]}
-                                   };
-    // *INDENT-ON*
-
+                                    };
     //Compute graddeltau
     //dXdx = (dx/dX)^(-1)
-    // Apply dXdx to deltadu = graddeltau
-    CeedScalar graddeltau[3][3];
+    // Apply dXdx to deltadu = graddeltau (9x1 vector [u1,x  u2,x  u3,x  u1,y ....]) to multiply by reshaped 9x9 dPdF
+    CeedScalar graddeltau[9];
     for (int j=0; j<3; j++)     // Component
       for (int k=0; k<3; k++) { // Derivative
-        graddeltau[j][k] = 0;
+        graddeltau[3*j+k] = 0;
         for (int m=0; m<3; m++)
-          graddeltau[j][k] += dXdx[m][k] * deltadu[j][m];
+          graddeltau[3*j+k] += dXdx[m][k] * deltadu[j][m];
       }
 
-    // Compute Strain : e (epsilon)
-    // e = 1/2 (grad u + (grad u)^T)
+    // I3 : 3x3 Identity matrix
+    // Compute The Deformation Gradient : F = I3 + gradu
     // *INDENT-OFF*
-    const CeedScalar de[3][3]     =  {{(graddeltau[0][0] + graddeltau[0][0])*0.5,
-                                       (graddeltau[0][1] + graddeltau[1][0])*0.5,
-                                       (graddeltau[0][2] + graddeltau[2][0])*0.5},
-                                      {(graddeltau[1][0] + graddeltau[0][1])*0.5,
-                                       (graddeltau[1][1] + graddeltau[1][1])*0.5,
-                                       (graddeltau[1][2] + graddeltau[2][1])*0.5},
-                                      {(graddeltau[2][0] + graddeltau[0][2])*0.5,
-                                       (graddeltau[2][1] + graddeltau[1][2])*0.5,
-                                       (graddeltau[2][2] + graddeltau[2][2])*0.5}
-                                     };
+    const CeedScalar F[3][3] =  {{gradu[0][0][i] + 1,
+                                  gradu[0][1][i],
+                                  gradu[0][2][i]},
+                                 {gradu[1][0][i],
+                                  gradu[1][1][i] + 1,
+                                  gradu[1][2][i]},
+                                 {gradu[2][0][i],
+                                  gradu[2][1][i],
+                                  gradu[2][2][i] + 1}
+                                };
+    // *INDENT-ON*
+
+    // Compute the F_inv componets and det(F)
+    const CeedScalar Fa00 = F[1][1]*F[2][2] - F[1][2]*F[2][1];
+    const CeedScalar Fa01 = F[0][2]*F[2][1] - F[0][1]*F[2][2];
+    const CeedScalar Fa02 = F[0][1]*F[1][2] - F[0][2]*F[1][1];
+    const CeedScalar Fa10 = F[1][2]*F[2][0] - F[1][0]*F[2][2];
+    const CeedScalar Fa11 = F[0][0]*F[2][2] - F[0][2]*F[2][0];
+    const CeedScalar Fa12 = F[0][2]*F[1][0] - F[0][0]*F[1][2];
+    const CeedScalar Fa20 = F[1][0]*F[2][1] - F[1][1]*F[2][0];
+    const CeedScalar Fa21 = F[0][1]*F[2][0] - F[0][0]*F[2][1];
+    const CeedScalar Fa22 = F[0][0]*F[1][1] - F[0][1]*F[1][0];
+    const CeedScalar detF = F[0][0]*Fa00 + F[1][0]*Fa01 + F[2][0]*Fa02;
+
+    const CeedScalar F_inv[3][3] = {{Fa00/detF, Fa01/detF, Fa02/detF},
+                                    {Fa10/detF, Fa11/detF, Fa12/detF},
+                                    {Fa20/detF, Fa21/detF, Fa22/detF}
+                                   };
+
+    // C : right Cauchy-Green tensor
+    // C = F^T * F (^T  means Transpose)
+    CeedScalar C[3][3];
+    for (int j=0; j<3; j++){
+        for (int k=0; k<3; k++){
+            C[j][k] = 0;
+            for(int m=0; m<3; m++)
+               C[j][k] += F[k][m] * F[j][m];
+        }
+    }
+
+
+    // Compute C^(-1) : C-Inverse
+    const CeedScalar A00 = C[1][1]*C[2][2] - C[1][2]*C[2][1];
+    const CeedScalar A01 = C[0][2]*F[2][1] - C[0][1]*C[2][2];
+    const CeedScalar A02 = C[0][1]*C[1][2] - C[0][2]*C[1][1];
+    const CeedScalar A10 = C[1][2]*C[2][0] - C[1][0]*C[2][2];
+    const CeedScalar A11 = C[0][0]*C[2][2] - C[0][2]*C[2][0];
+    const CeedScalar A12 = C[0][2]*C[1][0] - C[0][0]*C[1][2];
+    const CeedScalar A20 = C[1][0]*C[2][1] - C[1][1]*C[2][0];
+    const CeedScalar A21 = C[0][1]*C[2][0] - C[0][0]*C[2][1];
+    const CeedScalar A22 = C[0][0]*C[1][1] - C[0][1]*C[1][0];
+    const CeedScalar detC = C[0][0]*A00 + C[1][0]*A01 + C[2][0]*A02;
+
+    const CeedScalar C_inv[3][3] = {{A00/detC, A01/detC, A02/detC},
+                                    {A10/detC, A11/detC, A12/detC},
+                                    {A20/detC, A21/detC, A22/detC}
+                                   };
+
+    // Compute the Second Piola-Kirchhoff (S)
+    const CeedScalar llnj_m = lambda *log(detF)-mu;
+    CeedScalar S[3][3] = {{mu + llnj_m* C_inv[0][0],    llnj_m* C_inv[0][1],    llnj_m* C_inv[0][2]},
+                          {     llnj_m* C_inv[1][0], mu+llnj_m* C_inv[1][1],    llnj_m* C_inv[1][2]},
+                          {     llnj_m* C_inv[2][0],    llnj_m* C_inv[2][1], mu+llnj_m* C_inv[2][2]}
+                         };
+
+  // dPdF is indexed as an array of 81  elements
+  CeedScalar dPdF[81];
+  for (int j=0;j<3;j++){
+      for(int J=0;J<3;J++){
+          for(int a=0;a<3;a++){
+              for(int A=0;A<3;A++){
+                  dPdF[27*j+9*J+3*a+A]=(a==j?1:0)*(S[A][J]) + lambda*F_inv[A][a]*F_inv[J][j]
+                                   -(lambda*log(detF)-mu)*(F_inv[A][j]*F_inv[J][a] +(a==j?1:0)*C_inv[A][J]);
+              }
+          }
+      }
+  }
+
+  // dPdF is indexed as a 9x9 matrix
+  CeedScalar dPdF_grad_del_u[9];
+  for(int j=0;j<9;j++)
+     for(int k=0;k<9;k++)
+        dPdF_grad_del_u[j] += dPdF[9*j+k]* graddeltau[k];
 
     // *INDENT-ON*
-    // Formulation uses Voigt notation:
-    //  stress (sigma)      strain (epsilon)
-    //
-    //    [dsigma00]             [de00]
-    //    [dsigma11]             [de11]
-    //    [dsigma22]   =  S   *  [de22]
-    //    [dsigma12]             [de12]
-    //    [dsigma02]             [de02]
-    //    [dsigma01]             [de01]
-    //
-    //        where
-    //                         [1-nu   nu    nu                                    ]
-    //                         [ nu   1-nu   nu                                    ]
-    //                         [ nu    nu   1-nu                                   ]
-    // S = E/((1+nu)*(1-2*nu)) [                  (1-2*nu)/2                       ]
-    //                         [                             (1-2*nu)/2            ]
-    //                         [                                        (1-2*nu)/2 ]
 
-    //Above Voigt Notation is placed in a 3x3 matrix:
-    const CeedScalar ss      =  E/((1+nu)*(1-2*nu));
-    const CeedScalar dsigma00 = ss*((1-nu)*de[0][0] + nu*de[1][1] +nu*de[2][2]),
-                     dsigma11 = ss*(nu*de[0][0] + (1-nu)*de[1][1] +nu*de[2][2]),
-                     dsigma22 = ss*(nu*de[0][0] + nu*de[1][1] +(1-nu)*de[2][2]),
-                     dsigma12 = ss*(1-2*nu)*de[1][2]/2,
-                     dsigma02 = ss*(1-2*nu)*de[0][2]/2,
-                     dsigma01 = ss*(1-2*nu)*de[0][1]/2;
-    const CeedScalar dsigma[3][3] =
-        { {dsigma00, dsigma01, dsigma02},
-          {dsigma01, dsigma11, dsigma12},
-          {dsigma02, dsigma12, dsigma22}
-        };
 
     // Apply dXdx^T and weight
     for (int j=0; j<3; j++)     // Component
       for (int k=0; k<3; k++) { // Derivative
         deltadvdX[k][j][i] = 0;
         for (int m=0; m<3; m++)
-          deltadvdX[k][j][i] += dXdx[k][m] * dsigma[j][m] * wJ;
+          deltadvdX[k][j][i] += dXdx[k][m] * dPdF_grad_del_u[3*j+m] * wJ;
       }
     } // End of Quadrature Point Loop
 

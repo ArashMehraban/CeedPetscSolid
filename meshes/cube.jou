@@ -34,7 +34,29 @@ sideset 994 surface 4 #left
 #set idmap on
 export mesh "~/Matlab-fem/cube27_1e_1ss_s.exo" dimension 3 overwrite
 
+----------------------------------------------
+#To create a 2 element mesh (27-noded)
+reset
+brick x 1 y 1 z 0.5
+curve 1 3 5 7 9 10 11 12 interval 1
+curve 2 4 6 8 interval 2
+block 1 volume 1
+block 1 element type hex8
+mesh volume 1
+block 1 element type hex27
+export mesh "~/Matlab-fem/cube27_2e_s.exo" dimension 3 overwrite
 
+----------------------------------------------
+#To create a 2 element mesh (27-noded)
+reset 
+brick x 1 y 0.5 z 0.5
+curve 9 10 11 12 interval 1
+curve 1 3 5 7 2 4 6 8 interval 2
+block 1 volume 1
+block 1 element type hex8
+mesh volume 1
+block 1 element type hex27
+export mesh "~/Matlab-fem/cube27_4e_s.exo" dimension 3 overwrite
 
 ----------------------------------------------
 #To Create an unstructured cube with 1 element:  
