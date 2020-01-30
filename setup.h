@@ -122,7 +122,7 @@ typedef struct UserMult_private *UserMult;
 struct UserMult_private {
   MPI_Comm     comm;
   DM           dm;
-  Vec          Xloc, Yloc, diag, force;
+  Vec          Xloc, Yloc, diag;
   CeedVector   xceed, yceed;
   CeedOperator op;
   Ceed         ceed;
@@ -620,9 +620,9 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
     // Create the q-function that sets up the forcing vector (and true solution for MMS)
     CeedQFunctionCreateInterior(ceed, 1, forcingOptions[forcingChoice].setupforcing,
                                 forcingOptions[forcingChoice].setupforcingfname, &qf_setupforce);
-    CeedQFunctionAddInput(qf_setupforce, "x", dim, CEED_EVAL_INTERP);
-    CeedQFunctionAddInput(qf_setupforce, "qdata", 1, CEED_EVAL_NONE);
-    CeedQFunctionAddOutput(qf_setupforce, "rhs", ncompu, CEED_EVAL_INTERP);
+    CeedQFunctionAddInput(qf_setupforce, "x", ncompx, CEED_EVAL_INTERP);
+    CeedQFunctionAddInput(qf_setupforce, "qdata", qdatasize, CEED_EVAL_NONE);
+    CeedQFunctionAddOutput(qf_setupforce, "force", ncompu, CEED_EVAL_INTERP);
     CeedQFunctionSetContext(qf_setupforce, phys, sizeof(phys));
 
     // Create the operator that builds the forcing vector (and true solution for MMS)
@@ -632,7 +632,7 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
                          CEED_VECTOR_ACTIVE);
     CeedOperatorSetField(op_setupforce, "qdata", Erestrictqdi, CEED_NOTRANSPOSE,
                          CEED_BASIS_COLLOCATED, qdata);
-    CeedOperatorSetField(op_setupforce, "rhs", Erestrictu, CEED_TRANSPOSE, basisu,
+    CeedOperatorSetField(op_setupforce, "force", Erestrictu, CEED_TRANSPOSE, basisu,
                          CEED_VECTOR_ACTIVE);
 
     // Setup forcing vector (and true solution, for MMS)
@@ -770,7 +770,6 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ptr) {
   ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0, NULL,
                                     NULL, NULL); CHKERRQ(ierr);
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
-  ierr = VecAXPY(Y, -1.0, user->force); CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
 }
