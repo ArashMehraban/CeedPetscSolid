@@ -27,39 +27,41 @@ int main(int argc, char **argv) {
   SNES        snes;
 
 
-
   ierr = PetscInitialize(&argc, &argv, NULL, help);
   if(ierr)
     return ierr;
 
+  // Process command line options
   comm = PETSC_COMM_WORLD;
-  //set mesh-file, polynomial degree, problem type
+  // -- Set mesh-file, polynomial degree, problem type
   ierr = processCommandLineOptions(comm, &appCtx); CHKERRQ(ierr);
-  //set Poison's ratio, Young's Modulus
+  // -- Set Poison's ratio, Young's Modulus
   ierr = PetscMalloc1(1, &phys); CHKERRQ(ierr);
   ierr = processPhysics(comm, phys); CHKERRQ(ierr);
-  //create distributed DM from mesh file (interpolate if polynomial degree > 1)
+
+  // Setup DM
+  // -- Create distributed DM from mesh file (interpolate if polynomial degree > 1)
   ierr = createDistributedDM(comm, &appCtx, &dm); CHKERRQ(ierr);
-  //setup DM by polinomial degree
+  // -- Setup DM by polinomial degree
   ierr = SetupDMByDegree(dm, &appCtx, ncompu);
 
-  // Create Unknonw vector U and Residual Vector R
+  // Setup solution and work vectors
+  // -- Create global unknown vector U, forcing vector F, and residual vector R
   ierr = DMCreateGlobalVector(dm, &U); CHKERRQ(ierr);
   ierr = VecGetSize(U, &Ugsz); CHKERRQ(ierr);
   ierr = VecGetLocalSize(U, &Ulsz); CHKERRQ(ierr); //For matShell
-
-  ierr = DMCreateLocalVector(dm, &Uloc); CHKERRQ(ierr);
-  ierr = VecGetSize(Uloc, &Ulocsz); CHKERRQ(ierr); //For libCeed
-
   ierr = VecDuplicate(U, &R); CHKERRQ(ierr);
   ierr = VecDuplicate(U, &F); CHKERRQ(ierr);
+  // -- Create local Vectors
+  ierr = DMCreateLocalVector(dm, &Uloc); CHKERRQ(ierr);
+  ierr = VecGetSize(Uloc, &Ulocsz); CHKERRQ(ierr); //For libCeed
   ierr = VecZeroEntries(Uloc); CHKERRQ(ierr);
   ierr = VecDuplicate(Uloc, &Rloc); CHKERRQ(ierr);
 
   // Set up libCEED
   CeedInit(appCtx.ceedresource, &ceed);
   ierr = PetscCalloc1(1, &ceeddata); CHKERRQ(ierr);
-  // Create local forcing vector
+  // -- Create local forcing vector
   CeedVector forceceed;
   CeedScalar *f;
   if (appCtx.forcingChoice != FORCE_NONE) {
@@ -68,11 +70,10 @@ int main(int argc, char **argv) {
     ierr = VecGetArray(Floc, &f); CHKERRQ(ierr);
     CeedVectorSetArray(forceceed, CEED_MEM_HOST, CEED_USE_POINTER, f);
   }
-  // libCEED objects setup
+  // -- libCEED objects setup
   ierr = SetupLibceedByDegree(dm, ceed, &appCtx, phys, ceeddata, ncompu, Ugsz,
                               Ulocsz, forceceed); CHKERRQ(ierr);
-
-  // Setup global forcing vector
+  // -- Setup global forcing vector
   ierr = VecZeroEntries(F); CHKERRQ(ierr);
   if (appCtx.forcingChoice != FORCE_NONE) {
     ierr = VecRestoreArray(Floc, &f); CHKERRQ(ierr);
@@ -82,22 +83,42 @@ int main(int argc, char **argv) {
     ierr = VecDestroy(&Floc); CHKERRQ(ierr);
   }
 
+  // Print problem summary
+  if (!appCtx.testMode) {
+    const char *usedresource;
+    CeedGetResource(ceed, &usedresource);
+    ierr = PetscPrintf(comm,
+                       "\n-- libCEED + PETSc - %s Elastisticy Example --\n"
+                       "  libCEED:\n"
+                       "    libCEED Backend                    : %s\n"
+                       "  Mesh:\n"
+                       "    File                               : %s\n"
+                       "    Number of 1D Basis Nodes (p)       : %d\n"
+                       "    Number of 1D Quadrature Points (q) : %d\n"
+                       "    Global nodes                       : %D\n"
+                       "    Owned nodes                        : %D\n",
+                       problemTypesForDisp[appCtx.problemChoice], usedresource,
+                       appCtx.meshFile ? appCtx.meshFile : "Box Mesh",
+                       appCtx.degree + 1, appCtx.degree + 1, Ugsz/ncompu,
+                       Ulsz/ncompu); CHKERRQ(ierr);
+  }
+
   // Setup SNES
   ierr = SNESCreate(comm, &snes); CHKERRQ(ierr);
   ierr = PetscMalloc1(1, &resCtx); CHKERRQ(ierr);
-  // Jacobian context
+  // -- Jacobian context
   ierr = PetscMalloc1(1, &jacobCtx); CHKERRQ(ierr);
   ierr =  CreateMatrixFreeCtx(comm, dm, Uloc, ceeddata, ceed, resCtx, jacobCtx);
   CHKERRQ(ierr);
-  // Function that computes the residual
+  // -- Function that computes the residual
   ierr = SNESSetFunction(snes, R, FormResidual_Ceed, resCtx); CHKERRQ(ierr);
-  // Form Action of Jacobian on delta_u
+  // -- Form Action of Jacobian on delta_u
   ierr = MatCreateShell(comm, Ulsz, Ulsz, Ugsz, Ugsz, jacobCtx, &mat);
   CHKERRQ(ierr);
   ierr = MatShellSetOperation(mat, MATOP_MULT,
                               (void (*)(void))ApplyJacobian_Ceed); CHKERRQ(ierr);
   ierr = SNESSetJacobian(snes, mat, mat, dummyFun, NULL); CHKERRQ(ierr);
-  // Set KSP options
+  // -- Set inner KSP options
   {
     PC pc;
     KSP ksp;
@@ -110,10 +131,10 @@ int main(int argc, char **argv) {
   ierr = SNESSetDM(snes, dm); CHKERRQ(ierr);
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
 
-  // Initial Guess
+  // Set initial Guess
   ierr = VecSet(U, 1.0); CHKERRQ(ierr);
 
-  // Solve
+  // Solve SNES
   ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
 
   // Compute error
@@ -140,7 +161,10 @@ int main(int argc, char **argv) {
     ierr = VecNorm(U, NORM_2, &l2Unorm); CHKERRQ(ierr);
     l2error /= l2Unorm;
 
-    ierr = PetscPrintf(comm, "L2 Error: %f\n", l2error); CHKERRQ(ierr);
+    // Output
+    if (!appCtx.testMode || l2error > 0.013) {
+      ierr = PetscPrintf(comm, "  L2 Error: %f\n", l2error); CHKERRQ(ierr);
+    }
 
     // Cleanup
     ierr = VecDestroy(&errorVec); CHKERRQ(ierr);
@@ -158,12 +182,10 @@ int main(int argc, char **argv) {
   ierr = DMDestroy(&dm); CHKERRQ(ierr);
   ierr = PetscFree(resCtx); CHKERRQ(ierr);
   ierr = PetscFree(jacobCtx); CHKERRQ(ierr);
-
   ierr = PetscFree(phys); CHKERRQ(ierr);
   ierr = CeedDataDestroy(0, ceeddata); CHKERRQ(ierr);
   CeedDestroy(&ceed);
   SNESDestroy(&snes);
-
 
   return PetscFinalize();
 }

@@ -13,13 +13,14 @@
 #include "qfunctions/solid/hyperFS.h" //Hyperelasticity Small FiniteStrain
 #include "qfunctions/solid/constantForce.h"     // Constant forcing function
 #include "qfunctions/solid/manufacturedForce.h" // Manufactured solution forcing
-#include "qfunctions/solid/manufacturedTrue.h" // Manufactured true solution
+#include "qfunctions/solid/manufacturedTrue.h"  // Manufactured true solution
 
 // Problem options
 typedef enum {  //SmallStrain      FiniteStrain
   ELAS_LIN = 0, ELAS_HYPER_SS = 1, ELAS_HYPER_FS = 2
 } problemType;
 static const char *const problemTypes[] = {"linElas","hyperSS","hyperFS", "problemType","ELAS_",0};
+static const char *const problemTypesForDisp[] = {"Linear", "Hyper Small Strain", "Hyper Finite Strain"};
 
 // Forcing function options
 typedef enum {
@@ -40,7 +41,6 @@ BCFunc *boundaryOptions[] = {BCBend1_ss, BCBend2_ss, BCMMS, BCCube};
 // -----------------------------------------------------------------------------
 // Structs
 // -----------------------------------------------------------------------------
-
 typedef struct {
   char          ceedresource[PETSC_MAX_PATH_LEN]; // libCEED backend
   char          meshFile[PETSC_MAX_PATH_LEN];     // exodusII mesh file
@@ -51,9 +51,7 @@ typedef struct {
   boundaryType  boundaryChoice;
 } AppCtx;
 
-
-//Physics struct for Each problem is moved to its .h file (libCEED necessity)
-//linElas.h ,hyperSS.h, hyperFS.h
+//Physics struct for each problem is in the .h file
 
 // Problem specific data
 typedef struct {
@@ -255,6 +253,23 @@ static int processPhysics(MPI_Comm comm, Physics phys) {
   PetscFunctionReturn(0);
 }
 
+// -----------------------------------------------------------------------------
+// Setup DM
+// -----------------------------------------------------------------------------
+static PetscErrorCode CreateBCLabel(DM dm, const char name[]) {
+  int ierr;
+  DMLabel label;
+
+  PetscFunctionBeginUser;
+
+  ierr = DMCreateLabel(dm, name); CHKERRQ(ierr);
+  ierr = DMGetLabel(dm, name, &label); CHKERRQ(ierr);
+  ierr = DMPlexMarkBoundaryFaces(dm, 1, label); CHKERRQ(ierr);
+  ierr = DMPlexLabelComplete(dm, label); CHKERRQ(ierr);
+
+  PetscFunctionReturn(0);
+}
+
 static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
 
   PetscErrorCode  ierr;
@@ -281,23 +296,6 @@ static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
     ierr = DMDestroy(dm); CHKERRQ(ierr);
     *dm  = distributedMesh;
   }
-  PetscFunctionReturn(0);
-}
-
-// -----------------------------------------------------------------------------
-// Setup DM
-// -----------------------------------------------------------------------------
-static PetscErrorCode CreateBCLabel(DM dm, const char name[]) {
-  int ierr;
-  DMLabel label;
-
-  PetscFunctionBeginUser;
-
-  ierr = DMCreateLabel(dm, name); CHKERRQ(ierr);
-  ierr = DMGetLabel(dm, name, &label); CHKERRQ(ierr);
-  ierr = DMPlexMarkBoundaryFaces(dm, 1, label); CHKERRQ(ierr);
-  ierr = DMPlexLabelComplete(dm, label); CHKERRQ(ierr);
-
   PetscFunctionReturn(0);
 }
 
@@ -401,6 +399,9 @@ static int SetupDMByDegree(DM dm, AppCtx *appCtx, PetscInt ncompu) {
   PetscFunctionReturn(0);
 }
 
+// -----------------------------------------------------------------------------
+// libCEED Functions
+// -----------------------------------------------------------------------------
 // Destroy libCEED operator objects
 static PetscErrorCode CeedDataDestroy(CeedInt i, CeedData data) {
   PetscInt ierr;
@@ -742,6 +743,9 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
   PetscFunctionReturn(0);
 }
 
+// -----------------------------------------------------------------------------
+// Apply libCEED Operators
+// -----------------------------------------------------------------------------
 static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user) {
   PetscErrorCode ierr;
   PetscScalar *x, *y;
@@ -820,7 +824,9 @@ static PetscErrorCode CreateMatrixFreeCtx(MPI_Comm comm, DM dm, Vec vloc,
   PetscFunctionReturn(0);
 }
 
-// boundary Functions
+// -----------------------------------------------------------------------------
+// Boundary Functions
+// -----------------------------------------------------------------------------
 //
 /* BCMMS boundary function explanation
 ss : (sideset)
@@ -883,14 +889,14 @@ PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
 
   switch (*faceID) {
   case 999: // left side of the cyl-hol
-    u[0]= 0;
-    u[1]= 0;
-    u[2]= 0;
+    u[0] = 0;
+    u[1] = 0;
+    u[2] = 0;
     break;
   case 998: //right side of the cyl-hol
-    u[0]= 0;
-    u[1]= -1; //bend in the -y direction
-    u[2]= 0;
+    u[0] = 0;
+    u[1] = -1; //bend in the -y direction
+    u[2] = 0;
     break;
   }
   PetscFunctionReturn(0);
@@ -918,9 +924,9 @@ PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time,
 
   PetscFunctionBeginUser;
 
-  u[0]= 0;
-  u[1]= 0;
-  u[2]= 0;
+  u[0] = 0;
+  u[1] = 0;
+  u[2] = 0;
 
   PetscFunctionReturn(0);
 }
@@ -931,9 +937,9 @@ PetscErrorCode BCCube(PetscInt dim, PetscReal time,
 
   PetscFunctionBeginUser;
 
-  u[0]= 0;
-  u[1]= 0;
-  u[2]= 0;
+  u[0] = 0;
+  u[1] = 0;
+  u[2] = 0;
 
   PetscFunctionReturn(0);
 }
