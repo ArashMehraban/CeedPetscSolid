@@ -22,7 +22,6 @@ int main(int argc, char **argv) {
   UserMult    resCtx, jacobCtx;;
   Mat         mat;
   //Ceed constituents
-  char        ceedresource[PETSC_MAX_PATH_LEN] = "/cpu/self";
   Ceed        ceed;
   CeedData    ceeddata;
   SNES        snes;
@@ -58,7 +57,7 @@ int main(int argc, char **argv) {
   ierr = VecDuplicate(Uloc, &Rloc); CHKERRQ(ierr);
 
   // Set up libCEED
-  CeedInit(ceedresource, &ceed);
+  CeedInit(appCtx.ceedresource, &ceed);
   ierr = PetscCalloc1(1, &ceeddata); CHKERRQ(ierr);
   // Create local forcing vector
   CeedVector forceceed;

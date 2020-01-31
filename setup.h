@@ -42,7 +42,8 @@ BCFunc *boundaryOptions[] = {BCBend1_ss, BCBend2_ss, BCMMS, BCCube};
 // -----------------------------------------------------------------------------
 
 typedef struct {
-  char          meshFile[PETSC_MAX_PATH_LEN]; // exodusII mesh file
+  char          ceedresource[PETSC_MAX_PATH_LEN]; // libCEED backend
+  char          meshFile[PETSC_MAX_PATH_LEN];     // exodusII mesh file
   PetscBool     testMode;
   problemType   problemChoice;
   forcingType   forcingChoice;
@@ -96,7 +97,6 @@ problemData problemOptions[3] = {
 };
 
 // Forcing function data
-
 typedef struct {
   CeedQFunctionUser setupforcing;
   const char        *setupforcingfname;
@@ -149,6 +149,7 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
   PetscBool meshFileFlag = PETSC_FALSE;
   PetscBool degreeFalg = PETSC_FALSE;
   PetscBool boundaryFlag = PETSC_FALSE;
+  PetscBool ceedFlag = PETSC_FALSE;
   appCtx->problemChoice = ELAS_LIN; //-problem = Linear Elasticity if not given
   appCtx->degree = 3;
   appCtx->boundaryChoice = BDRY_WALL_NONE;
@@ -158,13 +159,20 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
 
   ierr = PetscOptionsBegin(comm, NULL,
                            "Elasticity / Hyperelasticity in PETSc with libCEED", NULL); CHKERRQ(ierr);
+
+  ierr = PetscOptionsString("-ceed", "CEED resource specifier",
+                            NULL, appCtx->ceedresource, appCtx->ceedresource,
+                            sizeof(appCtx->ceedresource), &ceedFlag);
+  CHKERRQ(ierr);
+
   ierr = PetscOptionsInt("-degree", "Polynomial degree of tensor product basis",
                          NULL, appCtx->degree, &appCtx->degree,
                          &degreeFalg); CHKERRQ(ierr);
 
   ierr = PetscOptionsString("-mesh", "Read mesh from file", NULL,
                             appCtx->meshFile, appCtx->meshFile,
-                            sizeof(appCtx->meshFile), &meshFileFlag); CHKERRQ(ierr);
+                            sizeof(appCtx->meshFile), &meshFileFlag);
+  CHKERRQ(ierr);
   #if !defined(PETSC_HAVE_EXODUSII)
   SETERRQ(comm, PETSC_ERR_ARG_WRONG,
           "ExodusII support needed. Reconfigure your Arch with --download-exodusii");
@@ -210,6 +218,12 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
     appCtx->boundaryChoice = BDRY_MMS;
     appCtx->forcingChoice = FORCE_MMS;
   }
+
+  if (!ceedFlag) {
+    const char* ceedresource = "/cpu/self";
+    strncpy(appCtx->ceedresource, ceedresource, 9);
+  }
+
   PetscFunctionReturn(0);
 }
 
