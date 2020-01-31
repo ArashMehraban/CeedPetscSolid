@@ -20,18 +20,20 @@ typedef enum {  //SmallStrain      FiniteStrain
   ELAS_LIN = 0, ELAS_HYPER_SS = 1, ELAS_HYPER_FS = 2
 } problemType;
 static const char *const problemTypes[] = {"linElas","hyperSS","hyperFS", "problemType","ELAS_",0};
-static const char *const problemTypesForDisp[] = {"Linear", "Hyper Small Strain", "Hyper Finite Strain"};
+static const char *const problemTypesForDisp[] = {"Linear Elasticity", "Hyper Elasticity Small Strain", "Hyper Elasticity Finite Strain"};
 
 // Forcing function options
 typedef enum {
   FORCE_NONE = 0, FORCE_CONST = 1, FORCE_MMS = 2
 } forcingType;
 static const char *const forcingTypes[] = {"none","constant","mms","forcingType","FORCE_",0};
+static const char *const forcingTypesForDisp[] = {"None","Constant","Manufactured Solution"};
 
 typedef enum {
   BDRY_WALL_NONE = 0, BDRY_WALL_WEIGHT = 1, BDRY_MMS = 2, BDRY_CUBE = 3
 } boundaryType;
 static const char *const boundaryTypes[] = {"wall_none","wall_weight","mms", "cube","boundaryType","BDRY_",0};
+static const char *const boundaryTypesForDisp[] = {"Wall with free end","Wall with weighted end","Manufactured Solution", "Cube"};
 
 typedef PetscErrorCode BCFunc(PetscInt, PetscReal, const PetscReal *, PetscInt,
                               PetscScalar *, void *);

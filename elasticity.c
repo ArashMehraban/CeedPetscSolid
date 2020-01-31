@@ -88,16 +88,22 @@ int main(int argc, char **argv) {
     const char *usedresource;
     CeedGetResource(ceed, &usedresource);
     ierr = PetscPrintf(comm,
-                       "\n-- libCEED + PETSc - %s Elastisticy Example --\n"
+                       "\n-- Elastisticy Example - libCEED + PETSc --\n"
                        "  libCEED:\n"
                        "    libCEED Backend                    : %s\n"
+                       "  Problem:\n"
+                       "    Problem Name                       : %s\n"
+                       "    Forcing Function                   : %s\n"
+                       "    Boundary Condition                 : %s\n"
                        "  Mesh:\n"
                        "    File                               : %s\n"
                        "    Number of 1D Basis Nodes (p)       : %d\n"
                        "    Number of 1D Quadrature Points (q) : %d\n"
                        "    Global nodes                       : %D\n"
                        "    Owned nodes                        : %D\n",
-                       problemTypesForDisp[appCtx.problemChoice], usedresource,
+                       usedresource, problemTypesForDisp[appCtx.problemChoice],
+                       forcingTypesForDisp[appCtx.forcingChoice],
+                       boundaryTypesForDisp[appCtx.boundaryChoice],
                        appCtx.meshFile ? appCtx.meshFile : "Box Mesh",
                        appCtx.degree + 1, appCtx.degree + 1, Ugsz/ncompu,
                        Ulsz/ncompu); CHKERRQ(ierr);
