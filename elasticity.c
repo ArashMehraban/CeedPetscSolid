@@ -1,3 +1,24 @@
+//                        libCEED + PETSc Example: Elasticity
+//
+// This example demonstrates a simple usage of libCEED with PETSc to solve
+//   elasticity problems.
+//
+// The code uses higher level communication protocols in DMPlex.
+//
+// Build with:
+//
+//     make elasticity [PETSC_DIR=</path/to/petsc>] [CEED_DIR=</path/to/libceed>]
+//
+// Sample runs:
+//
+//     ./elasticity -problem linElas -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672_4ss_us.exo
+//     ./elasticity -problem hyperSS -ceed /cpu/self -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672_4ss_us.exo
+//     ./elasticity -problem hyperFS -ceed /gpu/occa -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672_4ss_us.exo
+//
+//TESTARGS -ceed {ceed_resource} -test -degree 2 -nu 0.3 -E 1
+
+/// @file
+/// CEED elasticity example using PETSc with DMPlex
 const char help[] = "Solve solid Problems with CEED and PETSc DMPlex\n";
 
 #include <stdbool.h>
