@@ -100,13 +100,14 @@ int main(int argc, char **argv) {
                        "    Number of 1D Basis Nodes (p)       : %d\n"
                        "    Number of 1D Quadrature Points (q) : %d\n"
                        "    Global nodes                       : %D\n"
-                       "    Owned nodes                        : %D\n",
+                       "    Owned nodes                        : %D\n"
+                       "    DoF per node                       : %D\n",
                        usedresource, problemTypesForDisp[appCtx.problemChoice],
                        forcingTypesForDisp[appCtx.forcingChoice],
                        boundaryTypesForDisp[appCtx.boundaryChoice],
                        appCtx.meshFile ? appCtx.meshFile : "Box Mesh",
                        appCtx.degree + 1, appCtx.degree + 1, Ugsz/ncompu,
-                       Ulsz/ncompu); CHKERRQ(ierr);
+                       Ulsz/ncompu, ncompu); CHKERRQ(ierr);
   }
 
   // Setup SNES
