@@ -246,7 +246,7 @@ static int processPhysics(MPI_Comm comm, Physics phys, Units units) {
   phys->E = 0;
   units->meter     = 1;        // 1 meter in scaled length units
   units->second    = 1;        // 1 second in scaled time units
-  units->kilogram  = 1e9;      // 1 kilogram in scaled mass units
+  units->kilogram  = 1;        // 1 kilogram in scaled mass units
 
   PetscFunctionBeginUser;
 
