@@ -28,7 +28,16 @@ const char help[] = "Solve solid Problems with CEED and PETSc DMPlex\n";
 #include <ceed.h>
 #include "setup.h"
 
-static int dummyFun() { PetscFunctionBeginUser;  PetscFunctionReturn(0);}
+static PetscErrorCode FormJacobian(SNES snes,Vec U,Mat J,Mat Jpre,void *ctx) {
+  PetscErrorCode ierr;
+
+  PetscFunctionBeginUser;
+  // Nothing to do for J, which is of type MATSHELL and uses information from Newton.
+  // Jpre might be AIJ (e.g., when using coloring), so we need to assemble it.
+  ierr = MatAssemblyBegin(Jpre, MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(Jpre, MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
 
 int main(int argc, char **argv) {
   PetscInt    ierr;
@@ -135,6 +144,7 @@ int main(int argc, char **argv) {
 
   // Setup SNES
   ierr = SNESCreate(comm, &snes); CHKERRQ(ierr);
+  ierr = SNESSetDM(snes, dm); CHKERRQ(ierr);
   ierr = PetscMalloc1(1, &resCtx); CHKERRQ(ierr);
   // -- Jacobian context
   ierr = PetscMalloc1(1, &jacobCtx); CHKERRQ(ierr);
@@ -147,7 +157,9 @@ int main(int argc, char **argv) {
   CHKERRQ(ierr);
   ierr = MatShellSetOperation(mat, MATOP_MULT,
                               (void (*)(void))ApplyJacobian_Ceed); CHKERRQ(ierr);
-  ierr = SNESSetJacobian(snes, mat, mat, dummyFun, NULL); CHKERRQ(ierr);
+  // pass NULL for Pmat: skips assembly when PCNONE, otherwise use coloring (-snes_fd_color) to
+  // assemble a MATAIJ Jacobian for use with any real preconditioner
+  ierr = SNESSetJacobian(snes, mat, NULL, FormJacobian, NULL); CHKERRQ(ierr);
   // -- Set inner KSP options
   {
     PC pc;
