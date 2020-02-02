@@ -11,9 +11,9 @@
 //
 // Sample runs:
 //
-//     ./elasticity -problem linElas -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672_4ss_us.exo
-//     ./elasticity -problem hyperSS -ceed /cpu/self -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672_4ss_us.exo
-//     ./elasticity -problem hyperFS -ceed /gpu/occa -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672_4ss_us.exo
+//     ./elasticity -problem linElas -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672e_4ss_us.exo
+//     ./elasticity -problem hyperSS -ceed /cpu/self -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672e_4ss_us.exo
+//     ./elasticity -problem hyperFS -ceed /gpu/occa -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672e_4ss_us.exo
 //
 //TESTARGS -ceed {ceed_resource} -test -degree 2 -nu 0.3 -E 1
 
@@ -35,7 +35,8 @@ int main(int argc, char **argv) {
   MPI_Comm    comm;
   AppCtx
   appCtx; //contains polinomial basis degree, problem choice & mesh filename
-  Physics     phys;   //contains nu and E
+  Physics     phys;   // contains physical constants
+  Units       units;  // contains units scaling
   DM          dm;
   PetscInt    ncompu = 3;                 // 3 dofs in 3D
   Vec         U, Uloc, R, Rloc, F, Floc;  // loc: Local R:Residual
@@ -58,7 +59,8 @@ int main(int argc, char **argv) {
   ierr = processCommandLineOptions(comm, &appCtx); CHKERRQ(ierr);
   // -- Set Poison's ratio, Young's Modulus
   ierr = PetscMalloc1(1, &phys); CHKERRQ(ierr);
-  ierr = processPhysics(comm, phys); CHKERRQ(ierr);
+  ierr = PetscMalloc1(1, &units); CHKERRQ(ierr);
+  ierr = processPhysics(comm, phys, units); CHKERRQ(ierr);
 
   // Setup DM
   // -- Create distributed DM from mesh file (interpolate if polynomial degree > 1)
