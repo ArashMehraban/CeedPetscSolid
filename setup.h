@@ -43,6 +43,16 @@ BCFunc *boundaryOptions[] = {BCBend1_ss, BCBend2_ss, BCMMS, BCCube};
 // -----------------------------------------------------------------------------
 // Structs
 // -----------------------------------------------------------------------------
+typedef struct Units_private *Units;
+struct Units_private {
+  // fundamental units
+  PetscScalar meter;
+  PetscScalar kilogram;
+  PetscScalar second;
+  // derived unit
+  PetscScalar Pascal;
+};
+
 typedef struct {
   char          ceedresource[PETSC_MAX_PATH_LEN]; // libCEED backend
   char          meshFile[PETSC_MAX_PATH_LEN];     // exodusII mesh file
@@ -227,13 +237,16 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
   PetscFunctionReturn(0);
 }
 
-static int processPhysics(MPI_Comm comm, Physics phys) {
+static int processPhysics(MPI_Comm comm, Physics phys, Units units) {
 
   PetscErrorCode ierr;
   PetscBool nuFlag = PETSC_FALSE;
   PetscBool YoungFlag = PETSC_FALSE;
   phys->nu = 0;
   phys->E = 0;
+  units->meter     = 1;        // 1 meter in scaled length units
+  units->second    = 1;        // 1 second in scaled time units
+  units->kilogram  = 1e9;      // 1 kilogram in scaled mass units
 
   PetscFunctionBeginUser;
 
@@ -243,6 +256,15 @@ static int processPhysics(MPI_Comm comm, Physics phys) {
                             &nuFlag); CHKERRQ(ierr);
   ierr = PetscOptionsScalar("-E", "Young's Modulus", NULL, phys->E, &phys->E,
                             &YoungFlag); CHKERRQ(ierr);
+  ierr = PetscOptionsScalar("-units_meter", "1 meter in scaled length units",
+                            NULL, units->meter, &units->meter, NULL); CHKERRQ(ierr);
+  units->meter = fabs(units->meter);
+  ierr = PetscOptionsScalar("-units_second","1 second in scaled time units",
+                            NULL, units->second, &units->second, NULL); CHKERRQ(ierr);
+  units->second = fabs(units->second);
+  ierr = PetscOptionsScalar("-units_kilogram","1 kilogram in scaled mass units",
+                            NULL, units->kilogram, &units->kilogram, NULL); CHKERRQ(ierr);
+  units->kilogram = fabs(units->kilogram);
   ierr = PetscOptionsEnd(); CHKERRQ(ierr);//End of setting Physics
   if(!nuFlag) {
     ierr = PetscPrintf(comm, "-nu option needed\n\n"); CHKERRQ(ierr);
@@ -252,6 +274,11 @@ static int processPhysics(MPI_Comm comm, Physics phys) {
     ierr = PetscPrintf(comm, "-E option needed\n\n"); CHKERRQ(ierr);
     SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "Young's Modulus Error!");
   }
+  // Define derived units
+  units->Pascal = units->kilogram / (units->meter * PetscSqr(units->second));
+
+  // Scale E to GPa
+  phys->E *= units->Pascal;
   PetscFunctionReturn(0);
 }
 
