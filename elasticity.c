@@ -170,7 +170,6 @@ int main(int argc, char **argv) {
     ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr); //For Now No Preconditioner
     ierr = KSPSetFromOptions(ksp);
   }
-  ierr = SNESSetDM(snes, dm); CHKERRQ(ierr);
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
 
   // Set initial Guess
@@ -225,6 +224,7 @@ int main(int argc, char **argv) {
   ierr = PetscFree(resCtx); CHKERRQ(ierr);
   ierr = PetscFree(jacobCtx); CHKERRQ(ierr);
   ierr = PetscFree(phys); CHKERRQ(ierr);
+  ierr = PetscFree(units); CHKERRQ(ierr);
   ierr = CeedDataDestroy(0, ceeddata); CHKERRQ(ierr);
   CeedDestroy(&ceed);
   SNESDestroy(&snes);
