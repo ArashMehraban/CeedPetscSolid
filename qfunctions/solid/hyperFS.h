@@ -312,9 +312,11 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
   // dPdF is indexed as a 9x9 matrix
   CeedScalar dPdF_grad_del_u[9];
-  for(int j=0;j<9;j++)
+  for(int j=0;j<9;j++) {
+     dPdF_grad_del_u[j] = 0.;
      for(int k=0;k<9;k++)
         dPdF_grad_del_u[j] += dPdF[9*j+k]* graddeltau[k];
+  }
 
     // *INDENT-ON*
 

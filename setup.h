@@ -231,7 +231,7 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
 
   if (!ceedFlag) {
     const char* ceedresource = "/cpu/self";
-    strncpy(appCtx->ceedresource, ceedresource, 9);
+    strncpy(appCtx->ceedresource, ceedresource, 10);
   }
 
   PetscFunctionReturn(0);
