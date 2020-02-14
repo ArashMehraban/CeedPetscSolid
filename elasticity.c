@@ -180,11 +180,13 @@ int main(int argc, char **argv) {
 
   // Compute error
   if (appCtx.forcingChoice == FORCE_MMS) {
-    CeedScalar l2error, l2Unorm;
+    CeedScalar l2error = 1., l2Unorm = 1.;
     const CeedScalar *truearray;
     Vec errorVec, trueVec;
     ierr = VecDuplicate(U, &errorVec); CHKERRQ(ierr);
+    ierr = VecSet(errorVec, 0.0); CHKERRQ(ierr);
     ierr = VecDuplicate(U, &trueVec); CHKERRQ(ierr);
+    ierr = VecSet(trueVec, 0.0); CHKERRQ(ierr);
 
     // Global true soltion vector
     CeedVectorGetArrayRead(ceeddata->truesoln, CEED_MEM_HOST, &truearray);
@@ -203,7 +205,7 @@ int main(int argc, char **argv) {
     l2error /= l2Unorm;
 
     // Output
-    if (!appCtx.testMode || l2error > 0.013) {
+    if (!appCtx.testMode || l2error > 0.168) {
       ierr = PetscPrintf(comm, "  L2 Error: %f\n", l2error); CHKERRQ(ierr);
     }
 

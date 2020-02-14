@@ -559,16 +559,16 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
 
   ierr = DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd); CHKERRQ(ierr);
   nelem = cEnd - cStart;
-  CeedElemRestrictionCreateIdentity(ceed, CEED_NONINTERLACED, nelem, Q*Q*Q,
-                                    nelem*Q*Q*Q, ncompu, &Erestrictui);
-  CeedElemRestrictionCreateIdentity(ceed, CEED_NONINTERLACED, nelem, Q*Q*Q,
-                                    nelem*Q*Q*Q, qdatasize, &Erestrictqdi);
-  CeedElemRestrictionCreateIdentity(ceed, CEED_NONINTERLACED, nelem, Q*Q*Q,
-                                    nelem*Q*Q*Q, ncompx, &Erestrictxi);
+  CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, ncompu,
+                                   CEED_STRIDES_BACKEND, &Erestrictui);
+  CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, qdatasize,
+                                   CEED_STRIDES_BACKEND, &Erestrictqdi);
+  CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, ncompx,
+                                   CEED_STRIDES_BACKEND, &Erestrictxi);
   if (problemChoice != ELAS_LIN)
-    CeedElemRestrictionCreateIdentity(ceed, CEED_NONINTERLACED, nelem, Q*Q*Q,
-                                      nelem*Q*Q*Q, dim* ncompu,
-                                      &ErestrictGradui); 
+    CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q,
+                                     dim*ncompu, CEED_STRIDES_BACKEND,
+                                     &ErestrictGradui); 
 
 // Element coordinates
   ierr = DMGetCoordinatesLocal(dm, &coords); CHKERRQ(ierr);
@@ -599,8 +599,6 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
   CeedQFunctionAddOutput(qf_setupgeo, "qdata", qdatasize, CEED_EVAL_NONE);
   CeedOperatorCreate(ceed, qf_setupgeo, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
                      &op_setupgeo);
-//anything read from PETSc we use CEED_TRANSPOSE ([node][compu] in PETSc is considered transpose of [node][compu] in CEED )
-//field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
   CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, basisx,
                        CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(op_setupgeo, "weight", Erestrictxi, basisx,
@@ -619,11 +617,9 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
   CeedQFunctionSetContext(qf_apply, phys, sizeof(phys));
   CeedOperatorCreate(ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
                      &op_apply);
-//field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
   CeedOperatorSetField(op_apply, "du", Erestrictu, basisu, CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(op_apply, "qdata", Erestrictqdi, CEED_BASIS_COLLOCATED,
                        qdata);
-//field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
   CeedOperatorSetField(op_apply, "dv", Erestrictu, basisu, CEED_VECTOR_ACTIVE);
   if (problemChoice != ELAS_LIN)
     CeedOperatorSetField(op_apply, "gradu", ErestrictGradui, basisu, gradu);
@@ -639,12 +635,10 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
   CeedQFunctionSetContext(qf_jacob, phys, sizeof(phys));
   CeedOperatorCreate(ceed, qf_jacob, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
                      &op_jacob);
-//field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
   CeedOperatorSetField(op_jacob, "deltadu", Erestrictu, basisu,
                        CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(op_jacob, "qdata", Erestrictqdi, CEED_BASIS_COLLOCATED,
                        qdata);
-//field[compu][node] vs. Petsc convention is field[node][compu] --thefore--> CEED_TRANSPOSE in function below
   CeedOperatorSetField(op_jacob, "deltadv", Erestrictu, basisu,
                        CEED_VECTOR_ACTIVE);
   if (problemChoice != ELAS_LIN)
@@ -734,7 +728,6 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
       truearray[i] /= multarray[i];
     CeedVectorRestoreArray(data->truesoln, &truearray);
     CeedVectorRestoreArrayRead(multvec, &multarray);
-
 
     // Cleanup
     CeedVectorDestroy(&evec);
