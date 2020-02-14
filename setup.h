@@ -688,7 +688,7 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
   if (forcingChoice == FORCE_MMS) {
     CeedScalar *truearray;
     const CeedScalar *multarray;
-    CeedVector evec, multvec;
+    CeedVector multvec;
     CeedBasis basisxtrue;
     CeedQFunction qf_true;
     CeedOperator op_true;
@@ -717,7 +717,7 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
     CeedOperatorApply(op_true, xcoord, data->truesoln, CEED_REQUEST_IMMEDIATE);
 
     // Multiplicity calculation
-    CeedElemRestrictionCreateVector(Erestrictu, &multvec, &evec);
+    CeedElemRestrictionCreateVector(Erestrictu, &multvec, NULL);
     CeedVectorSetValue(multvec, 0.);
     CeedElemRestrictionGetMultiplicity(Erestrictu, multvec);
 
@@ -730,7 +730,6 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
     CeedVectorRestoreArrayRead(multvec, &multarray);
 
     // Cleanup
-    CeedVectorDestroy(&evec);
     CeedVectorDestroy(&multvec);
     CeedBasisDestroy(&basisxtrue);
     CeedQFunctionDestroy(&qf_true);
