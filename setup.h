@@ -568,7 +568,7 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
   if (problemChoice != ELAS_LIN)
     CeedElemRestrictionCreateIdentity(ceed, CEED_NONINTERLACED, nelem, Q*Q*Q,
                                       nelem*Q*Q*Q, dim* ncompu,
-                                      &ErestrictGradui); 
+                                      &ErestrictGradui);
 
 // Element coordinates
   ierr = DMGetCoordinatesLocal(dm, &coords); CHKERRQ(ierr);
@@ -884,10 +884,14 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
 
   PetscFunctionBeginUser;
 
+  u[0] = x*y*z;
+  u[1] = x*y*z;
+  u[2] = x*y*z;
+/*
   u[0] = exp(2*x)*sin(3*y)*cos(4*z)/1e8;
   u[1] = exp(3*y)*sin(4*z)*cos(2*x)/1e8;
   u[2] = exp(4*z)*sin(2*x)*cos(3*y)/1e8;
-
+*/
   PetscFunctionReturn(0);
 }
 

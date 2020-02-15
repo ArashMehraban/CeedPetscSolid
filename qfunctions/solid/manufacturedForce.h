@@ -35,6 +35,13 @@ CEED_QFUNCTION(SetupMMSForce)(void *ctx, const CeedInt Q,
     CeedScalar x = coords[i+0*Q], y = coords[i+1*Q], z = coords[i+2*Q];
     CeedScalar wJ = qdata[i];
 
+force[i+0*Q] = wJ*((E*nu*y)/((nu*2.0-1.0)*(nu+1.0))+(E*nu*z)/((nu*2.0-1.0)*(nu+1.0))-(E*y*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0)*2.0)-(E*z*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0)*2.0));
+force[i+1*Q] = wJ*((E*nu*x)/((nu*2.0-1.0)*(nu+1.0))+(E*nu*z)/((nu*2.0-1.0)*(nu+1.0))-(E*x*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0)*2.0)-(E*z*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0)*2.0));
+force[i+2+Q] = wJ*((E*nu*x)/((nu*2.0-1.0)*(nu+1.0))+(E*nu*y)/((nu*2.0-1.0)*(nu+1.0))-(E*x*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0)*2.0)-(E*y*(nu-1.0/2.0))/((nu*2.0-1.0)*(nu+1.0)*2.0));
+
+
+
+/*
     // Forcing function
     force[i+0*Q] = wJ*(-(E*(cos(x*2.0)*cos(y*3.0)*exp(z*4.0)*4.0-cos(z*4.0)*sin(y*3.0)*exp(x*2.0)*8.0)*(nu-0.5))/((nu*2.0-1.0)*(nu+1.0))+
                         (E*(cos(z*4.0)*sin(y*3.0)*exp(x*2.0)*(4.5)+sin(x*2.0)*sin(z*4.0)*exp(y*3.0)*3.0)*(nu-0.5))/((nu*2.0-1.0)*(nu+1.0))+
@@ -50,6 +57,7 @@ CEED_QFUNCTION(SetupMMSForce)(void *ctx, const CeedInt Q,
                         (E*(cos(y*3.0)*sin(x*2.0)*exp(z*4.0)*2.0+sin(y*3.0)*sin(z*4.0)*exp(x*2.0)*4.0)*(nu-0.5))/((nu*2.0-1.0)*(nu+1.0))+
                         (E*nu*cos(x*2.0)*cos(z*4.0)*exp(y*3.0)*12.0)/((nu*2.0-1.0)*(nu+1.0))-(E*nu*sin(y*3.0)*sin(z*4.0)*exp(x*2.0)*8.0)/((nu*2.0-1.0)*(nu+1.0))-
                         (E*cos(y*3.0)*sin(x*2.0)*exp(z*4.0)*(nu-1.0)*16.0)/((nu*2.0-1.0)*(nu+1.0)))/1e8;
+*/
   } // End of Quadrature Point Loop
 
   return 0;
