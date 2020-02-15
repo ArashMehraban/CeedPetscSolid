@@ -724,6 +724,7 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
 
     // Multiplicity calculation
     CeedElemRestrictionCreateVector(Erestrictu, &multvec, &evec);
+    CeedVectorSetValue(multvec, 0.);
     CeedElemRestrictionGetMultiplicity(Erestrictu, multvec);
 
     // Multiplicity correction
