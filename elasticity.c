@@ -187,7 +187,7 @@ int main(int argc, char **argv) {
   //ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
   ierr = VecDuplicate(VecTruSln_as_initial,&U); CHKERRQ(ierr);
   ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
-  VecView(U,PETSC_VIEWER_STDOUT_WORLD);
+  VecView(R,PETSC_VIEWER_STDOUT_WORLD);
   //clean up for initial guess as input
   ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
   CeedVectorRestoreArrayRead(ceeddata->truesoln, &CeedTruSln_as_initial);
