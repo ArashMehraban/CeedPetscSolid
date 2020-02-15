@@ -42,8 +42,7 @@ static PetscErrorCode FormJacobian(SNES snes,Vec U,Mat J,Mat Jpre,void *ctx) {
 int main(int argc, char **argv) {
   PetscInt    ierr;
   MPI_Comm    comm;
-  AppCtx
-  appCtx; //contains polinomial basis degree, problem choice & mesh filename
+  AppCtx      appCtx; //contains polinomial basis degree, problem choice & mesh filename
   Physics     phys;   // contains physical constants
   Units       units;  // contains units scaling
   DM          dm;
@@ -173,10 +172,28 @@ int main(int argc, char **argv) {
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
 
   // Set initial Guess
-  ierr = VecSet(U, 1.0); CHKERRQ(ierr);
+  const CeedScalar *CeedTruSln_as_initial;
+  Vec VecTruSln_as_initial;
+  ierr = VecDuplicate(U, &VecTruSln_as_initial); CHKERRQ(ierr);
+  //VecView(VecTruSln_as_initial,PETSC_VIEWER_STDOUT_WORLD);
+  CeedVectorGetArrayRead(ceeddata->truesoln, CEED_MEM_HOST, &CeedTruSln_as_initial);
+  ierr = VecPlaceArray(resCtx->Yloc, CeedTruSln_as_initial); CHKERRQ(ierr);
+  ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Yloc, INSERT_VALUES, VecTruSln_as_initial);CHKERRQ(ierr);
+  ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Yloc, INSERT_VALUES, VecTruSln_as_initial);CHKERRQ(ierr);
+  //VecView(VecTruSln_as_initial,PETSC_VIEWER_STDOUT_WORLD);
 
+  //ierr = VecSet(U, 1.0); CHKERRQ(ierr);
   // Solve SNES
+  //ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+  ierr = VecDuplicate(VecTruSln_as_initial,&U); CHKERRQ(ierr);
   ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+  VecView(U,PETSC_VIEWER_STDOUT_WORLD);
+  //clean up for initial guess as input
+  ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
+  CeedVectorRestoreArrayRead(ceeddata->truesoln, &CeedTruSln_as_initial);
+  ierr = VecDestroy(&VecTruSln_as_initial); CHKERRQ(ierr);
+
+
 
   // Compute error
   if (appCtx.forcingChoice == FORCE_MMS) {
