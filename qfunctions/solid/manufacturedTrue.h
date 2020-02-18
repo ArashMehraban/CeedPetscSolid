@@ -35,7 +35,6 @@ CEED_QFUNCTION(MMSTrueSoln)(void *ctx, const CeedInt Q,
     true_soln[i+2*Q] = exp(4*z)*sin(2*x)*cos(3*y)/1e8;
 */
   } // End of Quadrature Point Loop
-
   return 0;
 }
 // -----------------------------------------------------------------------------
