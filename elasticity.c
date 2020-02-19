@@ -111,6 +111,7 @@ int main(int argc, char **argv) {
     ierr = DMLocalToGlobalBegin(dm, Floc, ADD_VALUES, F); CHKERRQ(ierr);
     ierr = DMLocalToGlobalEnd(dm, Floc, ADD_VALUES, F); CHKERRQ(ierr);
     CeedVectorDestroy(&forceceed);
+  //VecView(Floc,PETSC_VIEWER_STDOUT_WORLD);
     ierr = VecDestroy(&Floc); CHKERRQ(ierr);
   }
 
@@ -178,19 +179,30 @@ int main(int argc, char **argv) {
   //VecView(VecTruSln_as_initial,PETSC_VIEWER_STDOUT_WORLD);
   CeedVectorGetArrayRead(ceeddata->truesoln, CEED_MEM_HOST, &CeedTruSln_as_initial);
   ierr = VecPlaceArray(resCtx->Yloc, CeedTruSln_as_initial); CHKERRQ(ierr);
+  //VecView(resCtx->Yloc,PETSC_VIEWER_STDOUT_WORLD);
   ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Yloc, INSERT_VALUES, VecTruSln_as_initial);CHKERRQ(ierr);
   ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Yloc, INSERT_VALUES, VecTruSln_as_initial);CHKERRQ(ierr);
-  VecView(VecTruSln_as_initial,PETSC_VIEWER_STDOUT_WORLD);
+  ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
+  CeedVectorRestoreArrayRead(ceeddata->truesoln, &CeedTruSln_as_initial);
+  //VecView(VecTruSln_as_initial,PETSC_VIEWER_STDOUT_WORLD);
+
+  
 
   // ierr = VecSet(U, 1.0); CHKERRQ(ierr);
   // // Solve SNES
   // ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
   ierr = VecCopy(VecTruSln_as_initial,U); CHKERRQ(ierr);
+
+
+
+  ierr = FormResidual_Ceed(snes, U, R, resCtx); CHKERRQ(ierr);
+  ierr = VecAXPY(R, -1.0, F); CHKERRQ(ierr);
+  VecView(R,PETSC_VIEWER_STDOUT_WORLD);
+  VecView(F,PETSC_VIEWER_STDOUT_WORLD);
+
   ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
   VecView(R,PETSC_VIEWER_STDOUT_WORLD);
   //clean up for initial guess as input
-  ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
-  CeedVectorRestoreArrayRead(ceeddata->truesoln, &CeedTruSln_as_initial);
   ierr = VecDestroy(&VecTruSln_as_initial); CHKERRQ(ierr);
 
 
