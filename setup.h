@@ -143,7 +143,7 @@ typedef struct CeedData_private *CeedData;
 struct CeedData_private {
   Ceed                ceed;
   CeedBasis           basisx, basisu, basisctof;
-  CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui,
+  CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi,
                       Erestrictqdi, ErestrictGradui;
   CeedQFunction       qf_apply, qf_jacob;
   CeedOperator        op_apply, op_jacob, op_restrict, op_interp;
@@ -444,7 +444,6 @@ static PetscErrorCode CeedDataDestroy(CeedInt i, CeedData data) {
   CeedBasisDestroy(&data->basisu);
   CeedElemRestrictionDestroy(&data->Erestrictu);
   CeedElemRestrictionDestroy(&data->Erestrictx);
-  CeedElemRestrictionDestroy(&data->Erestrictui);
   CeedElemRestrictionDestroy(&data->ErestrictGradui);
   CeedElemRestrictionDestroy(&data->Erestrictxi);
   CeedElemRestrictionDestroy(&data->Erestrictqdi);
@@ -525,7 +524,7 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
   CeedInt      dim, ncompx;
   CeedBasis    basisx, basisu;
   DM           dmcoord;
-  CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi, Erestrictui,
+  CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi,
                       Erestrictqdi, ErestrictGradui;
   CeedInt      cStart, cEnd, nelem;
   Vec          coords;
@@ -559,8 +558,6 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
 
   ierr = DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd); CHKERRQ(ierr);
   nelem = cEnd - cStart;
-  CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, ncompu,
-                                   CEED_STRIDES_BACKEND, &Erestrictui);
   CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, qdatasize,
                                    CEED_STRIDES_BACKEND, &Erestrictqdi);
   CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, ncompx,
@@ -747,7 +744,6 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx *appCtx, Physics phys,
   data->Erestrictx = Erestrictx;
   data->Erestrictu = Erestrictu;
   data->Erestrictxi = Erestrictxi;
-  data->Erestrictui = Erestrictui;
   data->Erestrictqdi = Erestrictqdi;
   if (problemChoice != ELAS_LIN)
     data->ErestrictGradui = ErestrictGradui;
