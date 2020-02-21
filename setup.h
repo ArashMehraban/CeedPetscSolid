@@ -192,6 +192,7 @@ struct CeedData_private {
 // -----------------------------------------------------------------------------
 // Helper Functions
 // -----------------------------------------------------------------------------
+// Process general command line options
 static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
 
   PetscErrorCode ierr;
@@ -319,6 +320,7 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
   PetscFunctionReturn(0);
 };
 
+// Process physics options
 static int processPhysics(MPI_Comm comm, Physics phys, Units units) {
 
   PetscErrorCode ierr;
@@ -395,6 +397,7 @@ static PetscErrorCode CreateBCLabel(DM dm, const char name[]) {
   PetscFunctionReturn(0);
 };
 
+// Read mesh and distribute DM in parallel
 static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
 
   PetscErrorCode  ierr;
@@ -404,6 +407,8 @@ static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
   PetscPartitioner part;
 
   PetscFunctionBeginUser;
+
+  // Read mesh
   if (ctx->degree >= 2)
     interpolate = PETSC_TRUE;
 
@@ -414,6 +419,8 @@ static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
   } else {
     ierr = DMPlexCreateFromFile(comm, filename, interpolate, dm); CHKERRQ(ierr);
   }
+
+  // Distribute DM in parallel
   ierr = DMPlexGetPartitioner(*dm, &part); CHKERRQ(ierr);
   ierr = PetscPartitionerSetFromOptions(part); CHKERRQ(ierr);
   ierr = DMPlexDistribute(*dm, 0, NULL, &distributedMesh); CHKERRQ(ierr);
@@ -421,9 +428,11 @@ static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
     ierr = DMDestroy(dm); CHKERRQ(ierr);
     *dm  = distributedMesh;
   }
+
   PetscFunctionReturn(0);
 };
 
+// Setup DM with FE space of apropriate degree
 static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
                            PetscInt ncompu) {
   PetscErrorCode  ierr;
@@ -527,7 +536,7 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
 // -----------------------------------------------------------------------------
 // libCEED Functions
 // -----------------------------------------------------------------------------
-// Destroy libCEED operator objects
+// Destroy libCEED objects
 static PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   PetscInt ierr;
 
@@ -569,7 +578,7 @@ static PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   PetscFunctionReturn(0);
 };
 
-// Get CEED restriction data from DMPlex
+// Get libCEED restriction data from DMPlex
 static int CreateRestrictionPlex(Ceed ceed, CeedInterlaceMode imode, CeedInt P,
                                  CeedInt ncomp, CeedElemRestriction *Erestrict,
                                  DM dm) {
@@ -650,7 +659,7 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   ncompx = dim;
 
   // ---------------------------------------------------------------------------
-  // CEED restrictions
+  // libCEED restrictions
   // ---------------------------------------------------------------------------
   ierr = DMGetCoordinateDM(dm, &dmcoord); CHKERRQ(ierr);
   ierr = DMPlexSetClosurePermutationTensor(dmcoord, PETSC_DETERMINE, NULL);
@@ -690,7 +699,7 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   ierr = VecRestoreArrayRead(coords, &coordArray); CHKERRQ(ierr);
 
   // ---------------------------------------------------------------------------
-  // CEED bases
+  // libCEED bases
   // ---------------------------------------------------------------------------
   // -- Solution basis
   CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompu, P, Q,
@@ -1155,25 +1164,25 @@ static PetscErrorCode FormJacobian(SNES snes,Vec U,Mat J,Mat Jpre,void *ctx) {
 // -----------------------------------------------------------------------------
 // Boundary Functions
 // -----------------------------------------------------------------------------
-/* BCMMS boundary function explanation
-ss : (sideset)
-MMS: Boundary corresponding to the Method of Manufactured Solutions
-Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
-Also check ..\meshes\cyl-hol.8.jou
-
- left: sideset 999
- right: sideset 998
- outer: sideset 997
- inner: sideset 996
-  / \-------------------\              y
- /   \                   \             |
-(  O  )                   )      x ____|
- \   /                   /              \
-  \ /-------------------/                \ z
-
- values on all points of the mesh is set beased on given solution below
- on u[0], u[1], u[2]
-*/
+// BCMMS boundary function
+// ss : (sideset)
+// MMS: Boundary corresponding to the Method of Manufactured Solutions
+// Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
+// Also check ..\meshes\cyl-hol.8.jou
+//
+// left: sideset 999
+// right: sideset 998
+// outer: sideset 997
+// inner: sideset 996
+//
+//   / \-------------------\              y
+//  /   \                   \             |
+// (  O  )                   )      x ____|
+//  \   /                   /              \
+//   \ /-------------------/                \ z
+//
+// Values on all points of the mesh is set based on given solution below
+// for u[0], u[1], u[2]
 PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
                      PetscInt ncompu, PetscScalar *u, void *ctx) {
 
@@ -1190,23 +1199,23 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
   PetscFunctionReturn(0);
 };
 
-/*BCBend2_ss boundary function explanation
-ss : (sideset)
-2_ss : two sides of the geometry
-Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
-Also check ..\meshes\cyl-hol.8.jou
-
- left: sideset 999
- right: sideset 998
-  / \-------------------\              y
- /   \                   \             |
-(  O  )                   )      x ____|
- \   /                   /              \
-  \ /-------------------/                \ z
-
-  0 values on the left side of the cyl-hole (sideset 999)
- -1 values on y direction of the right side of the cyl-hole (sideset 999)
-*/
+// BCBend2_ss boundary function
+// ss : (sideset)
+// 2_ss : two sides of the geometry
+// Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
+// Also check ..\meshes\cyl-hol.8.jou
+//
+// left: sideset 999
+// right: sideset 998
+//
+//   / \-------------------\              y
+//  /   \                   \             |
+// (  O  )                   )      x ____|
+//  \   /                   /              \
+//   \ /-------------------/                \ z
+//
+//  0 values on the left side of the cyl-hole (sideset 999)
+// -1 values on y direction of the right side of the cyl-hole (sideset 999)
 PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
                           const PetscReal coords[],
                           PetscInt ncompu, PetscScalar *u, void *ctx) {
@@ -1215,36 +1224,35 @@ PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
   PetscFunctionBeginUser;
 
   switch (*faceID) {
-  case 999: // left side of the cyl-hol
+  case 999:    // left side of the cyl-hol
     u[0] = 0;
     u[1] = 0;
     u[2] = 0;
     break;
-  case 998: //right side of the cyl-hol
+  case 998:    // right side of the cyl-hol
     u[0] = 0;
-    u[1] = -1; //bend in the -y direction
+    u[1] = -1; // bend in the -y direction
     u[2] = 0;
     break;
   }
   PetscFunctionReturn(0);
 };
 
-/*BCBend1_ss boundary function explanation
-ss : (sideset)
-1_ss : 1 side (left side) of the geometry
-Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
-Also check ..\meshes\cyl-hol.8.jou
-
- left: sideset 999
-
-  / \-------------------\              y
- /   \                   \             |
-(  O  )                   )      x ____|
- \   /                   /              \
-  \ /-------------------/                \ z
-
-  0 values on the left side of the cyl-hole (sideset 999)
-*/
+// BCBend1_ss boundary function
+// ss : (sideset)
+// 1_ss : 1 side (left side) of the geometry
+// Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
+// Also check ..\meshes\cyl-hol.8.jou
+//
+// left: sideset 999
+//
+//   / \-------------------\              y
+//  /   \                   \             |
+// (  O  )                   )      x ____|
+//  \   /                   /              \
+//   \ /-------------------/                \ z
+//
+//  0 values on the left side of the cyl-hole (sideset 999)
 PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time,
                           const PetscReal coords[],
                           PetscInt ncompu, PetscScalar *u, void *ctx) {
@@ -1258,6 +1266,7 @@ PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time,
   PetscFunctionReturn(0);
 };
 
+// Zero Dirictlet boundaries for a cube mesh
 PetscErrorCode BCCube(PetscInt dim, PetscReal time,
                           const PetscReal coords[],
                           PetscInt ncompu, PetscScalar *u, void *ctx) {

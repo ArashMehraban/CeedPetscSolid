@@ -205,16 +205,25 @@ int main(int argc, char **argv) {
     }
   }
 
+  // ---------------------------------------------------------------------------
   // Setup SNES
+  // ---------------------------------------------------------------------------
   ierr = SNESCreate(comm, &snes); CHKERRQ(ierr);
   ierr = SNESSetDM(snes, levelDMs[appCtx.numLevels-1]); CHKERRQ(ierr);
+
+  // -- Residual evaluation function
   ierr = PetscMalloc1(1, &resCtx); CHKERRQ(ierr);
+  ierr = SNESSetFunction(snes, R, FormResidual_Ceed, resCtx); CHKERRQ(ierr);
+
+  // ---------------------------------------------------------------------------
+  // Setup KSP
+  // ---------------------------------------------------------------------------
+
   // -- Jacobian context
   ierr = PetscMalloc1(1, &jacobCtx); CHKERRQ(ierr);
   ierr =  CreateMatrixFreeCtx(comm, levelDMs[appCtx.numLevels-1], Uloc[appCtx.numLevels-1], ceeddata[appCtx.numLevels-1], ceed, resCtx, jacobCtx);
   CHKERRQ(ierr);
-  // -- Function that computes the residual
-  ierr = SNESSetFunction(snes, R, FormResidual_Ceed, resCtx); CHKERRQ(ierr);
+
   // -- Form Action of Jacobian on delta_u
   ierr = MatCreateShell(comm, Ulsz[appCtx.numLevels-1], Ulsz[appCtx.numLevels-1], Ugsz[appCtx.numLevels-1], Ugsz[appCtx.numLevels-1], jacobCtx, &mat);
   CHKERRQ(ierr);
@@ -235,49 +244,62 @@ int main(int argc, char **argv) {
   }
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
 
-  // Set initial Guess
+  // ---------------------------------------------------------------------------
+  // Set initial guess
+  // ---------------------------------------------------------------------------
   ierr = VecSet(U[appCtx.numLevels-1], 1.0); CHKERRQ(ierr);
 
+  // ---------------------------------------------------------------------------
   // Solve SNES
+  // ---------------------------------------------------------------------------
   ierr = SNESSolve(snes, F, U[appCtx.numLevels-1]); CHKERRQ(ierr);
 
+  // ---------------------------------------------------------------------------
   // Compute error
+  // ---------------------------------------------------------------------------
   if (appCtx.forcingChoice == FORCE_MMS) {
     CeedScalar l2error = 1., l2Unorm = 1.;
     const CeedScalar *truearray;
     Vec errorVec, trueVec;
+
+    // -- Work vectors
     ierr = VecDuplicate(U[appCtx.numLevels-1], &errorVec); CHKERRQ(ierr);
     ierr = VecSet(errorVec, 0.0); CHKERRQ(ierr);
     ierr = VecDuplicate(U[appCtx.numLevels-1], &trueVec); CHKERRQ(ierr);
     ierr = VecSet(trueVec, 0.0); CHKERRQ(ierr);
 
-    // Global true soltion vector
-    CeedVectorGetArrayRead(ceeddata[appCtx.numLevels-1]->truesoln, CEED_MEM_HOST, &truearray);
+    // -- Assebmle global true soltion vector
+    CeedVectorGetArrayRead(ceeddata[appCtx.numLevels-1]->truesoln,
+                           CEED_MEM_HOST, &truearray);
     ierr = VecPlaceArray(resCtx->Yloc, truearray); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec);
-    CHKERRQ(ierr);
+    ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Yloc, INSERT_VALUES,
+                                trueVec); CHKERRQ(ierr);
     ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec);
     CHKERRQ(ierr);
     ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
-    CeedVectorRestoreArrayRead(ceeddata[appCtx.numLevels-1]->truesoln, &truearray);
+    CeedVectorRestoreArrayRead(ceeddata[appCtx.numLevels-1]->truesoln,
+                               &truearray);
 
-    // Compute error
-    ierr = VecWAXPY(errorVec, -1.0, U[appCtx.numLevels-1], trueVec); CHKERRQ(ierr);
+    // -- Compute l2 error
+    ierr = VecWAXPY(errorVec, -1.0, U[appCtx.numLevels-1], trueVec);
+    CHKERRQ(ierr);
     ierr = VecNorm(errorVec, NORM_2, &l2error); CHKERRQ(ierr);
     ierr = VecNorm(U[appCtx.numLevels-1], NORM_2, &l2Unorm); CHKERRQ(ierr);
     l2error /= l2Unorm;
 
-    // Output
+    // -- Output
     if (!appCtx.testMode || l2error > 0.168) {
       ierr = PetscPrintf(comm, "  L2 Error: %f\n", l2error); CHKERRQ(ierr);
     }
 
-    // Cleanup
+    // -- Cleanup
     ierr = VecDestroy(&errorVec); CHKERRQ(ierr);
     ierr = VecDestroy(&trueVec); CHKERRQ(ierr);
   }
 
+  // ---------------------------------------------------------------------------
   // Free objects
+  // ---------------------------------------------------------------------------
   for (int i=0; i < appCtx.numLevels; i++) {
     ierr = VecDestroy(&U[i]); CHKERRQ(ierr);
     ierr = VecDestroy(&Uloc[i]); CHKERRQ(ierr);
