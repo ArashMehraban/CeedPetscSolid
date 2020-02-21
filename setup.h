@@ -171,9 +171,21 @@ typedef struct UserMult_private *UserMult;
 struct UserMult_private {
   MPI_Comm     comm;
   DM           dm;
-  Vec          Xloc, Yloc, diag;
-  CeedVector   xceed, yceed;
+  Vec          Xloc, Yloc, diagVec;
+  PetscInt     diagState, maxDiagState;
+  CeedVector   Xceed, Yceed;
   CeedOperator op;
+  Ceed         ceed;
+};
+
+// Data for PETSc Prolongation/Restriction Matshell
+typedef struct UserMultProlongRestr_private *UserMultProlongRestr;
+struct UserMultProlongRestr_private {
+  MPI_Comm     comm;
+  DM           dmC, dmF;
+  Vec          locVecC, locVecF, multVec;
+  CeedVector   ceedVecC, ceedVecF;
+  CeedOperator opProlong, opRestrict;
   Ceed         ceed;
 };
 
@@ -184,8 +196,8 @@ struct CeedData_private {
   CeedBasis           basisx, basisu, basisCtoF;
   CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi,
                       Erestrictqdi, ErestrictGradui;
-  CeedQFunction       qf_apply, qf_jacob;
-  CeedOperator        op_apply, op_jacob, op_restrict, op_prolong;
+  CeedQFunction       qfApply, qfJacob;
+  CeedOperator        opApply, opJacob, opRestrict, opProlong;
   CeedVector          qdata, gradu, xceed, yceed, truesoln;
 };
 
@@ -559,18 +571,18 @@ static PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   CeedBasisDestroy(&data->basisu);
 
   // QFunctions
-  CeedQFunctionDestroy(&data->qf_jacob);
-  CeedQFunctionDestroy(&data->qf_apply);
+  CeedQFunctionDestroy(&data->qfJacob);
+  CeedQFunctionDestroy(&data->qfApply);
 
   // Operators
-  CeedOperatorDestroy(&data->op_jacob);
-  CeedOperatorDestroy(&data->op_apply);
+  CeedOperatorDestroy(&data->opJacob);
+  CeedOperatorDestroy(&data->opApply);
 
   // Restriction and Prolongation data
   if (level > 0) {
     CeedBasisDestroy(&data->basisCtoF);
-    CeedOperatorDestroy(&data->op_prolong);
-    CeedOperatorDestroy(&data->op_restrict);
+    CeedOperatorDestroy(&data->opProlong);
+    CeedOperatorDestroy(&data->opRestrict);
   }
 
   ierr = PetscFree(data); CHKERRQ(ierr);
@@ -631,8 +643,8 @@ static int CreateRestrictionPlex(Ceed ceed, CeedInterlaceMode imode, CeedInt P,
 static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
                                 CeedData *data, PetscInt level, PetscInt ncompu,
                                 PetscInt Ugsz, PetscInt Ulocsz,
-                                CeedVector forceceed, CeedQFunction qf_restrict,
-                                CeedQFunction qf_prolong) {
+                                CeedVector forceceed, CeedQFunction qfRestrict,
+                                CeedQFunction qfProlong) {
   int          ierr;
   CeedInt      P = appCtx.levelDegrees[level] + 1;
   CeedInt      Q = P;
@@ -650,8 +662,8 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi,
                       Erestrictqdi, ErestrictGradui;
   CeedBasis    basisx, basisu, basisCtoF;
-  CeedQFunction qf_setupgeo, qf_apply, qf_jacob;
-  CeedOperator op_setupgeo, op_apply, op_jacob;
+  CeedQFunction qfSetupGeo, qfApply, qfJacob;
+  CeedOperator opSetupGeo, opApply, opJacob;
 
   PetscFunctionBeginUser;
 
@@ -735,27 +747,27 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   // -- QFunction
   CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].setupgeo,
                               problemOptions[problemChoice].setupgeofname,
-                              &qf_setupgeo);
-  CeedQFunctionAddInput(qf_setupgeo, "dx", ncompx*dim, CEED_EVAL_GRAD);
-  CeedQFunctionAddInput(qf_setupgeo, "weight", 1, CEED_EVAL_WEIGHT);
-  CeedQFunctionAddOutput(qf_setupgeo, "qdata", qdatasize, CEED_EVAL_NONE);
+                              &qfSetupGeo);
+  CeedQFunctionAddInput(qfSetupGeo, "dx", ncompx*dim, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qfSetupGeo, "weight", 1, CEED_EVAL_WEIGHT);
+  CeedQFunctionAddOutput(qfSetupGeo, "qdata", qdatasize, CEED_EVAL_NONE);
 
   // -- Operator
-  CeedOperatorCreate(ceed, qf_setupgeo, CEED_QFUNCTION_NONE,
-                     CEED_QFUNCTION_NONE, &op_setupgeo);
-  CeedOperatorSetField(op_setupgeo, "dx", Erestrictx, basisx,
+  CeedOperatorCreate(ceed, qfSetupGeo, CEED_QFUNCTION_NONE,
+                     CEED_QFUNCTION_NONE, &opSetupGeo);
+  CeedOperatorSetField(opSetupGeo, "dx", Erestrictx, basisx,
                        CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op_setupgeo, "weight", Erestrictxi, basisx,
+  CeedOperatorSetField(opSetupGeo, "weight", Erestrictxi, basisx,
                        CEED_VECTOR_NONE);
-  CeedOperatorSetField(op_setupgeo, "qdata", Erestrictqdi,
+  CeedOperatorSetField(opSetupGeo, "qdata", Erestrictqdi,
                        CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
 
   // -- Compute the quadrature data
-  CeedOperatorApply(op_setupgeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
+  CeedOperatorApply(opSetupGeo, xcoord, qdata, CEED_REQUEST_IMMEDIATE);
 
   // -- Cleanup
-  CeedQFunctionDestroy(&qf_setupgeo);
-  CeedOperatorDestroy(&op_setupgeo);
+  CeedQFunctionDestroy(&qfSetupGeo);
+  CeedOperatorDestroy(&opSetupGeo);
 
   // ---------------------------------------------------------------------------
   // Local residual evaluator
@@ -764,23 +776,23 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
     // -- QFunction
     CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].apply,
                                 problemOptions[problemChoice].applyfname,
-                                &qf_apply);
-    CeedQFunctionAddInput(qf_apply, "du", ncompu*dim, CEED_EVAL_GRAD);
-    CeedQFunctionAddInput(qf_apply, "qdata", qdatasize, CEED_EVAL_NONE);
-    CeedQFunctionAddOutput(qf_apply, "dv", ncompu*dim, CEED_EVAL_GRAD);
+                                &qfApply);
+    CeedQFunctionAddInput(qfApply, "du", ncompu*dim, CEED_EVAL_GRAD);
+    CeedQFunctionAddInput(qfApply, "qdata", qdatasize, CEED_EVAL_NONE);
+    CeedQFunctionAddOutput(qfApply, "dv", ncompu*dim, CEED_EVAL_GRAD);
     if (problemChoice != ELAS_LIN)
-      CeedQFunctionAddOutput(qf_apply, "gradu", ncompu*dim, CEED_EVAL_NONE);
-    CeedQFunctionSetContext(qf_apply, phys, sizeof(phys));
+      CeedQFunctionAddOutput(qfApply, "gradu", ncompu*dim, CEED_EVAL_NONE);
+    CeedQFunctionSetContext(qfApply, phys, sizeof(phys));
 
     // -- Operator
-    CeedOperatorCreate(ceed, qf_apply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
-                       &op_apply);
-    CeedOperatorSetField(op_apply, "du", Erestrictu, basisu, CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op_apply, "qdata", Erestrictqdi, CEED_BASIS_COLLOCATED,
+    CeedOperatorCreate(ceed, qfApply, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
+                       &opApply);
+    CeedOperatorSetField(opApply, "du", Erestrictu, basisu, CEED_VECTOR_ACTIVE);
+    CeedOperatorSetField(opApply, "qdata", Erestrictqdi, CEED_BASIS_COLLOCATED,
                          qdata);
-    CeedOperatorSetField(op_apply, "dv", Erestrictu, basisu, CEED_VECTOR_ACTIVE);
+    CeedOperatorSetField(opApply, "dv", Erestrictu, basisu, CEED_VECTOR_ACTIVE);
     if (problemChoice != ELAS_LIN)
-      CeedOperatorSetField(op_apply, "gradu", ErestrictGradui, basisu, gradu);
+      CeedOperatorSetField(opApply, "gradu", ErestrictGradui, basisu, gradu);
   }
 
   // ---------------------------------------------------------------------------
@@ -789,61 +801,61 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   // -- QFunction
   CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].jacob,
                               problemOptions[problemChoice].jacobfname,
-                              &qf_jacob);
-  CeedQFunctionAddInput(qf_jacob, "deltadu", ncompu*dim, CEED_EVAL_GRAD);
-  CeedQFunctionAddInput(qf_jacob, "qdata", qdatasize, CEED_EVAL_NONE);
+                              &qfJacob);
+  CeedQFunctionAddInput(qfJacob, "deltadu", ncompu*dim, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qfJacob, "qdata", qdatasize, CEED_EVAL_NONE);
   if (problemChoice != ELAS_LIN)
-    CeedQFunctionAddInput(qf_jacob, "gradu", ncompu*dim, CEED_EVAL_NONE);
-  CeedQFunctionAddOutput(qf_jacob, "deltadv", ncompu*dim, CEED_EVAL_GRAD);
-  CeedQFunctionSetContext(qf_jacob, phys, sizeof(phys));
+    CeedQFunctionAddInput(qfJacob, "gradu", ncompu*dim, CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(qfJacob, "deltadv", ncompu*dim, CEED_EVAL_GRAD);
+  CeedQFunctionSetContext(qfJacob, phys, sizeof(phys));
 
   // -- Operator
-  CeedOperatorCreate(ceed, qf_jacob, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
-                     &op_jacob);
-  CeedOperatorSetField(op_jacob, "deltadu", Erestrictu, basisu,
+  CeedOperatorCreate(ceed, qfJacob, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
+                     &opJacob);
+  CeedOperatorSetField(opJacob, "deltadu", Erestrictu, basisu,
                        CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(op_jacob, "qdata", Erestrictqdi, CEED_BASIS_COLLOCATED,
+  CeedOperatorSetField(opJacob, "qdata", Erestrictqdi, CEED_BASIS_COLLOCATED,
                        qdata);
-  CeedOperatorSetField(op_jacob, "deltadv", Erestrictu, basisu,
+  CeedOperatorSetField(opJacob, "deltadv", Erestrictu, basisu,
                        CEED_VECTOR_ACTIVE);
   if (problemChoice != ELAS_LIN)
-    CeedOperatorSetField(op_jacob, "gradu", ErestrictGradui,
+    CeedOperatorSetField(opJacob, "gradu", ErestrictGradui,
                          CEED_BASIS_COLLOCATED, gradu);
 
   // ---------------------------------------------------------------------------
   // Forcing term, if needed
   // ---------------------------------------------------------------------------
   if ((level == appCtx.numLevels - 1) && (forcingChoice != FORCE_NONE)) {
-    CeedQFunction qf_setupforce;
-    CeedOperator op_setupforce;
+    CeedQFunction qfSetupForce;
+    CeedOperator opSetupForce;
 
     // -- QFunction
     CeedQFunctionCreateInterior(ceed, 1,
                                 forcingOptions[forcingChoice].setupforcing,
                                 forcingOptions[forcingChoice].setupforcingfname,
-                                &qf_setupforce);
-    CeedQFunctionAddInput(qf_setupforce, "x", ncompx, CEED_EVAL_INTERP);
-    CeedQFunctionAddInput(qf_setupforce, "qdata", qdatasize, CEED_EVAL_NONE);
-    CeedQFunctionAddOutput(qf_setupforce, "force", ncompu, CEED_EVAL_INTERP);
-    CeedQFunctionSetContext(qf_setupforce, phys, sizeof(phys));
+                                &qfSetupForce);
+    CeedQFunctionAddInput(qfSetupForce, "x", ncompx, CEED_EVAL_INTERP);
+    CeedQFunctionAddInput(qfSetupForce, "qdata", qdatasize, CEED_EVAL_NONE);
+    CeedQFunctionAddOutput(qfSetupForce, "force", ncompu, CEED_EVAL_INTERP);
+    CeedQFunctionSetContext(qfSetupForce, phys, sizeof(phys));
 
     // -- Operator
-    CeedOperatorCreate(ceed, qf_setupforce, CEED_QFUNCTION_NONE,
-                       CEED_QFUNCTION_NONE, &op_setupforce);
-    CeedOperatorSetField(op_setupforce, "x", Erestrictx, basisx,
+    CeedOperatorCreate(ceed, qfSetupForce, CEED_QFUNCTION_NONE,
+                       CEED_QFUNCTION_NONE, &opSetupForce);
+    CeedOperatorSetField(opSetupForce, "x", Erestrictx, basisx,
                          CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op_setupforce, "qdata", Erestrictqdi,
+    CeedOperatorSetField(opSetupForce, "qdata", Erestrictqdi,
                          CEED_BASIS_COLLOCATED, qdata);
-    CeedOperatorSetField(op_setupforce, "force", Erestrictu, basisu,
+    CeedOperatorSetField(opSetupForce, "force", Erestrictu, basisu,
                          CEED_VECTOR_ACTIVE);
 
     // -- Compute forcing term
-    CeedOperatorApply(op_setupforce, xcoord, forceceed, CEED_REQUEST_IMMEDIATE);
+    CeedOperatorApply(opSetupForce, xcoord, forceceed, CEED_REQUEST_IMMEDIATE);
     CeedVectorSyncArray(forceceed, CEED_MEM_HOST);
 
     // -- Cleanup
-    CeedQFunctionDestroy(&qf_setupforce);
-    CeedOperatorDestroy(&op_setupforce);
+    CeedQFunctionDestroy(&qfSetupForce);
+    CeedOperatorDestroy(&opSetupForce);
   }
 
   // ---------------------------------------------------------------------------
@@ -854,8 +866,8 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
     const CeedScalar *multarray;
     CeedVector multvec;
     CeedBasis basisxtrue;
-    CeedQFunction qf_true;
-    CeedOperator op_true;
+    CeedQFunction qfTrue;
+    CeedOperator opTrue;
 
     // -- Solution vector
     CeedVectorCreate(ceed, Ulocsz, &(data[level]->truesoln));
@@ -866,20 +878,20 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
 
     // QFunction
     CeedQFunctionCreateInterior(ceed, 1, MMSTrueSoln, MMSTrueSoln_loc,
-                                &qf_true);
-    CeedQFunctionAddInput(qf_true, "x", ncompx, CEED_EVAL_INTERP);
-    CeedQFunctionAddOutput(qf_true, "true_soln", ncompu, CEED_EVAL_NONE);
+                                &qfTrue);
+    CeedQFunctionAddInput(qfTrue, "x", ncompx, CEED_EVAL_INTERP);
+    CeedQFunctionAddOutput(qfTrue, "true_soln", ncompu, CEED_EVAL_NONE);
 
     // Operator
-    CeedOperatorCreate(ceed, qf_true, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
-                       &op_true);
-    CeedOperatorSetField(op_true, "x", Erestrictx, basisxtrue,
+    CeedOperatorCreate(ceed, qfTrue, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
+                       &opTrue);
+    CeedOperatorSetField(opTrue, "x", Erestrictx, basisxtrue,
                          CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op_true, "true_soln", Erestrictu,
+    CeedOperatorSetField(opTrue, "true_soln", Erestrictu,
                          CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
 
     // -- Compute true solution
-    CeedOperatorApply(op_true, xcoord, data[level]->truesoln,
+    CeedOperatorApply(opTrue, xcoord, data[level]->truesoln,
                       CEED_REQUEST_IMMEDIATE);
 
     // -- Multiplicity calculation
@@ -898,35 +910,35 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
     // -- Cleanup
     CeedVectorDestroy(&multvec);
     CeedBasisDestroy(&basisxtrue);
-    CeedQFunctionDestroy(&qf_true);
-    CeedOperatorDestroy(&op_true);
+    CeedQFunctionDestroy(&qfTrue);
+    CeedOperatorDestroy(&opTrue);
   }
 
   // ---------------------------------------------------------------------------
   // Restriction and Prolongation
   // ---------------------------------------------------------------------------
   if ((level != 0) && appCtx.multigridChoice != MULTIGRID_NONE) {
-    CeedOperator op_restrict, op_prolong;
+    CeedOperator opRestrict, opProlong;
 
     // -- Restriction
-    CeedOperatorCreate(ceed, qf_restrict, CEED_QFUNCTION_NONE,
-                       CEED_QFUNCTION_NONE, &op_restrict);
-    CeedOperatorSetField(op_restrict, "input", Erestrictu,
+    CeedOperatorCreate(ceed, qfRestrict, CEED_QFUNCTION_NONE,
+                       CEED_QFUNCTION_NONE, &opRestrict);
+    CeedOperatorSetField(opRestrict, "input", Erestrictu,
                          CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op_restrict, "output", data[level-1]->Erestrictu,
+    CeedOperatorSetField(opRestrict, "output", data[level-1]->Erestrictu,
                          basisCtoF, CEED_VECTOR_ACTIVE);
 
     // -- Prolongation
-    CeedOperatorCreate(ceed, qf_prolong, CEED_QFUNCTION_NONE,
-                       CEED_QFUNCTION_NONE, &op_prolong);
-    CeedOperatorSetField(op_prolong, "input", data[level-1]->Erestrictu,
+    CeedOperatorCreate(ceed, qfProlong, CEED_QFUNCTION_NONE,
+                       CEED_QFUNCTION_NONE, &opProlong);
+    CeedOperatorSetField(opProlong, "input", data[level-1]->Erestrictu,
                          basisCtoF, CEED_VECTOR_ACTIVE);
-    CeedOperatorSetField(op_prolong, "output", Erestrictu,
+    CeedOperatorSetField(opProlong, "output", Erestrictu,
                          CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
 
     // -- Save libCEED data required for level
-    data[level]->op_restrict = op_restrict;
-    data[level]->op_prolong = op_prolong;
+    data[level]->opRestrict = opRestrict;
+    data[level]->opProlong = opProlong;
   }
 
   // ---------------------------------------------------------------------------
@@ -959,14 +971,14 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
     data[level]->basisCtoF = basisCtoF;
 
   // -- QFunctions
-  data[level]->qf_jacob = qf_jacob;
+  data[level]->qfJacob = qfJacob;
   if (level == appCtx.numLevels - 1)
-    data[level]->qf_apply = qf_apply;
+    data[level]->qfApply = qfApply;
 
   // -- Operators
-  data[level]->op_jacob = op_jacob;
+  data[level]->opJacob = opJacob;
   if (level == appCtx.numLevels - 1)
-    data[level]->op_apply = op_apply;
+    data[level]->opApply = opApply;
 
   PetscFunctionReturn(0);
 };
@@ -974,6 +986,47 @@ static int SetupLibceedByDegree(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
 // -----------------------------------------------------------------------------
 // Apply libCEED Operators
 // -----------------------------------------------------------------------------
+// This function returns the computed diagonal of the operator
+static PetscErrorCode GetDiag_Ceed(Mat A, Vec D) {
+  PetscErrorCode ierr;
+  UserMult user;
+
+  PetscFunctionBeginUser;
+
+  ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
+
+  // Recompute diagonal if it is too stale
+  if (user->diagState > user->maxDiagState) {
+    CeedVector ceedDiagVec;
+    const CeedScalar *d;
+
+    // -- Compute Diagonal
+    CeedOperatorAssembleLinearDiagonal(user->op, &ceedDiagVec,
+                                       CEED_REQUEST_IMMEDIATE);
+
+    // -- Place in PETSc vector
+    CeedVectorGetArrayRead(ceedDiagVec, CEED_MEM_HOST, &d);
+    ierr = VecPlaceArray(user->Xloc, d); CHKERRQ(ierr);
+
+    // -- Local-to-Global
+    ierr = VecZeroEntries(user->diagVec); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalBegin(user->dm, user->Xloc, ADD_VALUES,
+                                user->diagVec); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalEnd(user->dm, user->Xloc, ADD_VALUES, user->diagVec);
+    CHKERRQ(ierr);
+
+    // -- Cleanup
+    ierr = VecResetArray(user->Xloc); CHKERRQ(ierr);
+    CeedVectorRestoreArrayRead(ceedDiagVec, &d);
+    CeedVectorDestroy(&ceedDiagVec);    
+  }
+
+  // Copy diagonal
+  ierr = VecCopy(user->diagVec, D); CHKERRQ(ierr);
+
+  PetscFunctionReturn(0);
+}
+
 // This function uses libCEED to compute the local action of an operator
 static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user) {
   PetscErrorCode ierr;
@@ -989,12 +1042,12 @@ static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user) {
   // Setup CEED vectors
   ierr = VecGetArrayRead(user->Xloc, (const PetscScalar **)&x); CHKERRQ(ierr);
   ierr = VecGetArray(user->Yloc, &y); CHKERRQ(ierr);
-  CeedVectorSetArray(user->xceed, CEED_MEM_HOST, CEED_USE_POINTER, x);
-  CeedVectorSetArray(user->yceed, CEED_MEM_HOST, CEED_USE_POINTER, y);
+  CeedVectorSetArray(user->Xceed, CEED_MEM_HOST, CEED_USE_POINTER, x);
+  CeedVectorSetArray(user->Yceed, CEED_MEM_HOST, CEED_USE_POINTER, y);
 
   // Apply CEED operator
-  CeedOperatorApply(user->op, user->xceed, user->yceed, CEED_REQUEST_IMMEDIATE);
-  CeedVectorSyncArray(user->yceed, CEED_MEM_HOST);
+  CeedOperatorApply(user->op, user->Xceed, user->Yceed, CEED_REQUEST_IMMEDIATE);
+  CeedVectorSyncArray(user->Yceed, CEED_MEM_HOST);
 
   // Restore PETSc vectors
   ierr = VecRestoreArrayRead(user->Xloc, (const PetscScalar **)&x); CHKERRQ(ierr);
@@ -1034,130 +1087,210 @@ static PetscErrorCode ApplyJacobian_Ceed(Mat A, Vec X, Vec Y) {
 
   PetscFunctionReturn(0);
 };
-/*
+
 // This function uses libCEED to compute the action of the prolongation operator
-static PetscErrorCode MatMult_Prolong(Mat A, Vec X, Vec Y) {
+static PetscErrorCode Prolong_Ceed(Mat A, Vec X, Vec Y) {
   PetscErrorCode ierr;
-  UserIR user;
-  PetscScalar *x, *y;
+  UserMultProlongRestr user;
+  PetscScalar *c, *f;
 
   PetscFunctionBeginUser;
   ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
 
   // Global-to-local
-  ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
-  ierr = DMGlobalToLocalBegin(user->dmc, X, INSERT_VALUES, user->Xloc);
+  ierr = VecZeroEntries(user->locVecC); CHKERRQ(ierr);
+  ierr = DMGlobalToLocalBegin(user->dmC, X, INSERT_VALUES, user->locVecC);
   CHKERRQ(ierr);
-  ierr = DMGlobalToLocalEnd(user->dmc, X, INSERT_VALUES, user->Xloc);
+  ierr = DMGlobalToLocalEnd(user->dmC, X, INSERT_VALUES, user->locVecC);
   CHKERRQ(ierr);
-  ierr = VecZeroEntries(user->Yloc); CHKERRQ(ierr);
+  ierr = VecZeroEntries(user->locVecF); CHKERRQ(ierr);
 
   // Setup CEED vectors
-  ierr = VecGetArrayRead(user->Xloc, (const PetscScalar **)&x); CHKERRQ(ierr);
-  ierr = VecGetArray(user->Yloc, &y); CHKERRQ(ierr);
-  CeedVectorSetArray(user->ceedvecc, CEED_MEM_HOST, CEED_USE_POINTER, x);
-  CeedVectorSetArray(user->ceedvecf, CEED_MEM_HOST, CEED_USE_POINTER, y);
+  ierr = VecGetArrayRead(user->locVecC, (const PetscScalar **)&c); CHKERRQ(ierr);
+  ierr = VecGetArray(user->locVecF, &f); CHKERRQ(ierr);
+  CeedVectorSetArray(user->ceedVecC, CEED_MEM_HOST, CEED_USE_POINTER, c);
+  CeedVectorSetArray(user->ceedVecF, CEED_MEM_HOST, CEED_USE_POINTER, f);
 
   // Apply CEED operator
-  CeedOperatorApply(user->op, user->ceedvecc, user->ceedvecf,
+  CeedOperatorApply(user->opProlong, user->ceedVecC, user->ceedVecF,
                     CEED_REQUEST_IMMEDIATE);
-  CeedVectorSyncArray(user->ceedvecf, CEED_MEM_HOST);
+  CeedVectorSyncArray(user->ceedVecF, CEED_MEM_HOST);
 
   // Restore PETSc vectors
-  ierr = VecRestoreArrayRead(user->Xloc, (const PetscScalar **)&x);
+  ierr = VecRestoreArrayRead(user->locVecC, (const PetscScalar **)c);
   CHKERRQ(ierr);
-  ierr = VecRestoreArray(user->Yloc, &y); CHKERRQ(ierr);
+  ierr = VecRestoreArray(user->locVecF, &f); CHKERRQ(ierr);
 
   // Multiplicity
-  ierr = VecPointwiseMult(user->Yloc, user->Yloc, user->mult);
+  ierr = VecPointwiseMult(user->locVecF, user->locVecF, user->multVec);
 
   // Local-to-global
   ierr = VecZeroEntries(Y); CHKERRQ(ierr);
-  ierr = DMLocalToGlobalBegin(user->dmf, user->Yloc, ADD_VALUES, Y);
+  ierr = DMLocalToGlobalBegin(user->dmF, user->locVecF, ADD_VALUES, Y);
   CHKERRQ(ierr);
-  ierr = DMLocalToGlobalEnd(user->dmf, user->Yloc, ADD_VALUES, Y);
+  ierr = DMLocalToGlobalEnd(user->dmF, user->locVecF, ADD_VALUES, Y);
   CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
 }
 
 // This function uses libCEED to compute the action of the restriction operator
-static PetscErrorCode MatMult_Restrict(Mat A, Vec X, Vec Y) {
+static PetscErrorCode Restrict_Ceed(Mat A, Vec X, Vec Y) {
   PetscErrorCode ierr;
-  UserIR user;
-  PetscScalar *x, *y;
+  UserMultProlongRestr user;
+  PetscScalar *c, *f;
 
   PetscFunctionBeginUser;
   ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
 
   // Global-to-local
-  ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
-  ierr = DMGlobalToLocalBegin(user->dmf, X, INSERT_VALUES, user->Xloc);
+  ierr = VecZeroEntries(user->locVecF); CHKERRQ(ierr);
+  ierr = DMGlobalToLocalBegin(user->dmF, X, INSERT_VALUES, user->locVecF);
   CHKERRQ(ierr);
-  ierr = DMGlobalToLocalEnd(user->dmf, X, INSERT_VALUES, user->Xloc);
+  ierr = DMGlobalToLocalEnd(user->dmF, X, INSERT_VALUES, user->locVecF);
   CHKERRQ(ierr);
-  ierr = VecZeroEntries(user->Yloc); CHKERRQ(ierr);
+  ierr = VecZeroEntries(user->locVecC); CHKERRQ(ierr);
 
   // Multiplicity
-  ierr = VecPointwiseMult(user->Xloc, user->Xloc, user->mult); CHKERRQ(ierr);
+  ierr = VecPointwiseMult(user->locVecF, user->locVecF, user->multVec);
+  CHKERRQ(ierr);
 
   // Setup CEED vectors
-  ierr = VecGetArrayRead(user->Xloc, (const PetscScalar **)&x); CHKERRQ(ierr);
-  ierr = VecGetArray(user->Yloc, &y); CHKERRQ(ierr);
-  CeedVectorSetArray(user->ceedvecf, CEED_MEM_HOST, CEED_USE_POINTER, x);
-  CeedVectorSetArray(user->ceedvecc, CEED_MEM_HOST, CEED_USE_POINTER, y);
+  ierr = VecGetArrayRead(user->locVecF, (const PetscScalar **)&f); CHKERRQ(ierr);
+  ierr = VecGetArray(user->locVecC, &c); CHKERRQ(ierr);
+  CeedVectorSetArray(user->ceedVecF, CEED_MEM_HOST, CEED_USE_POINTER, f);
+  CeedVectorSetArray(user->ceedVecC, CEED_MEM_HOST, CEED_USE_POINTER, c);
 
   // Apply CEED operator
-  CeedOperatorApply(user->op, user->ceedvecf, user->ceedvecc,
+  CeedOperatorApply(user->opRestrict, user->ceedVecF, user->ceedVecC,
                     CEED_REQUEST_IMMEDIATE);
-  CeedVectorSyncArray(user->ceedvecc, CEED_MEM_HOST);
+  CeedVectorSyncArray(user->ceedVecC, CEED_MEM_HOST);
 
   // Restore PETSc vectors
-  ierr = VecRestoreArrayRead(user->Xloc, (const PetscScalar **)&x);
+  ierr = VecRestoreArrayRead(user->locVecF, (const PetscScalar **)&f);
   CHKERRQ(ierr);
-  ierr = VecRestoreArray(user->Yloc, &y); CHKERRQ(ierr);
+  ierr = VecRestoreArray(user->locVecC, &c); CHKERRQ(ierr);
 
   // Local-to-global
   ierr = VecZeroEntries(Y); CHKERRQ(ierr);
-  ierr = DMLocalToGlobalBegin(user->dmc, user->Yloc, ADD_VALUES, Y);
+  ierr = DMLocalToGlobalBegin(user->dmC, user->locVecC, ADD_VALUES, Y);
   CHKERRQ(ierr);
-  ierr = DMLocalToGlobalEnd(user->dmc, user->Yloc, ADD_VALUES, Y);
+  ierr = DMLocalToGlobalEnd(user->dmC, user->locVecC, ADD_VALUES, Y);
   CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
 }
-*/
-static PetscErrorCode CreateMatrixFreeCtx(MPI_Comm comm, DM dm, Vec vloc,
-    CeedData ceeddata, Ceed ceed, UserMult residualCtx, UserMult jacobianCtx) {
 
+// Setup context data for Jacobian evaluation
+static PetscErrorCode SetupJacobianCtx(MPI_Comm comm, DM dm, Vec V, Vec Vloc,
+    CeedData ceedData, Ceed ceed, UserMult jacobianCtx) {
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
-  residualCtx->comm = comm;
-  residualCtx->dm = dm;
-  residualCtx->Xloc = vloc;
-  ierr = VecDuplicate(vloc, &residualCtx->Yloc); CHKERRQ(ierr);
-  residualCtx->xceed = ceeddata->xceed;
-  residualCtx->yceed = ceeddata->yceed;
-  residualCtx->op = ceeddata->op_apply;
-  residualCtx->ceed = ceed;
-  ierr = PetscMemcpy(jacobianCtx, residualCtx, sizeof(*residualCtx));
+
+  // PETSc objects
+  jacobianCtx->comm = comm;
+  jacobianCtx->dm = dm;
+
+  // Work vectors
+  jacobianCtx->Xloc = Vloc;
+  ierr = VecDuplicate(Vloc, &jacobianCtx->Yloc); CHKERRQ(ierr);
+  jacobianCtx->Xceed = ceedData->xceed;
+  jacobianCtx->Yceed = ceedData->yceed;
+
+  // Diagonal vector
+  ierr = VecDuplicate(V, &jacobianCtx->diagVec); CHKERRQ(ierr);
+  jacobianCtx->diagState = 1; // TODO: Update to command line lag option
+
+  // libCEED operator
+  jacobianCtx->op = ceedData->opJacob;
+
+  // Ceed
+  jacobianCtx->ceed = ceed;
+
+  PetscFunctionReturn(0);
+};
+
+// Setup context data for prolongation and restriction operators
+static PetscErrorCode SetupProlongRestrictCtx(MPI_Comm comm, DM dmC, DM dmF,
+    Vec VF, Vec VlocC, Vec VlocF, CeedData ceedDataC, CeedData ceedDataF,
+    Ceed ceed, UserMultProlongRestr prolongRestrCtx) {
+  PetscErrorCode ierr;
+  PetscScalar *m;
+
+  PetscFunctionBeginUser;
+
+  // PETSc objects
+  prolongRestrCtx->comm = comm;
+  prolongRestrCtx->dmC = dmC;
+  prolongRestrCtx->dmF = dmF;
+
+  // Work vectors
+  prolongRestrCtx->locVecC = VlocC;
+  prolongRestrCtx->locVecF = VlocF;
+  prolongRestrCtx->ceedVecC = ceedDataC->xceed;
+  prolongRestrCtx->ceedVecF = ceedDataF->xceed;
+
+  // libCEED operators
+  prolongRestrCtx->opProlong = ceedDataF->opProlong;
+  prolongRestrCtx->opRestrict = ceedDataF->opRestrict;
+
+  // Ceed
+  prolongRestrCtx->ceed = ceed;
+
+  // Multiplicity vector
+  // -- Set libCEED vector
+  ierr = VecZeroEntries(VlocF);
+  ierr = VecGetArray(VlocF, &m); CHKERRQ(ierr);
+  CeedVectorSetArray(ceedDataF->xceed, CEED_MEM_HOST, CEED_USE_POINTER, m);
+
+  // -- Compute multiplicity
+  CeedElemRestrictionGetMultiplicity(ceedDataF->Erestrictu, ceedDataF->xceed);
+
+  // -- Restore PETSc vector
+  ierr = VecRestoreArray(VlocF, &m); CHKERRQ(ierr);
+
+  // -- Local-to-global
+  ierr = VecZeroEntries(VF); CHKERRQ(ierr);
+  ierr = DMLocalToGlobalBegin(dmF, VlocF, ADD_VALUES, VF); CHKERRQ(ierr);
+  ierr = DMLocalToGlobalEnd(dmF, VlocF, ADD_VALUES, VF); CHKERRQ(ierr);
+
+  // -- Global-to-local
+  ierr = VecDuplicate(VlocF, &prolongRestrCtx->multVec); CHKERRQ(ierr);
+  ierr = DMGlobalToLocalBegin(dmF, VF, INSERT_VALUES, prolongRestrCtx->multVec);
   CHKERRQ(ierr);
-  jacobianCtx->op = ceeddata->op_jacob;
+  ierr = DMGlobalToLocalEnd(dmF, VF, INSERT_VALUES, prolongRestrCtx->multVec);
+  CHKERRQ(ierr);
+
+  // -- Reciprocal
+  ierr = VecReciprocal(prolongRestrCtx->multVec); CHKERRQ(ierr);
+
+  // -- Reset work arrays
+  ierr = VecZeroEntries(VF); CHKERRQ(ierr);
+  ierr = VecZeroEntries(VlocF); CHKERRQ(ierr);
+
   PetscFunctionReturn(0);
 };
 
 // -----------------------------------------------------------------------------
 // Jacobian setup
 // -----------------------------------------------------------------------------
-static PetscErrorCode FormJacobian(SNES snes,Vec U,Mat J,Mat Jpre,void *ctx) {
+static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
+                                   void *ctx) {
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
-  // Nothing to do for J, which is of type MATSHELL and uses information from Newton.
-  // Jpre might be AIJ (e.g., when using coloring), so we need to assemble it.
-  ierr = MatAssemblyBegin(Jpre, MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
-  ierr = MatAssemblyEnd(Jpre, MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
+
+  // Restrict and take gradient of state vector
+
+
+  // Flag diagonals as stale
+
+
+  // Jpre might be AIJ (e.g., when using coloring), so we need to assemble it
+  ierr = MatAssemblyBegin(Jpre, MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
+  ierr = MatAssemblyEnd(Jpre, MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
+
   PetscFunctionReturn(0);
 };
 
@@ -1178,7 +1311,7 @@ static PetscErrorCode FormJacobian(SNES snes,Vec U,Mat J,Mat Jpre,void *ctx) {
 //   / \-------------------\              y
 //  /   \                   \             |
 // (  O  )                   )      x ____|
-//  \   /                   /              \
+//  \   /                   /              \    Coodinate axis
 //   \ /-------------------/                \ z
 //
 // Values on all points of the mesh is set based on given solution below
@@ -1211,7 +1344,7 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
 //   / \-------------------\              y
 //  /   \                   \             |
 // (  O  )                   )      x ____|
-//  \   /                   /              \
+//  \   /                   /              \    Coodinate axis
 //   \ /-------------------/                \ z
 //
 //  0 values on the left side of the cyl-hole (sideset 999)
@@ -1249,7 +1382,7 @@ PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
 //   / \-------------------\              y
 //  /   \                   \             |
 // (  O  )                   )      x ____|
-//  \   /                   /              \
+//  \   /                   /              \    Coodinate axis
 //   \ /-------------------/                \ z
 //
 //  0 values on the left side of the cyl-hole (sideset 999)
