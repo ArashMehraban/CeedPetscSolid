@@ -885,9 +885,14 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
 
   PetscFunctionBeginUser;
 
-  u[0] = x*y*z;
-  u[1] = x*y*z;
-  u[2] = x*y*z;
+  // u[0] = x*y*z;
+  // u[1] = x*y*z;
+  // u[2] = x*y*z;
+
+  u[0] = x*x + y*y + z*z;
+  u[1] = x*x + y*y + z*z;
+  u[2] = x*x + y*y + z*z;
+
 
   // u[0] = exp(2*x)*sin(3*y)*cos(4*z)/1e8;
   // u[1] = exp(3*y)*sin(4*z)*cos(2*x)/1e8;

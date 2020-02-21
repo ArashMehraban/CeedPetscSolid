@@ -20,9 +20,14 @@ CEED_QFUNCTION(MMSTrueSoln)(void *ctx, const CeedInt Q,
   for (CeedInt i=0; i<Q; i++) {
     CeedScalar x = coords[i+0*Q], y = coords[i+1*Q], z = coords[i+2*Q];
 
-     true_soln[i+0*Q] = x*y*z;
-     true_soln[i+1*Q] = x*y*z;
-     true_soln[i+2*Q] = x*y*z;
+     // true_soln[i+0*Q] = x*y*z;
+     // true_soln[i+1*Q] = x*y*z;
+     // true_soln[i+2*Q] = x*y*z;
+
+
+     true_soln[i+0*Q] = x*x + y*y + z*z;
+     true_soln[i+1*Q] = x*x + y*y + z*z;
+     true_soln[i+2*Q] = x*x + y*y + z*z;
 
 
 /*

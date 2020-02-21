@@ -186,7 +186,7 @@ int main(int argc, char **argv) {
   CeedVectorRestoreArrayRead(ceeddata->truesoln, &CeedTruSln_as_initial);
   //VecView(VecTruSln_as_initial,PETSC_VIEWER_STDOUT_WORLD);
 
-  
+
 
   // ierr = VecSet(U, 1.0); CHKERRQ(ierr);
   // // Solve SNES
@@ -197,10 +197,13 @@ int main(int argc, char **argv) {
 
   ierr = FormResidual_Ceed(snes, U, R, resCtx); CHKERRQ(ierr);
   ierr = VecAXPY(R, -1.0, F); CHKERRQ(ierr);
+  PetscPrintf(comm, "\nR using FormResidual_Ceed()\n");
   VecView(R,PETSC_VIEWER_STDOUT_WORLD);
+  PetscPrintf(comm, "\nF (forcing) using FormResidual_Ceed()\n");
   VecView(F,PETSC_VIEWER_STDOUT_WORLD);
 
   ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+  PetscPrintf(comm, "\nR after SNESSolve() \n");
   VecView(R,PETSC_VIEWER_STDOUT_WORLD);
   //clean up for initial guess as input
   ierr = VecDestroy(&VecTruSln_as_initial); CHKERRQ(ierr);
@@ -210,7 +213,7 @@ int main(int argc, char **argv) {
 
   ierr = PetscViewerCreate(comm, &vtkviewersoln); CHKERRQ(ierr);
   ierr = PetscViewerSetType(vtkviewersoln, PETSCVIEWERVTK); CHKERRQ(ierr);
-  ierr = PetscViewerFileSetName(vtkviewersoln, "solution.vtk"); CHKERRQ(ierr);
+  ierr = PetscViewerFileSetName(vtkviewersoln, "solution.vtu"); CHKERRQ(ierr);
   ierr = VecView(U, vtkviewersoln); CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&vtkviewersoln); CHKERRQ(ierr);
 
