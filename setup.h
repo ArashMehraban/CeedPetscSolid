@@ -178,6 +178,13 @@ struct UserMult_private {
   Ceed         ceed;
 };
 
+// Data for Jacobian setup routine
+typedef struct FormJacobCtx_private *FormJacobCtx;
+struct FormJacobCtx_private {
+  UserMult     *jacobCtx;
+  PetscInt     numLevels;
+};
+
 // Data for PETSc Prolongation/Restriction Matshell
 typedef struct UserMultProlongRestr_private *UserMultProlongRestr;
 struct UserMultProlongRestr_private {
@@ -1062,9 +1069,9 @@ static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user) {
 };
 
 // This function uses libCEED to compute the non-linear residual
-static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ptr) {
+static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ctx) {
   PetscErrorCode ierr;
-  UserMult user = (UserMult)ptr;
+  UserMult user = (UserMult)ctx;
 
   PetscFunctionBeginUser;
   ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
@@ -1281,11 +1288,21 @@ static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
 
   PetscFunctionBeginUser;
 
-  // Restrict and take gradient of state vector
+  FormJacobCtx formJacobCtx = (FormJacobCtx)ctx;
+  PetscInt numLevels = formJacobCtx->numLevels;
+  UserMult *jacobCtx = formJacobCtx->jacobCtx;  
 
+  // Update data for coarse levels
+  for (int level = 0; level < numLevels - 1; level++) {
+    // -- Update diagonal state counter
+    jacobCtx[level]->diagState++;
 
-  // Flag diagonals as stale
+    // -- Restrict and take gradient of state vector
 
+  }
+
+  // Update fine level diagonal state counter
+  jacobCtx[numLevels - 1]->diagState++;
 
   // Jpre might be AIJ (e.g., when using coloring), so we need to assemble it
   ierr = MatAssemblyBegin(Jpre, MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);

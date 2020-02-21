@@ -29,25 +29,26 @@ const char help[] = "Solve solid Problems with CEED and PETSc DMPlex\n";
 #include "setup.h"
 
 int main(int argc, char **argv) {
-  PetscInt    ierr;
-  MPI_Comm    comm;
-  AppCtx      appCtx;                 // contains problem options
-  Physics     phys;                   // contains physical constants
-  Units       units;                  // contains units scaling
-  DM          dmOrig;
-  DM          *levelDMs;
-  PetscInt    ncompu = 3;             // 3 dofs in 3D
-  Vec         *U, *Uloc;
-  Vec         R, Rloc, F, Floc;       // loc: Local R:Residual
-  PetscInt    *Ugsz, *Ulsz, *Ulocsz;  // g:global, sz: size
-  UserMult    resCtx, *jacobCtx;
+  PetscInt       ierr;
+  MPI_Comm       comm;
+  AppCtx         appCtx;                 // contains problem options
+  Physics        phys;                   // contains physical constants
+  Units          units;                  // contains units scaling
+  DM             dmOrig;                 // distributed DM to clone
+  DM             *levelDMs;
+  PetscInt       ncompu = 3;             // 3 dofs in 3D
+  Vec            *U, *Uloc;
+  Vec            R, Rloc, F, Floc;       // loc: local, R: residual, F: forcing
+  PetscInt       *Ugsz, *Ulsz, *Ulocsz;  // g: global, sz: size
+  UserMult       resCtx, *jacobCtx;
   UserMultProlongRestr *prolongRestrCtx;
-  Mat         *jacobMat, *prolongRestrMat;
+  FormJacobCtx   formJacobCtx;
+  Mat            *jacobMat, *prolongRestrMat;
   //Ceed constituents
-  Ceed        ceed;
-  CeedData    *ceedData;
-  CeedQFunction qfRestrict, qfProlong;
-  SNES        snes;
+  Ceed           ceed;
+  CeedData       *ceedData;
+  CeedQFunction  qfRestrict, qfProlong;
+  SNES           snes;
 
 
   ierr = PetscInitialize(&argc, &argv, NULL, help);
@@ -235,8 +236,11 @@ int main(int argc, char **argv) {
   }
   // FormJacobian restricts the gradient of the state vector and assembles
   //   the diagonal of each Jacobian
+  ierr = PetscMalloc1(1, &formJacobCtx); CHKERRQ(ierr);
+  formJacobCtx->jacobCtx = jacobCtx;
+  formJacobCtx->numLevels = appCtx.numLevels;
   ierr = SNESSetJacobian(snes, jacobMat[appCtx.numLevels-1], NULL,
-                         FormJacobian, NULL); CHKERRQ(ierr);
+                         FormJacobian, formJacobCtx); CHKERRQ(ierr);
 
   // -- Residual evaluation function
   ierr = PetscMalloc1(1, &resCtx); CHKERRQ(ierr);
@@ -378,6 +382,7 @@ int main(int argc, char **argv) {
   ierr = PetscFree(Ulsz); CHKERRQ(ierr);
   ierr = PetscFree(Ulocsz); CHKERRQ(ierr);
   ierr = PetscFree(jacobCtx); CHKERRQ(ierr);
+  ierr = PetscFree(formJacobCtx); CHKERRQ(ierr);
   ierr = PetscFree(jacobMat); CHKERRQ(ierr);
   ierr = PetscFree(prolongRestrCtx); CHKERRQ(ierr);
   ierr = PetscFree(prolongRestrMat); CHKERRQ(ierr);
