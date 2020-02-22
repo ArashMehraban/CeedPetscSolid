@@ -449,7 +449,7 @@ int main(int argc, char **argv) {
     // -- Output
     if (!appCtx.testMode || l2error > 0.168) {
       ierr = PetscPrintf(comm,
-                         "  Performance:"
+                         "  Performance:\n"
                          "    L2 Error                         :  %f\n",
                          l2error); CHKERRQ(ierr);
     }
