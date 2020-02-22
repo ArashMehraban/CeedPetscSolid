@@ -294,8 +294,8 @@ int main(int argc, char **argv) {
 
     // -- KSP
     ierr = SNESGetKSP(snes, &ksp); CHKERRQ(ierr);
-    ierr = KSPSetDM(ksp, levelDMs[fineLevel]); CHKERRQ(ierr);
     ierr = KSPSetType(ksp, KSPCG); CHKERRQ(ierr);
+    ierr = KSPSetDM(ksp, levelDMs[fineLevel]); CHKERRQ(ierr);
     ierr = KSPSetNormType(ksp, KSP_NORM_NATURAL); CHKERRQ(ierr);
     ierr = KSPSetTolerances(ksp, 1e-10, PETSC_DEFAULT, PETSC_DEFAULT,
                             PETSC_DEFAULT); CHKERRQ(ierr);
@@ -315,21 +315,22 @@ int main(int argc, char **argv) {
       ierr = PCMGSetLevels(pc, numLevels, NULL); CHKERRQ(ierr);
       for (int level = 0; level < numLevels; level++) {
         // -------- Smoother
-        KSP smoother;
-        ierr = PCMGGetSmoother(pc, level, &smoother); CHKERRQ(ierr);
-        ierr = KSPSetDM(ksp, levelDMs[level]); CHKERRQ(ierr);
-        ierr = KSPSetType(smoother, KSPCHEBYSHEV); CHKERRQ(ierr);
-        ierr = KSPChebyshevEstEigSet(smoother, 0, 0.1, 0, 1.1); CHKERRQ(ierr);
-        ierr = KSPChebyshevEstEigSetUseNoisy(smoother, PETSC_TRUE);
+        KSP kspSmoother;
+        ierr = PCMGGetSmoother(pc, level, &kspSmoother); CHKERRQ(ierr);
+        ierr = KSPSetType(kspSmoother, KSPCHEBYSHEV); CHKERRQ(ierr);
+        ierr = KSPSetDM(kspSmoother, levelDMs[level]); CHKERRQ(ierr);
+        ierr = KSPChebyshevEstEigSet(kspSmoother, 0, 0.1, 0, 1.1);
         CHKERRQ(ierr);
-        ierr = KSPSetOperators(smoother, jacobMat[level], jacobMat[level]);
+        ierr = KSPChebyshevEstEigSetUseNoisy(kspSmoother, PETSC_TRUE);
+        CHKERRQ(ierr);
+        ierr = KSPSetOperators(kspSmoother, jacobMat[level], jacobMat[level]);
         CHKERRQ(ierr);
 
-        PC smoother_pc;
-        ierr = KSPGetPC(smoother, &smoother_pc); CHKERRQ(ierr);
-        ierr = PCSetDM(pc, levelDMs[level]); CHKERRQ(ierr);
-        ierr = PCSetType(smoother_pc, PCJACOBI); CHKERRQ(ierr);
-        ierr = PCJacobiSetType(smoother_pc, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
+        PC pcSmoother;
+        ierr = KSPGetPC(kspSmoother, &pcSmoother); CHKERRQ(ierr);
+        ierr = PCSetDM(pcSmoother, levelDMs[level]); CHKERRQ(ierr);
+        ierr = PCSetType(pcSmoother, PCJACOBI); CHKERRQ(ierr);
+        ierr = PCJacobiSetType(pcSmoother, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
 
       // -------- Work vector
       if (level != fineLevel) {
@@ -345,16 +346,17 @@ int main(int argc, char **argv) {
       }
 
       // -------- Coarse solve
-      KSP coarse;
-      PC coarse_pc;
-      ierr = PCMGGetCoarseSolve(pc, &coarse); CHKERRQ(ierr);
-      ierr = KSPSetType(coarse, KSPCG); CHKERRQ(ierr);
-      ierr = KSPSetOperators(coarse, jacobMat[0], jacobMat[0]); CHKERRQ(ierr);
-      ierr = KSPSetTolerances(coarse, 1e-10, 1e-10, PETSC_DEFAULT,
+      KSP kspCoarse;
+      PC pcCoarse;
+      ierr = PCMGGetCoarseSolve(pc, &kspCoarse); CHKERRQ(ierr);
+      ierr = KSPSetType(kspCoarse, KSPCG); CHKERRQ(ierr);
+      ierr = KSPSetOperators(kspCoarse, jacobMat[0], jacobMat[0]);
+      CHKERRQ(ierr);
+      ierr = KSPSetTolerances(kspCoarse, 1e-10, 1e-10, PETSC_DEFAULT,
                               PETSC_DEFAULT); CHKERRQ(ierr);
-      ierr = KSPGetPC(coarse, &coarse_pc); CHKERRQ(ierr);
-      ierr = PCSetType(coarse_pc, PCJACOBI); CHKERRQ(ierr);
-      ierr = PCJacobiSetType(coarse_pc, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
+      ierr = KSPGetPC(kspCoarse, &pcCoarse); CHKERRQ(ierr);
+      ierr = PCSetType(pcCoarse, PCJACOBI); CHKERRQ(ierr);
+      ierr = PCJacobiSetType(pcCoarse, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
     }
 
     // -------- PCMG options
