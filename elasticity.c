@@ -293,7 +293,8 @@ int main(int argc, char **argv) {
     KSP ksp;
 
     // -- KSP
-    ierr = SNESGetKSP(snes,&ksp); CHKERRQ(ierr);
+    ierr = SNESGetKSP(snes, &ksp); CHKERRQ(ierr);
+    ierr = KSPSetDM(ksp, levelDMs[fineLevel]); CHKERRQ(ierr);
     ierr = KSPSetType(ksp, KSPCG); CHKERRQ(ierr);
     ierr = KSPSetNormType(ksp, KSP_NORM_NATURAL); CHKERRQ(ierr);
     ierr = KSPSetTolerances(ksp, 1e-10, PETSC_DEFAULT, PETSC_DEFAULT,
@@ -301,6 +302,7 @@ int main(int argc, char **argv) {
 
     // -- Preconditioning
     ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
+    ierr = PCSetDM(pc, levelDMs[fineLevel]); CHKERRQ(ierr);
 
     if (appCtx.multigridChoice == MULTIGRID_NONE) {
       // ---- No Multigrid
@@ -314,14 +316,18 @@ int main(int argc, char **argv) {
       for (int level = 0; level < numLevels; level++) {
         // -------- Smoother
         KSP smoother;
-        PC smoother_pc;
         ierr = PCMGGetSmoother(pc, level, &smoother); CHKERRQ(ierr);
+        ierr = KSPSetDM(ksp, levelDMs[level]); CHKERRQ(ierr);
         ierr = KSPSetType(smoother, KSPCHEBYSHEV); CHKERRQ(ierr);
         ierr = KSPChebyshevEstEigSet(smoother, 0, 0.1, 0, 1.1); CHKERRQ(ierr);
-        ierr = KSPChebyshevEstEigSetUseNoisy(smoother, PETSC_TRUE); CHKERRQ(ierr);
+        ierr = KSPChebyshevEstEigSetUseNoisy(smoother, PETSC_TRUE);
+        CHKERRQ(ierr);
         ierr = KSPSetOperators(smoother, jacobMat[level], jacobMat[level]);
         CHKERRQ(ierr);
+
+        PC smoother_pc;
         ierr = KSPGetPC(smoother, &smoother_pc); CHKERRQ(ierr);
+        ierr = PCSetDM(pc, levelDMs[level]); CHKERRQ(ierr);
         ierr = PCSetType(smoother_pc, PCJACOBI); CHKERRQ(ierr);
         ierr = PCJacobiSetType(smoother_pc, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
 
@@ -333,6 +339,8 @@ int main(int argc, char **argv) {
       // -------- Level prolongation operator
       if (level > 0) {
         ierr = PCMGSetInterpolation(pc, level, prolongRestrMat[level]);
+        CHKERRQ(ierr);
+        ierr = PCMGSetRestriction(pc, level, prolongRestrMat[level]);
         CHKERRQ(ierr);
       }
 
