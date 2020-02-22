@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
   UserMultProlongRestr *prolongRestrCtx;
   FormJacobCtx   formJacobCtx;
   Mat            *jacobMat, *prolongRestrMat;
-  PCMGCycleType  pcgmcycletype = PC_MG_CYCLE_V;
+  PCMGCycleType  pcmgCycleType = PC_MG_CYCLE_V;
   //Ceed constituents
   Ceed           ceed;
   CeedData       *ceedData;
@@ -352,7 +352,7 @@ int main(int argc, char **argv) {
     // -------- PCMG options
     ierr = PCMGSetType(pc, PC_MG_MULTIPLICATIVE); CHKERRQ(ierr);
     ierr = PCMGSetNumberSmooth(pc, 3); CHKERRQ(ierr);
-    ierr = PCMGSetCycleType(pc, pcgmcycletype); CHKERRQ(ierr);
+    ierr = PCMGSetCycleType(pc, pcmgCycleType); CHKERRQ(ierr);
   }
 
     ierr = KSPSetFromOptions(ksp);
@@ -368,6 +368,52 @@ int main(int argc, char **argv) {
   // Solve SNES
   // ---------------------------------------------------------------------------
   ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+
+  // ---------------------------------------------------------------------------
+  // Output summary
+  // ---------------------------------------------------------------------------
+  if (!appCtx.testMode) {
+    // -- SNES
+    SNESType snesType;
+    SNESConvergedReason reason;
+    PetscInt its;
+    PetscReal rnorm;
+    ierr = SNESGetType(snes, &snesType); CHKERRQ(ierr);
+    ierr = SNESGetConvergedReason(snes, &reason); CHKERRQ(ierr);
+    ierr = SNESGetIterationNumber(snes, &its); CHKERRQ(ierr);
+    ierr = SNESGetFunctionNorm(snes, &rnorm); CHKERRQ(ierr);
+    ierr = PetscPrintf(comm,
+                       "  SNES:\n"
+                       "    SNES Type                          : %s\n"
+                       "    SNES Convergence                   : %s\n"
+                       "    Total SNES Iterations              : %D\n"
+                       "    Final rnorm                        : %e\n",
+                       snesType, SNESConvergedReasons[reason], its,
+                       (double)rnorm); CHKERRQ(ierr);
+    // -- KSP
+    KSP ksp;
+    KSPType kspType;
+    ierr = SNESGetKSP(snes, &ksp); CHKERRQ(ierr);
+    ierr = KSPGetType(ksp, &kspType); CHKERRQ(ierr);
+    ierr = PetscPrintf(comm,
+                       "  KSP:\n"
+                       "    KSP Type                           : %s\n",
+                       kspType); CHKERRQ(ierr);
+
+    // -- PC
+    if (appCtx.multigridChoice != MULTIGRID_NONE) {
+      PC pc;
+      PCMGType pcmgType;
+      ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
+      ierr = PCMGGetType(pc, &pcmgType); CHKERRQ(ierr);
+      ierr = PetscPrintf(comm,
+                         "  PCMG:\n"
+                         "    PCMG Type                          : %s\n"
+                         "    PCMG Cycle Type                    : %s\n",
+                         PCMGTypes[pcmgType],
+                         PCMGCycleTypes[pcmgCycleType]); CHKERRQ(ierr);
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Compute error
@@ -392,8 +438,7 @@ int main(int argc, char **argv) {
     ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec);
     CHKERRQ(ierr);
     ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
-    CeedVectorRestoreArrayRead(ceedData[fineLevel]->truesoln,
-                               &truearray);
+    CeedVectorRestoreArrayRead(ceedData[fineLevel]->truesoln, &truearray);
 
     // -- Compute l2 error
     ierr = VecWAXPY(errorVec, -1.0, U, trueVec); CHKERRQ(ierr);
@@ -403,7 +448,10 @@ int main(int argc, char **argv) {
 
     // -- Output
     if (!appCtx.testMode || l2error > 0.168) {
-      ierr = PetscPrintf(comm, "  L2 Error: %f\n", l2error); CHKERRQ(ierr);
+      ierr = PetscPrintf(comm,
+                         "  Performance:"
+                         "    L2 Error                         :  %f\n",
+                         l2error); CHKERRQ(ierr);
     }
 
     // -- Cleanup
