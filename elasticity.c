@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
   DM             *levelDMs;
   PetscInt       ncompu = 3;             // 3 dofs in 3D
   PetscInt       numLevels = 1, fineLevel = 0;
-  Vec            *U, *Uloc;
+  Vec            U, *Ug, *Uloc;
   Vec            R, Rloc, F, Floc;       // loc: local, R: residual, F: forcing
   PetscInt       *Ugsz, *Ulsz, *Ulocsz;  // g: global, sz: size
   UserMult       resCtx, *jacobCtx;
@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
   // Setup solution and work vectors
   // ---------------------------------------------------------------------------
   // Allocate arrays
-  ierr = PetscMalloc1(numLevels, &U); CHKERRQ(ierr);
+  ierr = PetscMalloc1(numLevels, &Ug); CHKERRQ(ierr);
   ierr = PetscMalloc1(numLevels, &Uloc); CHKERRQ(ierr);
   ierr = PetscMalloc1(numLevels, &Ugsz); CHKERRQ(ierr);
   ierr = PetscMalloc1(numLevels, &Ulsz); CHKERRQ(ierr);
@@ -100,9 +100,9 @@ int main(int argc, char **argv) {
   // -- Setup solution vectors for each level
   for (int level = 0; level < numLevels; level++) {
     // -- Create global unknown vector U
-    ierr = DMCreateGlobalVector(levelDMs[level], &U[level]); CHKERRQ(ierr);
-    ierr = VecGetSize(U[level], &Ugsz[level]); CHKERRQ(ierr);
-    ierr = VecGetLocalSize(U[level], &Ulsz[level]); CHKERRQ(ierr); // For matShell
+    ierr = DMCreateGlobalVector(levelDMs[level], &Ug[level]); CHKERRQ(ierr);
+    ierr = VecGetSize(Ug[level], &Ugsz[level]); CHKERRQ(ierr);
+    ierr = VecGetLocalSize(Ug[level], &Ulsz[level]); CHKERRQ(ierr); // For matShell
 
     // -- Create local unknown vector Uloc
     ierr = DMCreateLocalVector(levelDMs[level], &Uloc[level]); CHKERRQ(ierr);
@@ -110,8 +110,9 @@ int main(int argc, char **argv) {
   }
 
   // -- Create residual and forcing vectors
-  ierr = VecDuplicate(U[fineLevel], &R); CHKERRQ(ierr);
-  ierr = VecDuplicate(U[fineLevel], &F); CHKERRQ(ierr);
+  ierr = VecDuplicate(Ug[fineLevel], &U); CHKERRQ(ierr);
+  ierr = VecDuplicate(Ug[fineLevel], &R); CHKERRQ(ierr);
+  ierr = VecDuplicate(Ug[fineLevel], &F); CHKERRQ(ierr);
   ierr = VecDuplicate(Uloc[fineLevel], &Rloc); CHKERRQ(ierr);
   ierr = VecDuplicate(Uloc[fineLevel], &Floc); CHKERRQ(ierr);
 
@@ -232,7 +233,7 @@ int main(int argc, char **argv) {
   for (int level = 0; level < numLevels; level++) {
     // -- Jacobian context for level
     ierr = PetscMalloc1(1, &jacobCtx[level]); CHKERRQ(ierr);
-    ierr = SetupJacobianCtx(comm, levelDMs[level], U[level], Uloc[level],
+    ierr = SetupJacobianCtx(comm, levelDMs[level], Ug[level], Uloc[level],
                             ceedData[level], ceed, jacobCtx[level]);
     CHKERRQ(ierr);
 
@@ -268,13 +269,13 @@ int main(int argc, char **argv) {
     // -- Prolongation/restriction context for level
     ierr = PetscMalloc1(1, &prolongRestrCtx[level]); CHKERRQ(ierr);
     ierr = SetupProlongRestrictCtx(comm, levelDMs[level-1], levelDMs[level],
-                                   U[level], Uloc[level-1], Uloc[level],
+                                   Ug[level], Uloc[level-1], Uloc[level],
                                    ceedData[level-1], ceedData[level], ceed,
                                    prolongRestrCtx[level]); CHKERRQ(ierr);
 
     // -- Form Action of Jacobian on delta_u
     ierr = MatCreateShell(comm, Ulsz[level], Ulsz[level-1], Ugsz[level],
-                          Ugsz[level-1], jacobCtx[level],
+                          Ugsz[level-1], prolongRestrCtx[level],
                           &prolongRestrMat[level]); CHKERRQ(ierr);
     // Note: In PCMG, restriction is the transpose of prolongation
     ierr = MatShellSetOperation(prolongRestrMat[level], MATOP_MULT,
@@ -325,8 +326,8 @@ int main(int argc, char **argv) {
         ierr = PCJacobiSetType(smoother_pc, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
 
       // -------- Work vector
-      if (level < fineLevel) {
-        ierr = PCMGSetX(pc, level, U[level]); CHKERRQ(ierr);
+      if (level != fineLevel) {
+        ierr = PCMGSetX(pc, level, Ug[level]); CHKERRQ(ierr);
       }
 
       // -------- Level prolongation operator
@@ -361,12 +362,12 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Set initial guess
   // ---------------------------------------------------------------------------
-  ierr = VecSet(U[fineLevel], 1.0); CHKERRQ(ierr);
+  ierr = VecSet(U, 1.0); CHKERRQ(ierr);
 
   // ---------------------------------------------------------------------------
   // Solve SNES
   // ---------------------------------------------------------------------------
-  ierr = SNESSolve(snes, F, U[fineLevel]); CHKERRQ(ierr);
+  ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
 
   // ---------------------------------------------------------------------------
   // Compute error
@@ -377,9 +378,9 @@ int main(int argc, char **argv) {
     Vec errorVec, trueVec;
 
     // -- Work vectors
-    ierr = VecDuplicate(U[fineLevel], &errorVec); CHKERRQ(ierr);
+    ierr = VecDuplicate(U, &errorVec); CHKERRQ(ierr);
     ierr = VecSet(errorVec, 0.0); CHKERRQ(ierr);
-    ierr = VecDuplicate(U[fineLevel], &trueVec); CHKERRQ(ierr);
+    ierr = VecDuplicate(U, &trueVec); CHKERRQ(ierr);
     ierr = VecSet(trueVec, 0.0); CHKERRQ(ierr);
 
     // -- Assebmle global true soltion vector
@@ -395,9 +396,9 @@ int main(int argc, char **argv) {
                                &truearray);
 
     // -- Compute l2 error
-    ierr = VecWAXPY(errorVec, -1.0, U[fineLevel], trueVec); CHKERRQ(ierr);
+    ierr = VecWAXPY(errorVec, -1.0, U, trueVec); CHKERRQ(ierr);
     ierr = VecNorm(errorVec, NORM_2, &l2error); CHKERRQ(ierr);
-    ierr = VecNorm(U[fineLevel], NORM_2, &l2Unorm); CHKERRQ(ierr);
+    ierr = VecNorm(U, NORM_2, &l2Unorm); CHKERRQ(ierr);
     l2error /= l2Unorm;
 
     // -- Output
@@ -416,7 +417,7 @@ int main(int argc, char **argv) {
   // Data in arrays per level
   for (int level = 0; level < numLevels; level++) {
     // Vectors
-    ierr = VecDestroy(&U[level]); CHKERRQ(ierr);
+    ierr = VecDestroy(&Ug[level]); CHKERRQ(ierr);
     ierr = VecDestroy(&Uloc[level]); CHKERRQ(ierr);
 
     // Jacobian matrix and data
@@ -440,7 +441,7 @@ int main(int argc, char **argv) {
   }
 
   // Arrays
-  ierr = PetscFree(U); CHKERRQ(ierr);
+  ierr = PetscFree(Ug); CHKERRQ(ierr);
   ierr = PetscFree(Uloc); CHKERRQ(ierr);
   ierr = PetscFree(Ugsz); CHKERRQ(ierr);
   ierr = PetscFree(Ulsz); CHKERRQ(ierr);
@@ -459,6 +460,7 @@ int main(int argc, char **argv) {
   CeedDestroy(&ceed);
 
   // PETSc Objects
+  ierr = VecDestroy(&U); CHKERRQ(ierr);
   ierr = VecDestroy(&R); CHKERRQ(ierr);
   ierr = VecDestroy(&Rloc); CHKERRQ(ierr);
   ierr = VecDestroy(&F); CHKERRQ(ierr);
