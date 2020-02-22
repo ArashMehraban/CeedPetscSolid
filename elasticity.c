@@ -37,6 +37,7 @@ int main(int argc, char **argv) {
   DM             dmOrig;                 // distributed DM to clone
   DM             *levelDMs;
   PetscInt       ncompu = 3;             // 3 dofs in 3D
+  PetscInt       numLevels = 1, fineLevel = 0;
   Vec            *U, *Uloc;
   Vec            R, Rloc, F, Floc;       // loc: local, R: residual, F: forcing
   PetscInt       *Ugsz, *Ulsz, *Ulocsz;  // g: global, sz: size
@@ -44,6 +45,7 @@ int main(int argc, char **argv) {
   UserMultProlongRestr *prolongRestrCtx;
   FormJacobCtx   formJacobCtx;
   Mat            *jacobMat, *prolongRestrMat;
+  PCMGCycleType  pcgmcycletype = PC_MG_CYCLE_V;
   //Ceed constituents
   Ceed           ceed;
   CeedData       *ceedData;
@@ -62,6 +64,8 @@ int main(int argc, char **argv) {
 
   // -- Set mesh-file, polynomial degree, problem type
   ierr = processCommandLineOptions(comm, &appCtx); CHKERRQ(ierr);
+  numLevels = appCtx.numLevels;
+  fineLevel = numLevels - 1;
 
   // -- Set Poison's ratio, Young's Modulus
   ierr = PetscMalloc1(1, &phys); CHKERRQ(ierr);
@@ -76,10 +80,10 @@ int main(int argc, char **argv) {
   ierr = createDistributedDM(comm, &appCtx, &dmOrig); CHKERRQ(ierr);
 
   // -- Setup DM by polynomial degree
-  ierr = PetscMalloc1(appCtx.numLevels, &levelDMs); CHKERRQ(ierr);
-  for (int i = 0; i < appCtx.numLevels; i++) {
-    ierr = DMClone(dmOrig, &levelDMs[i]); CHKERRQ(ierr);
-    ierr = SetupDMByDegree(levelDMs[i], appCtx, appCtx.levelDegrees[i],
+  ierr = PetscMalloc1(numLevels, &levelDMs); CHKERRQ(ierr);
+  for (int level = 0; level < numLevels; level++) {
+    ierr = DMClone(dmOrig, &levelDMs[level]); CHKERRQ(ierr);
+    ierr = SetupDMByDegree(levelDMs[level], appCtx, appCtx.levelDegrees[level],
                            ncompu); CHKERRQ(ierr);
   }
 
@@ -87,29 +91,29 @@ int main(int argc, char **argv) {
   // Setup solution and work vectors
   // ---------------------------------------------------------------------------
   // Allocate arrays
-  ierr = PetscMalloc1(appCtx.numLevels, &U); CHKERRQ(ierr);
-  ierr = PetscMalloc1(appCtx.numLevels, &Uloc); CHKERRQ(ierr);
-  ierr = PetscMalloc1(appCtx.numLevels, &Ugsz); CHKERRQ(ierr);
-  ierr = PetscMalloc1(appCtx.numLevels, &Ulsz); CHKERRQ(ierr);
-  ierr = PetscMalloc1(appCtx.numLevels, &Ulocsz); CHKERRQ(ierr);
+  ierr = PetscMalloc1(numLevels, &U); CHKERRQ(ierr);
+  ierr = PetscMalloc1(numLevels, &Uloc); CHKERRQ(ierr);
+  ierr = PetscMalloc1(numLevels, &Ugsz); CHKERRQ(ierr);
+  ierr = PetscMalloc1(numLevels, &Ulsz); CHKERRQ(ierr);
+  ierr = PetscMalloc1(numLevels, &Ulocsz); CHKERRQ(ierr);
 
   // -- Setup solution vectors for each level
-  for (int i = 0; i < appCtx.numLevels; i++) {
+  for (int level = 0; level < numLevels; level++) {
     // -- Create global unknown vector U
-    ierr = DMCreateGlobalVector(levelDMs[i], &U[i]); CHKERRQ(ierr);
-    ierr = VecGetSize(U[i], &Ugsz[i]); CHKERRQ(ierr);
-    ierr = VecGetLocalSize(U[i], &Ulsz[i]); CHKERRQ(ierr); // For matShell
+    ierr = DMCreateGlobalVector(levelDMs[level], &U[level]); CHKERRQ(ierr);
+    ierr = VecGetSize(U[level], &Ugsz[level]); CHKERRQ(ierr);
+    ierr = VecGetLocalSize(U[level], &Ulsz[level]); CHKERRQ(ierr); // For matShell
 
     // -- Create local unknown vector Uloc
-    ierr = DMCreateLocalVector(levelDMs[i], &Uloc[i]); CHKERRQ(ierr);
-    ierr = VecGetSize(Uloc[i], &Ulocsz[i]); CHKERRQ(ierr); // For libCeed
+    ierr = DMCreateLocalVector(levelDMs[level], &Uloc[level]); CHKERRQ(ierr);
+    ierr = VecGetSize(Uloc[level], &Ulocsz[level]); CHKERRQ(ierr); // For libCeed
   }
 
   // -- Create residual and forcing vectors
-  ierr = VecDuplicate(U[appCtx.numLevels-1], &R); CHKERRQ(ierr);
-  ierr = VecDuplicate(U[appCtx.numLevels-1], &F); CHKERRQ(ierr);
-  ierr = VecDuplicate(Uloc[appCtx.numLevels-1], &Rloc); CHKERRQ(ierr);
-  ierr = VecDuplicate(Uloc[appCtx.numLevels-1], &Floc); CHKERRQ(ierr);
+  ierr = VecDuplicate(U[fineLevel], &R); CHKERRQ(ierr);
+  ierr = VecDuplicate(U[fineLevel], &F); CHKERRQ(ierr);
+  ierr = VecDuplicate(Uloc[fineLevel], &Rloc); CHKERRQ(ierr);
+  ierr = VecDuplicate(Uloc[fineLevel], &Floc); CHKERRQ(ierr);
 
   // ---------------------------------------------------------------------------
   // Set up libCEED
@@ -117,12 +121,12 @@ int main(int argc, char **argv) {
   CeedInit(appCtx.ceedresource, &ceed);
 
   // -- Create libCEED local forcing vector
-  CeedVector forceceed;
+  CeedVector forceCeed;
   CeedScalar *f;
   if (appCtx.forcingChoice != FORCE_NONE) {
     ierr = VecGetArray(Floc, &f); CHKERRQ(ierr);
-    CeedVectorCreate(ceed, Ulocsz[appCtx.numLevels-1], &forceceed);
-    CeedVectorSetArray(forceceed, CEED_MEM_HOST, CEED_USE_POINTER, f);
+    CeedVectorCreate(ceed, Ulocsz[fineLevel], &forceCeed);
+    CeedVectorSetArray(forceCeed, CEED_MEM_HOST, CEED_USE_POINTER, f);
   }
 
   // -- Restriction and prolongation QFunction
@@ -134,13 +138,23 @@ int main(int argc, char **argv) {
   }
 
   // -- Setup libCEED objects
-  ierr = PetscMalloc1(appCtx.numLevels, &ceedData); CHKERRQ(ierr);
-  for (int i = 0; i < appCtx.numLevels; i++) {
-    ierr = PetscCalloc1(1, &ceedData[i]); CHKERRQ(ierr);
-    ierr = SetupLibceedByDegree(levelDMs[i], ceed, appCtx, phys, ceedData, i,
-                                ncompu, Ugsz[i], Ulocsz[i], forceceed,
-                                qfRestrict, qfProlong);
-    CHKERRQ(ierr);
+  ierr = PetscMalloc1(numLevels, &ceedData); CHKERRQ(ierr);
+  // ---- Setup residual evaluator and geometric information
+  ierr = PetscCalloc1(1, &ceedData[fineLevel]); CHKERRQ(ierr);
+  ierr = SetupLibceedFineLevel(levelDMs[fineLevel], ceed, appCtx,
+                               phys, ceedData, fineLevel, ncompu, 
+                               Ugsz[fineLevel], Ulocsz[fineLevel], forceCeed,
+                               qfRestrict, qfProlong);
+  CHKERRQ(ierr);
+  // ---- Setup Jacobian evaluator and prolongtion/restriction
+  for (int level = 0; level < numLevels; level++) {
+    if (level != fineLevel) {
+      ierr = PetscCalloc1(1, &ceedData[level]); CHKERRQ(ierr);
+    }
+    ierr = SetupLibceedLevel(levelDMs[level], ceed, appCtx, phys,
+                             ceedData,  level, ncompu, Ugsz[level],
+                             Ulocsz[level], forceCeed, qfRestrict,
+                             qfProlong); CHKERRQ(ierr);
   }
 
   // ---------------------------------------------------------------------------
@@ -150,11 +164,11 @@ int main(int argc, char **argv) {
 
   if (appCtx.forcingChoice != FORCE_NONE) {
     ierr = VecRestoreArray(Floc, &f); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalBegin(levelDMs[appCtx.numLevels-1], Floc, ADD_VALUES,
+    ierr = DMLocalToGlobalBegin(levelDMs[fineLevel], Floc, ADD_VALUES,
                                 F); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalEnd(levelDMs[appCtx.numLevels-1], Floc, ADD_VALUES,
+    ierr = DMLocalToGlobalEnd(levelDMs[fineLevel], Floc, ADD_VALUES,
                               F); CHKERRQ(ierr);
-    CeedVectorDestroy(&forceceed);
+    CeedVectorDestroy(&forceCeed);
   }
 
   // ---------------------------------------------------------------------------
@@ -187,14 +201,13 @@ int main(int argc, char **argv) {
                        boundaryTypesForDisp[appCtx.boundaryChoice],
                        appCtx.meshFile ? appCtx.meshFile : "Box Mesh",
                        appCtx.degree + 1, appCtx.degree + 1,
-                       Ugsz[appCtx.numLevels-1]/ncompu,
-                       Ulsz[appCtx.numLevels-1]/ncompu, ncompu,
+                       Ugsz[fineLevel]/ncompu, Ulsz[fineLevel]/ncompu, ncompu,
                        multigridTypesForDisp[appCtx.multigridChoice],
-                       appCtx.numLevels); CHKERRQ(ierr);
+                       numLevels); CHKERRQ(ierr);
 
     if (appCtx.multigridChoice != MULTIGRID_NONE) {
       for (int i = 0; i < 2; i++) {  
-        CeedInt level = i ? appCtx.numLevels - 1 : 0;
+        CeedInt level = i ? fineLevel : 0;
         ierr = PetscPrintf(comm,"    Level %D (%s):\n"
                            "      Number of 1D Basis Nodes (p)     : %d\n"
                            "      Global Nodes                     : %D\n"
@@ -211,12 +224,12 @@ int main(int argc, char **argv) {
   // Setup SNES
   // ---------------------------------------------------------------------------
   ierr = SNESCreate(comm, &snes); CHKERRQ(ierr);
-  ierr = SNESSetDM(snes, levelDMs[appCtx.numLevels-1]); CHKERRQ(ierr);
+  ierr = SNESSetDM(snes, levelDMs[fineLevel]); CHKERRQ(ierr);
 
   // -- Jacobian evaluators
-  ierr = PetscMalloc1(appCtx.numLevels, &jacobCtx); CHKERRQ(ierr);
-  ierr = PetscMalloc1(appCtx.numLevels, &jacobMat); CHKERRQ(ierr);
-  for (int level = 0; level < appCtx.numLevels; level++) {
+  ierr = PetscMalloc1(numLevels, &jacobCtx); CHKERRQ(ierr);
+  ierr = PetscMalloc1(numLevels, &jacobMat); CHKERRQ(ierr);
+  for (int level = 0; level < numLevels; level++) {
     // -- Jacobian context for level
     ierr = PetscMalloc1(1, &jacobCtx[level]); CHKERRQ(ierr);
     ierr = SetupJacobianCtx(comm, levelDMs[level], U[level], Uloc[level],
@@ -238,30 +251,30 @@ int main(int argc, char **argv) {
   //   the diagonal of each Jacobian
   ierr = PetscMalloc1(1, &formJacobCtx); CHKERRQ(ierr);
   formJacobCtx->jacobCtx = jacobCtx;
-  formJacobCtx->numLevels = appCtx.numLevels;
-  ierr = SNESSetJacobian(snes, jacobMat[appCtx.numLevels-1], NULL,
+  formJacobCtx->numLevels = numLevels;
+  ierr = SNESSetJacobian(snes, jacobMat[fineLevel], NULL,
                          FormJacobian, formJacobCtx); CHKERRQ(ierr);
 
   // -- Residual evaluation function
   ierr = PetscMalloc1(1, &resCtx); CHKERRQ(ierr);
-  ierr = PetscMemcpy(resCtx, jacobCtx[appCtx.numLevels-1],
-                     sizeof(*jacobCtx[appCtx.numLevels-1])); CHKERRQ(ierr);
+  ierr = PetscMemcpy(resCtx, jacobCtx[fineLevel],
+                     sizeof(*jacobCtx[fineLevel])); CHKERRQ(ierr);
   ierr = SNESSetFunction(snes, R, FormResidual_Ceed, resCtx); CHKERRQ(ierr);
 
   // -- Prolongation/Restriction evaluation
-  ierr = PetscMalloc1(appCtx.numLevels, &prolongRestrCtx); CHKERRQ(ierr);
-  ierr = PetscMalloc1(appCtx.numLevels, &prolongRestrMat); CHKERRQ(ierr);
-  for (int level = 1; level < appCtx.numLevels; level++) {
+  ierr = PetscMalloc1(numLevels, &prolongRestrCtx); CHKERRQ(ierr);
+  ierr = PetscMalloc1(numLevels, &prolongRestrMat); CHKERRQ(ierr);
+  for (int level = 1; level < numLevels; level++) {
     // -- Prolongation/restriction context for level
     ierr = PetscMalloc1(1, &prolongRestrCtx[level]); CHKERRQ(ierr);
-    ierr = SetupProlongRestrictCtx(comm, levelDMs[level], levelDMs[level-1],
-                                   U[level], Uloc[level], Uloc[level-1],
-                                   ceedData[level], ceedData[level-1], ceed,
+    ierr = SetupProlongRestrictCtx(comm, levelDMs[level-1], levelDMs[level],
+                                   U[level], Uloc[level-1], Uloc[level],
+                                   ceedData[level-1], ceedData[level], ceed,
                                    prolongRestrCtx[level]); CHKERRQ(ierr);
 
     // -- Form Action of Jacobian on delta_u
-    ierr = MatCreateShell(comm, Ulsz[level], Ulsz[level], Ugsz[level],
-                          Ugsz[level], jacobCtx[level],
+    ierr = MatCreateShell(comm, Ulsz[level], Ulsz[level-1], Ugsz[level],
+                          Ugsz[level-1], jacobCtx[level],
                           &prolongRestrMat[level]); CHKERRQ(ierr);
     // Note: In PCMG, restriction is the transpose of prolongation
     ierr = MatShellSetOperation(prolongRestrMat[level], MATOP_MULT,
@@ -285,9 +298,61 @@ int main(int argc, char **argv) {
     ierr = KSPSetTolerances(ksp, 1e-10, PETSC_DEFAULT, PETSC_DEFAULT,
                             PETSC_DEFAULT); CHKERRQ(ierr);
 
-    // -- PCMG
+    // -- Preconditioning
     ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
-    ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr); //For Now No Preconditioner
+
+    if (appCtx.multigridChoice == MULTIGRID_NONE) {
+      // ---- No Multigrid
+      ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr);
+    } else {
+      // ---- PCMG
+      ierr = PCSetType(pc, PCMG); CHKERRQ(ierr);
+
+      // ------ PCMG levels
+      ierr = PCMGSetLevels(pc, numLevels, NULL); CHKERRQ(ierr);
+      for (int level = 0; level < numLevels; level++) {
+        // -------- Smoother
+        KSP smoother;
+        PC smoother_pc;
+        ierr = PCMGGetSmoother(pc, level, &smoother); CHKERRQ(ierr);
+        ierr = KSPSetType(smoother, KSPCHEBYSHEV); CHKERRQ(ierr);
+        ierr = KSPChebyshevEstEigSet(smoother, 0, 0.1, 0, 1.1); CHKERRQ(ierr);
+        ierr = KSPChebyshevEstEigSetUseNoisy(smoother, PETSC_TRUE); CHKERRQ(ierr);
+        ierr = KSPSetOperators(smoother, jacobMat[level], jacobMat[level]);
+        CHKERRQ(ierr);
+        ierr = KSPGetPC(smoother, &smoother_pc); CHKERRQ(ierr);
+        ierr = PCSetType(smoother_pc, PCJACOBI); CHKERRQ(ierr);
+        ierr = PCJacobiSetType(smoother_pc, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
+
+      // -------- Work vector
+      if (level < fineLevel) {
+        ierr = PCMGSetX(pc, level, U[level]); CHKERRQ(ierr);
+      }
+
+      // -------- Level prolongation operator
+      if (level > 0) {
+        ierr = PCMGSetInterpolation(pc, level, prolongRestrMat[level]);
+        CHKERRQ(ierr);
+      }
+
+      // -------- Coarse solve
+      KSP coarse;
+      PC coarse_pc;
+      ierr = PCMGGetCoarseSolve(pc, &coarse); CHKERRQ(ierr);
+      ierr = KSPSetType(coarse, KSPCG); CHKERRQ(ierr);
+      ierr = KSPSetOperators(coarse, jacobMat[0], jacobMat[0]); CHKERRQ(ierr);
+      ierr = KSPSetTolerances(coarse, 1e-10, 1e-10, PETSC_DEFAULT,
+                              PETSC_DEFAULT); CHKERRQ(ierr);
+      ierr = KSPGetPC(coarse, &coarse_pc); CHKERRQ(ierr);
+      ierr = PCSetType(coarse_pc, PCJACOBI); CHKERRQ(ierr);
+      ierr = PCJacobiSetType(coarse_pc, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
+    }
+
+    // -------- PCMG options
+    ierr = PCMGSetType(pc, PC_MG_MULTIPLICATIVE); CHKERRQ(ierr);
+    ierr = PCMGSetNumberSmooth(pc, 3); CHKERRQ(ierr);
+    ierr = PCMGSetCycleType(pc, pcgmcycletype); CHKERRQ(ierr);
+  }
 
     ierr = KSPSetFromOptions(ksp);
   }
@@ -296,12 +361,12 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Set initial guess
   // ---------------------------------------------------------------------------
-  ierr = VecSet(U[appCtx.numLevels-1], 1.0); CHKERRQ(ierr);
+  ierr = VecSet(U[fineLevel], 1.0); CHKERRQ(ierr);
 
   // ---------------------------------------------------------------------------
   // Solve SNES
   // ---------------------------------------------------------------------------
-  ierr = SNESSolve(snes, F, U[appCtx.numLevels-1]); CHKERRQ(ierr);
+  ierr = SNESSolve(snes, F, U[fineLevel]); CHKERRQ(ierr);
 
   // ---------------------------------------------------------------------------
   // Compute error
@@ -312,28 +377,27 @@ int main(int argc, char **argv) {
     Vec errorVec, trueVec;
 
     // -- Work vectors
-    ierr = VecDuplicate(U[appCtx.numLevels-1], &errorVec); CHKERRQ(ierr);
+    ierr = VecDuplicate(U[fineLevel], &errorVec); CHKERRQ(ierr);
     ierr = VecSet(errorVec, 0.0); CHKERRQ(ierr);
-    ierr = VecDuplicate(U[appCtx.numLevels-1], &trueVec); CHKERRQ(ierr);
+    ierr = VecDuplicate(U[fineLevel], &trueVec); CHKERRQ(ierr);
     ierr = VecSet(trueVec, 0.0); CHKERRQ(ierr);
 
     // -- Assebmle global true soltion vector
-    CeedVectorGetArrayRead(ceedData[appCtx.numLevels-1]->truesoln,
-                           CEED_MEM_HOST, &truearray);
+    CeedVectorGetArrayRead(ceedData[fineLevel]->truesoln, CEED_MEM_HOST,
+                           &truearray);
     ierr = VecPlaceArray(resCtx->Yloc, truearray); CHKERRQ(ierr);
     ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Yloc, INSERT_VALUES,
                                 trueVec); CHKERRQ(ierr);
     ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec);
     CHKERRQ(ierr);
     ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
-    CeedVectorRestoreArrayRead(ceedData[appCtx.numLevels-1]->truesoln,
+    CeedVectorRestoreArrayRead(ceedData[fineLevel]->truesoln,
                                &truearray);
 
     // -- Compute l2 error
-    ierr = VecWAXPY(errorVec, -1.0, U[appCtx.numLevels-1], trueVec);
-    CHKERRQ(ierr);
+    ierr = VecWAXPY(errorVec, -1.0, U[fineLevel], trueVec); CHKERRQ(ierr);
     ierr = VecNorm(errorVec, NORM_2, &l2error); CHKERRQ(ierr);
-    ierr = VecNorm(U[appCtx.numLevels-1], NORM_2, &l2Unorm); CHKERRQ(ierr);
+    ierr = VecNorm(U[fineLevel], NORM_2, &l2Unorm); CHKERRQ(ierr);
     l2error /= l2Unorm;
 
     // -- Output
@@ -350,7 +414,7 @@ int main(int argc, char **argv) {
   // Free objects
   // ---------------------------------------------------------------------------
   // Data in arrays per level
-  for (int level = 0; level < appCtx.numLevels; level++) {
+  for (int level = 0; level < numLevels; level++) {
     // Vectors
     ierr = VecDestroy(&U[level]); CHKERRQ(ierr);
     ierr = VecDestroy(&Uloc[level]); CHKERRQ(ierr);
