@@ -1107,7 +1107,6 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ctx) {
 
   PetscFunctionBeginUser;
 
-
   // Use computed BCs
   ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
   ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0, NULL,
