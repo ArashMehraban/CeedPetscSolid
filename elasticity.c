@@ -329,7 +329,6 @@ int main(int argc, char **argv) {
 
         PC pcSmoother;
         ierr = KSPGetPC(kspSmoother, &pcSmoother); CHKERRQ(ierr);
-        ierr = PCSetDM(pcSmoother, levelDMs[level]); CHKERRQ(ierr);
         ierr = PCSetType(pcSmoother, PCJACOBI); CHKERRQ(ierr);
         ierr = PCJacobiSetType(pcSmoother, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
 

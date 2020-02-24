@@ -921,7 +921,6 @@ static int SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
 
   PetscFunctionBeginUser;
 
-
   ierr = DMGetDimension(dm, &dim); CHKERRQ(ierr);
 
   // ---------------------------------------------------------------------------
@@ -1069,6 +1068,8 @@ static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user) {
   PetscScalar *x, *y;
 
   PetscFunctionBeginUser;
+
+  // Global-to-local
   ierr = DMGlobalToLocalBegin(user->dm, X, INSERT_VALUES, user->Xloc);
   CHKERRQ(ierr);
   ierr = DMGlobalToLocalEnd(user->dm, X, INSERT_VALUES, user->Xloc);
@@ -1086,12 +1087,14 @@ static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user) {
   CeedVectorSyncArray(user->Yceed, CEED_MEM_HOST);
 
   // Restore PETSc vectors
-  ierr = VecRestoreArrayRead(user->Xloc, (const PetscScalar **)&x); CHKERRQ(ierr);
+  ierr = VecRestoreArrayRead(user->Xloc, (const PetscScalar **)&x);
+  CHKERRQ(ierr);
   ierr = VecRestoreArray(user->Yloc, &y); CHKERRQ(ierr);
 
   // Local-to-global
   ierr = VecZeroEntries(Y); CHKERRQ(ierr);
-  ierr = DMLocalToGlobalBegin(user->dm, user->Yloc, ADD_VALUES, Y); CHKERRQ(ierr);
+  ierr = DMLocalToGlobalBegin(user->dm, user->Yloc, ADD_VALUES, Y);
+  CHKERRQ(ierr);
   ierr = DMLocalToGlobalEnd(user->dm, user->Yloc, ADD_VALUES, Y); CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
@@ -1103,9 +1106,14 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ctx) {
   UserMult user = (UserMult)ctx;
 
   PetscFunctionBeginUser;
+
+
+  // Use computed BCs
   ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
   ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0, NULL,
                                     NULL, NULL); CHKERRQ(ierr);
+
+  // libCEED for local action of residual evaluator
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
@@ -1117,8 +1125,12 @@ static PetscErrorCode ApplyJacobian_Ceed(Mat A, Vec X, Vec Y) {
   UserMult user;
 
   PetscFunctionBeginUser;
+
+  // Zero boundary values
   ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
   ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
+
+  // libCEED for local action of Jacobian
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
@@ -1131,6 +1143,7 @@ static PetscErrorCode Prolong_Ceed(Mat A, Vec X, Vec Y) {
   PetscScalar *c, *f;
 
   PetscFunctionBeginUser;
+
   ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
 
   // Global-to-local
@@ -1177,6 +1190,7 @@ static PetscErrorCode Restrict_Ceed(Mat A, Vec X, Vec Y) {
   PetscScalar *c, *f;
 
   PetscFunctionBeginUser;
+
   ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
 
   // Global-to-local
@@ -1358,7 +1372,6 @@ static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
 // for u[0], u[1], u[2]
 PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
                      PetscInt ncompu, PetscScalar *u, void *ctx) {
-
   PetscScalar x = coords[0];
   PetscScalar y = coords[1];
   PetscScalar z = coords[2];
@@ -1392,8 +1405,8 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
 PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
                           const PetscReal coords[],
                           PetscInt ncompu, PetscScalar *u, void *ctx) {
-
   PetscInt *faceID = (PetscInt *)ctx;
+
   PetscFunctionBeginUser;
 
   switch (*faceID) {
@@ -1429,7 +1442,6 @@ PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
 PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time,
                           const PetscReal coords[],
                           PetscInt ncompu, PetscScalar *u, void *ctx) {
-
   PetscFunctionBeginUser;
 
   u[0] = 0;
@@ -1443,7 +1455,6 @@ PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time,
 PetscErrorCode BCCube(PetscInt dim, PetscReal time,
                           const PetscReal coords[],
                           PetscInt ncompu, PetscScalar *u, void *ctx) {
-
   PetscFunctionBeginUser;
 
   u[0] = 0;
