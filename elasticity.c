@@ -233,8 +233,8 @@ int main(int argc, char **argv) {
   for (int level = 0; level < numLevels; level++) {
     // -- Jacobian context for level
     ierr = PetscMalloc1(1, &jacobCtx[level]); CHKERRQ(ierr);
-    ierr = SetupJacobianCtx(comm, levelDMs[level], Ug[level], Uloc[level],
-                            ceedData[level], ceed, jacobCtx[level]);
+    ierr = SetupJacobianCtx(comm, appCtx, levelDMs[level], Ug[level],
+                            Uloc[level], ceedData[level], ceed, jacobCtx[level]);
     CHKERRQ(ierr);
 
     // -- Form Action of Jacobian on delta_u

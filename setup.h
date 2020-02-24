@@ -101,6 +101,7 @@ typedef struct {
   PetscInt      degree;
   PetscInt      numLevels;
   PetscInt      *levelDegrees;
+  PetscInt      maxDiagState;
 } AppCtx;
 
 // Problem specific data
@@ -215,13 +216,14 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
 
   PetscErrorCode ierr;
   PetscBool meshFileFlag = PETSC_FALSE;
-  PetscBool degreeFalg = PETSC_FALSE;
+  PetscBool degreeFalg   = PETSC_FALSE;
   PetscBool boundaryFlag = PETSC_FALSE;
-  PetscBool ceedFlag = PETSC_FALSE;
-  appCtx->problemChoice = ELAS_LIN; //-problem = Linear Elasticity if not given
-  appCtx->degree = 3;
+  PetscBool ceedFlag     = PETSC_FALSE;
+  appCtx->problemChoice  = ELAS_LIN;       // Default - Linear Elasticity
+  appCtx->degree         = 3;
   appCtx->boundaryChoice = BDRY_WALL_NONE;
-  appCtx->forcingChoice = FORCE_NONE;
+  appCtx->forcingChoice  = FORCE_NONE;
+  appCtx->maxDiagState   = 1;              // Default - no diagonal reuse
 
   PetscFunctionBeginUser;
 
@@ -269,6 +271,10 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
                           multigridTypes, (PetscEnum)appCtx->multigridChoice,
                           (PetscEnum *)&appCtx->multigridChoice, NULL);
   CHKERRQ(ierr);
+
+  ierr = PetscOptionsInt("-maxDiagState", "Set number of times to use Jacobian diagonal before recalculation",
+                         NULL, appCtx->maxDiagState, &appCtx->maxDiagState,
+                         NULL); CHKERRQ(ierr);
 
   appCtx->testMode = PETSC_FALSE;
   ierr = PetscOptionsBool("-test",
@@ -1212,8 +1218,8 @@ static PetscErrorCode Restrict_Ceed(Mat A, Vec X, Vec Y) {
 }
 
 // Setup context data for Jacobian evaluation
-static PetscErrorCode SetupJacobianCtx(MPI_Comm comm, DM dm, Vec V, Vec Vloc,
-    CeedData ceedData, Ceed ceed, UserMult jacobianCtx) {
+static PetscErrorCode SetupJacobianCtx(MPI_Comm comm, AppCtx appCtx, DM dm,
+    Vec V, Vec Vloc, CeedData ceedData, Ceed ceed, UserMult jacobianCtx) {
   PetscErrorCode ierr;
 
   PetscFunctionBeginUser;
@@ -1230,8 +1236,8 @@ static PetscErrorCode SetupJacobianCtx(MPI_Comm comm, DM dm, Vec V, Vec Vloc,
 
   // Diagonal vector
   ierr = VecDuplicate(V, &jacobianCtx->diagVec); CHKERRQ(ierr);
-  jacobianCtx->diagState = 3; // TODO: Update to command line lag option
-  jacobianCtx->maxDiagState = 3;
+  jacobianCtx->diagState = appCtx.maxDiagState;
+  jacobianCtx->maxDiagState = appCtx.maxDiagState + 1; // Force initial assembly
 
   // libCEED operator
   jacobianCtx->op = ceedData->opJacob;
