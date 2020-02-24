@@ -295,7 +295,6 @@ int main(int argc, char **argv) {
     // -- KSP
     ierr = SNESGetKSP(snes, &ksp); CHKERRQ(ierr);
     ierr = KSPSetType(ksp, KSPCG); CHKERRQ(ierr);
-    ierr = KSPSetDM(ksp, levelDMs[fineLevel]); CHKERRQ(ierr);
     ierr = KSPSetNormType(ksp, KSP_NORM_NATURAL); CHKERRQ(ierr);
     ierr = KSPSetTolerances(ksp, 1e-10, PETSC_DEFAULT, PETSC_DEFAULT,
                             PETSC_DEFAULT); CHKERRQ(ierr);
