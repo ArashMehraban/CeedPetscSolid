@@ -1154,7 +1154,8 @@ static PetscErrorCode Prolong_Ceed(Mat A, Vec X, Vec Y) {
   ierr = VecZeroEntries(user->locVecF); CHKERRQ(ierr);
 
   // Setup CEED vectors
-  ierr = VecGetArrayRead(user->locVecC, (const PetscScalar **)&c); CHKERRQ(ierr);
+  ierr = VecGetArrayRead(user->locVecC, (const PetscScalar **)&c);
+  CHKERRQ(ierr);
   ierr = VecGetArray(user->locVecF, &f); CHKERRQ(ierr);
   CeedVectorSetArray(user->ceedVecC, CEED_MEM_HOST, CEED_USE_POINTER, c);
   CeedVectorSetArray(user->ceedVecF, CEED_MEM_HOST, CEED_USE_POINTER, f);
