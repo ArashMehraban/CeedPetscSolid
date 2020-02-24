@@ -201,8 +201,7 @@ typedef struct CeedData_private *CeedData;
 struct CeedData_private {
   Ceed                ceed;
   CeedBasis           basisx, basisu, basisCtoF;
-  CeedElemRestriction Erestrictx, Erestrictu, Erestrictxi,
-                      Erestrictqdi, ErestrictGradui;
+  CeedElemRestriction Erestrictx, Erestrictu, Erestrictqdi, ErestrictGradui;
   CeedQFunction       qfApply, qfJacob;
   CeedOperator        opApply, opJacob, opRestrict, opProlong;
   CeedVector          qdata, gradu, xceed, yceed, truesoln;
@@ -570,7 +569,6 @@ static PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   CeedElemRestrictionDestroy(&data->Erestrictu);
   CeedElemRestrictionDestroy(&data->Erestrictx);
   CeedElemRestrictionDestroy(&data->ErestrictGradui);
-  CeedElemRestrictionDestroy(&data->Erestrictxi);
   CeedElemRestrictionDestroy(&data->Erestrictqdi);
 
   // Bases
@@ -696,10 +694,6 @@ static int SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, qdatasize,
                                    CEED_STRIDES_BACKEND,
                                    &data[fineLevel]->Erestrictqdi);
-  // -- Dummy weights restriction
-  CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, ncompx,
-                                   CEED_STRIDES_BACKEND,
-                                   &data[fineLevel]->Erestrictxi);
   // -- State vector gradient restriction
   if (problemChoice != ELAS_LIN)
     CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q,
@@ -759,7 +753,7 @@ static int SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
                      CEED_QFUNCTION_NONE, &opSetupGeo);
   CeedOperatorSetField(opSetupGeo, "dx", data[fineLevel]->Erestrictx,
                        data[fineLevel]->basisx, CEED_VECTOR_ACTIVE);
-  CeedOperatorSetField(opSetupGeo, "weight", data[fineLevel]->Erestrictxi,
+  CeedOperatorSetField(opSetupGeo, "weight", CEED_ELEMRESTRICTION_NONE,
                        data[fineLevel]->basisx, CEED_VECTOR_NONE);
   CeedOperatorSetField(opSetupGeo, "qdata", data[fineLevel]->Erestrictqdi,
                        CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
@@ -1237,6 +1231,7 @@ static PetscErrorCode SetupJacobianCtx(MPI_Comm comm, DM dm, Vec V, Vec Vloc,
   // Diagonal vector
   ierr = VecDuplicate(V, &jacobianCtx->diagVec); CHKERRQ(ierr);
   jacobianCtx->diagState = 3; // TODO: Update to command line lag option
+  jacobianCtx->maxDiagState = 3;
 
   // libCEED operator
   jacobianCtx->op = ceedData->opJacob;
@@ -1323,9 +1318,8 @@ static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
   UserMult *jacobCtx = formJacobCtx->jacobCtx;
 
   // Update diagonal state counter
-  for (int level = 0; level < numLevels; level++) {
+  for (int level = 0; level < numLevels; level++)
     jacobCtx[level]->diagState++;
-  }
 
   // Jpre might be AIJ (e.g., when using coloring), so we need to assemble it
   ierr = MatAssemblyBegin(Jpre, MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);

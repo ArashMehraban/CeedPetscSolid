@@ -319,6 +319,8 @@ int main(int argc, char **argv) {
         ierr = PCMGGetSmoother(pc, level, &kspSmoother); CHKERRQ(ierr);
         ierr = KSPSetType(kspSmoother, KSPCHEBYSHEV); CHKERRQ(ierr);
         ierr = KSPSetDM(kspSmoother, levelDMs[level]); CHKERRQ(ierr);
+        ierr = KSPSetDMActive(kspSmoother, PETSC_FALSE); CHKERRQ(ierr);
+
         ierr = KSPChebyshevEstEigSet(kspSmoother, 0, 0.1, 0, 1.1);
         CHKERRQ(ierr);
         ierr = KSPChebyshevEstEigSetUseNoisy(kspSmoother, PETSC_TRUE);
