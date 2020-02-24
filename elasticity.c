@@ -457,7 +457,7 @@ int main(int argc, char **argv) {
     l2error /= l2Unorm;
 
     // -- Output
-    if (!appCtx.testMode || l2error > 0.168) {
+    if (!appCtx.testMode || l2error > 0.013) {
       ierr = PetscPrintf(comm,
                          "  Performance:\n"
                          "    L2 Error                           : %f\n",
