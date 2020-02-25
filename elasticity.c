@@ -318,11 +318,15 @@ int main(int argc, char **argv) {
       for (int level = 0; level < numLevels; level++) {
         // -------- Smoother
         KSP kspSmoother;
+        PC pcSmoother;
+
+        // ---------- Smoother KSP
         ierr = PCMGGetSmoother(pc, level, &kspSmoother); CHKERRQ(ierr);
-        ierr = KSPSetType(kspSmoother, KSPCHEBYSHEV); CHKERRQ(ierr);
         ierr = KSPSetDM(kspSmoother, levelDMs[level]); CHKERRQ(ierr);
         ierr = KSPSetDMActive(kspSmoother, PETSC_FALSE); CHKERRQ(ierr);
 
+        // ---------- Chebyshev options
+        ierr = KSPSetType(kspSmoother, KSPCHEBYSHEV); CHKERRQ(ierr);
         ierr = KSPChebyshevEstEigSet(kspSmoother, 0, 0.1, 0, 1.1);
         CHKERRQ(ierr);
         ierr = KSPChebyshevEstEigSetUseNoisy(kspSmoother, PETSC_TRUE);
@@ -330,7 +334,7 @@ int main(int argc, char **argv) {
         ierr = KSPSetOperators(kspSmoother, jacobMat[level], jacobMat[level]);
         CHKERRQ(ierr);
 
-        PC pcSmoother;
+        // ---------- Smoother preconditioner
         ierr = KSPGetPC(kspSmoother, &pcSmoother); CHKERRQ(ierr);
         ierr = PCSetType(pcSmoother, PCJACOBI); CHKERRQ(ierr);
         ierr = PCJacobiSetType(pcSmoother, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
