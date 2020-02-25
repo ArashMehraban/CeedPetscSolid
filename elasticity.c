@@ -510,7 +510,7 @@ int main(int argc, char **argv) {
   ierr = PetscFree(appCtx.levelDegrees); CHKERRQ(ierr);
   ierr = PetscFree(ceedData); CHKERRQ(ierr);
 
-  // libCEED QFunctions
+  // libCEED Objects
   CeedQFunctionDestroy(&qfRestrict);
   CeedQFunctionDestroy(&qfProlong);
   CeedDestroy(&ceed);
