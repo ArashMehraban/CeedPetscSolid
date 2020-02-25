@@ -21,7 +21,6 @@
 // -----------------------------------------------------------------------------
 // Command Line Options
 // -----------------------------------------------------------------------------
-
 // Problem options
 typedef enum {
   ELAS_LIN = 0, ELAS_HYPER_SS = 1, ELAS_HYPER_FS = 2
@@ -779,6 +778,9 @@ static int SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   // ---------------------------------------------------------------------------
   // Local residual evaluator
   // ---------------------------------------------------------------------------
+  // Create the QFunction and Operator that computes the residual of the
+  //   non-linear PDE.
+  // ---------------------------------------------------------------------------
   // -- QFunction
   CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].apply,
                               problemOptions[problemChoice].applyfname,
@@ -808,6 +810,9 @@ static int SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
 
   // ---------------------------------------------------------------------------
   // Forcing term, if needed
+  // ---------------------------------------------------------------------------
+  // Create the QFunction and Operator that computes the forcing term (RHS)
+  //   for the non-linear PDE.
   // ---------------------------------------------------------------------------
   if (forcingChoice != FORCE_NONE) {
     CeedQFunction qfSetupForce;
@@ -844,6 +849,9 @@ static int SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
 
   // ---------------------------------------------------------------------------
   // True solution, for MMS
+  // ---------------------------------------------------------------------------
+  // Create the QFunction and Operator that computes the true solution at
+  //   the mesh nodes for validation with the manufactured solution.
   // ---------------------------------------------------------------------------
   if (forcingChoice == FORCE_MMS) {
     CeedScalar *truearray;
@@ -961,6 +969,9 @@ static int SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   // ---------------------------------------------------------------------------
   // Jacobian evaluator
   // ---------------------------------------------------------------------------
+  // Create the QFunction and Operator that computes the action of the
+  //   Jacobian for each linear solve.
+  // ---------------------------------------------------------------------------
   // -- QFunction
   CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].jacob,
                               problemOptions[problemChoice].jacobfname,
@@ -987,6 +998,9 @@ static int SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
 
   // ---------------------------------------------------------------------------
   // Restriction and Prolongation
+  // ---------------------------------------------------------------------------
+  // Create the QFunction and Operator that computes the prolongation and
+  //   restriction between the p-multigrid levels.
   // ---------------------------------------------------------------------------
   if ((level != 0) && appCtx.multigridChoice != MULTIGRID_NONE) {
     // -- Restriction
