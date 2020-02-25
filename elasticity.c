@@ -470,7 +470,7 @@ int main(int argc, char **argv) {
     ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
     CeedVectorRestoreArrayRead(ceedData[fineLevel]->truesoln, &truearray);
 
-    // -- Compute l2 error
+    // -- Compute L2 error
     ierr = VecWAXPY(errorVec, -1.0, U, trueVec); CHKERRQ(ierr);
     ierr = VecNorm(errorVec, NORM_2, &l2error); CHKERRQ(ierr);
     ierr = VecNorm(U, NORM_2, &l2Unorm); CHKERRQ(ierr);
