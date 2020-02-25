@@ -31,27 +31,30 @@ const char help[] = "Solve solid Problems with CEED and PETSc DMPlex\n";
 int main(int argc, char **argv) {
   PetscInt       ierr;
   MPI_Comm       comm;
-  AppCtx         appCtx;                 // contains problem options
-  Physics        phys;                   // contains physical constants
-  Units          units;                  // contains units scaling
-  DM             dmOrig;                 // distributed DM to clone
+  // Context structs
+  AppCtx         appCtx;                 // Contains problem options
+  Physics        phys;                   // Contains physical constants
+  Units          units;                  // Contains units scaling
+  // PETSc objects
+  DM             dmOrig;                 // Distributed DM to clone
   DM             *levelDMs;
-  PetscInt       ncompu = 3;             // 3 dofs in 3D
-  PetscInt       numLevels = 1, fineLevel = 0;
-  Vec            U, *Ug, *Uloc;
-  Vec            R, Rloc, F, Floc;       // loc: local, R: residual, F: forcing
-  PetscInt       *Ugsz, *Ulsz, *Ulocsz;  // g: global, sz: size
-  UserMult       resCtx, *jacobCtx;
-  UserMultProlongRestr *prolongRestrCtx;
-  FormJacobCtx   formJacobCtx;
+  Vec            U, *Ug, *Uloc;          // U: solution, R: residual, F: forcing
+  Vec            R, Rloc, F, Floc;       // g: global, loc: local
+  SNES           snes;
   Mat            *jacobMat, *prolongRestrMat;
+  // PETSc data
+  UserMult       resCtx, *jacobCtx;
+  FormJacobCtx   formJacobCtx;
+  UserMultProlongRestr *prolongRestrCtx;
   PCMGCycleType  pcmgCycleType = PC_MG_CYCLE_V;
-  //Ceed constituents
+  // libCEED objects
   Ceed           ceed;
   CeedData       *ceedData;
   CeedQFunction  qfRestrict, qfProlong;
-  SNES           snes;
-
+  // Parameters
+  PetscInt       ncompu = 3;             // 3 DoFs in 3D
+  PetscInt       numLevels = 1, fineLevel = 0;
+  PetscInt       *Ugsz, *Ulsz, *Ulocsz;  // sz: size
 
   ierr = PetscInitialize(&argc, &argv, NULL, help);
   if (ierr)
