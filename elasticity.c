@@ -449,7 +449,7 @@ int main(int argc, char **argv) {
   // Compute error
   // ---------------------------------------------------------------------------
   if (appCtx.forcingChoice == FORCE_MMS) {
-    CeedScalar l2error = 1., l2Unorm = 1.;
+    CeedScalar l2Error = 1., l2Unorm = 1.;
     const CeedScalar *truearray;
     Vec errorVec, trueVec;
 
@@ -472,16 +472,16 @@ int main(int argc, char **argv) {
 
     // -- Compute L2 error
     ierr = VecWAXPY(errorVec, -1.0, U, trueVec); CHKERRQ(ierr);
-    ierr = VecNorm(errorVec, NORM_2, &l2error); CHKERRQ(ierr);
+    ierr = VecNorm(errorVec, NORM_2, &l2Error); CHKERRQ(ierr);
     ierr = VecNorm(U, NORM_2, &l2Unorm); CHKERRQ(ierr);
-    l2error /= l2Unorm;
+    l2Error /= l2Unorm;
 
     // -- Output
-    if (!appCtx.testMode || l2error > 0.013) {
+    if (!appCtx.testMode || l2Error > 0.013) {
       ierr = PetscPrintf(comm,
                          "  Performance:\n"
                          "    L2 Error                           : %f\n",
-                         l2error); CHKERRQ(ierr);
+                         l2Error); CHKERRQ(ierr);
     }
 
     // -- Cleanup

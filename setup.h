@@ -1074,7 +1074,7 @@ static PetscErrorCode GetDiag_Ceed(Mat A, Vec D) {
 
   // Copy diagonal
   ierr = VecCopy(user->diagVec, D); CHKERRQ(ierr);
-
+VecView(user->diagVec, PETSC_VIEWER_STDOUT_WORLD);
   PetscFunctionReturn(0);
 }
 
@@ -1266,8 +1266,8 @@ static PetscErrorCode SetupJacobianCtx(MPI_Comm comm, AppCtx appCtx, DM dm,
 
   // Diagonal vector
   ierr = VecDuplicate(V, &jacobianCtx->diagVec); CHKERRQ(ierr);
-  jacobianCtx->diagState = appCtx.maxDiagState;
-  jacobianCtx->maxDiagState = appCtx.maxDiagState + 1; // Force initial assembly
+  jacobianCtx->diagState = appCtx.maxDiagState + 1; // Force initial assembly
+  jacobianCtx->maxDiagState = appCtx.maxDiagState;
 
   // libCEED operator
   jacobianCtx->op = ceedData->opJacob;
