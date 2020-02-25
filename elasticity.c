@@ -504,7 +504,6 @@ int main(int argc, char **argv) {
   ierr = PetscFree(Ulsz); CHKERRQ(ierr);
   ierr = PetscFree(Ulocsz); CHKERRQ(ierr);
   ierr = PetscFree(jacobCtx); CHKERRQ(ierr);
-  ierr = PetscFree(formJacobCtx); CHKERRQ(ierr);
   ierr = PetscFree(jacobMat); CHKERRQ(ierr);
   ierr = PetscFree(prolongRestrCtx); CHKERRQ(ierr);
   ierr = PetscFree(prolongRestrMat); CHKERRQ(ierr);
@@ -528,6 +527,7 @@ int main(int argc, char **argv) {
 
   // Structs
   ierr = PetscFree(resCtx); CHKERRQ(ierr);
+  ierr = PetscFree(formJacobCtx); CHKERRQ(ierr);
   ierr = PetscFree(phys); CHKERRQ(ierr);
   ierr = PetscFree(units); CHKERRQ(ierr);
 
