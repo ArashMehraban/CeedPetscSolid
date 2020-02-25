@@ -346,7 +346,7 @@ int main(int argc, char **argv) {
       }
     }
 
-    // ------ PCMG Coarse solve
+    // ------ PCMG coarse solve
     KSP kspCoarse;
     PC pcCoarse;
     ierr = PCMGGetCoarseSolve(pc, &kspCoarse); CHKERRQ(ierr);
