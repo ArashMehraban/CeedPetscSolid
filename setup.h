@@ -1069,7 +1069,10 @@ static PetscErrorCode GetDiag_Ceed(Mat A, Vec D) {
     // -- Cleanup
     ierr = VecResetArray(user->Xloc); CHKERRQ(ierr);
     CeedVectorRestoreArrayRead(ceedDiagVec, &diagArray);
-    CeedVectorDestroy(&ceedDiagVec);    
+    CeedVectorDestroy(&ceedDiagVec);  
+
+    // -- Update state
+    user->diagState = 0;  
   }
 
   // Copy diagonal
