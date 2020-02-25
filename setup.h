@@ -47,22 +47,20 @@ static const char *const forcingTypesForDisp[] = {"None",
 
 // Boundary condition options
 typedef enum {
-  BDRY_WALL_NONE = 0, BDRY_WALL_WEIGHT = 1, BDRY_MMS = 2, BDRY_CUBE = 3
+  BDRY_WALL_NONE = 0, BDRY_WALL_WEIGHT = 1, BDRY_MMS = 2
 } boundaryType;
 static const char *const boundaryTypes[] = {"wall_none",
                                             "wall_weight",
                                             "mms",
-                                            "cube",
                                             "boundaryType","BDRY_",0};
 static const char *const boundaryTypesForDisp[] = {"Wall with free end",
                                                    "Wall with weighted end",
-                                                   "Manufactured solution",
-                                                   "Cube"};
+                                                   "Manufactured solution"};
 
 typedef PetscErrorCode BCFunc(PetscInt, PetscReal, const PetscReal *, PetscInt,
                               PetscScalar *, void *);
-BCFunc BCBend1_ss, BCBend2_ss, BCMMS, BCCube;
-BCFunc *boundaryOptions[] = {BCBend1_ss, BCBend2_ss, BCMMS, BCCube};
+BCFunc BCBend1_ss, BCBend2_ss, BCMMS;
+BCFunc *boundaryOptions[] = {BCBend1_ss, BCBend2_ss, BCMMS};
 
 // Multigrid options
 typedef enum {
@@ -83,11 +81,11 @@ static const char *const multigridTypesForDisp[] = {"P-multigrid, logarithmic co
 // Units
 typedef struct Units_private *Units;
 struct Units_private {
-  // fundamental units
+  // Fundamental units
   PetscScalar meter;
   PetscScalar kilogram;
   PetscScalar second;
-  // derived unit
+  // Derived unit
   PetscScalar Pascal;
 };
 
@@ -117,7 +115,7 @@ typedef struct {
 // Data specific to each problem option
 problemData problemOptions[3] = {
   [ELAS_LIN] = {
-    .qdatasize = 10, // For linear Elasticty we could do 6
+    .qdatasize = 10, // For linear Elasticty, 6 would be sufficient
     .setupgeo = SetupGeo,
     .apply = LinElasF,
     .jacob = LinElasdF,
@@ -223,8 +221,8 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
   PetscBool ceedFlag     = PETSC_FALSE;
   appCtx->problemChoice  = ELAS_LIN;       // Default - Linear Elasticity
   appCtx->degree         = 3;
-  appCtx->boundaryChoice = BDRY_WALL_NONE;
-  appCtx->forcingChoice  = FORCE_NONE;
+  appCtx->boundaryChoice = BDRY_WALL_NONE; // Related to mesh choice
+  appCtx->forcingChoice  = FORCE_NONE;     // Default - no forcing term
   appCtx->maxDiagState   = 1;              // Default - no diagonal reuse
 
   PetscFunctionBeginUser;
@@ -1458,19 +1456,6 @@ PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
 //
 //  0 values on the left side of the cyl-hole (sideset 999)
 PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time,
-                          const PetscReal coords[],
-                          PetscInt ncompu, PetscScalar *u, void *ctx) {
-  PetscFunctionBeginUser;
-
-  u[0] = 0;
-  u[1] = 0;
-  u[2] = 0;
-
-  PetscFunctionReturn(0);
-};
-
-// Zero Dirictlet boundaries for a cube mesh
-PetscErrorCode BCCube(PetscInt dim, PetscReal time,
                           const PetscReal coords[],
                           PetscInt ncompu, PetscScalar *u, void *ctx) {
   PetscFunctionBeginUser;
