@@ -71,8 +71,8 @@ static const char *const multigridTypes [] = {"logarithmic",
                                               "none",
                                               "multigridType","MULTIGRID",0
                                              };
-static const char *const multigridTypesForDisp[] = {"P-multigrid with logarithmic coarsening",
-                                                    "P-multigrind with uniform coarsening",
+static const char *const multigridTypesForDisp[] = {"P-multigrid, logarithmic coarsening",
+                                                    "P-multigrind, uniform coarsening",
                                                     "No multigrid"};
 
 // -----------------------------------------------------------------------------
@@ -209,7 +209,7 @@ struct CeedData_private {
 };
 
 // -----------------------------------------------------------------------------
-// Helper Functions
+// Process command line options
 // -----------------------------------------------------------------------------
 // Process general command line options
 static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
