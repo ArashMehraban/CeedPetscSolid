@@ -1074,7 +1074,7 @@ static PetscErrorCode GetDiag_Ceed(Mat A, Vec D) {
 
   // Copy diagonal
   ierr = VecCopy(user->diagVec, D); CHKERRQ(ierr);
-VecView(user->diagVec, PETSC_VIEWER_STDOUT_WORLD);
+
   PetscFunctionReturn(0);
 }
 
