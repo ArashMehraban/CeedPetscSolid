@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   comm = PETSC_COMM_WORLD;
 
-  // -- Set mesh-file, polynomial degree, problem type
+  // -- Set mesh file, polynomial degree, problem type
   ierr = processCommandLineOptions(comm, &appCtx); CHKERRQ(ierr);
   numLevels = appCtx.numLevels;
   fineLevel = numLevels - 1;
@@ -76,7 +76,6 @@ int main(int argc, char **argv) {
   // Setup DM
   // ---------------------------------------------------------------------------
   // -- Create distributed DM from mesh file
-  //      (interpolate if polynomial degree > 1)
   ierr = createDistributedDM(comm, &appCtx, &dmOrig); CHKERRQ(ierr);
 
   // -- Setup DM by polynomial degree
@@ -102,11 +101,13 @@ int main(int argc, char **argv) {
     // -- Create global unknown vector U
     ierr = DMCreateGlobalVector(levelDMs[level], &Ug[level]); CHKERRQ(ierr);
     ierr = VecGetSize(Ug[level], &Ugsz[level]); CHKERRQ(ierr);
-    ierr = VecGetLocalSize(Ug[level], &Ulsz[level]); CHKERRQ(ierr); // For matShell
+    // Note: Local size for matShell
+    ierr = VecGetLocalSize(Ug[level], &Ulsz[level]); CHKERRQ(ierr);
 
     // -- Create local unknown vector Uloc
     ierr = DMCreateLocalVector(levelDMs[level], &Uloc[level]); CHKERRQ(ierr);
-    ierr = VecGetSize(Uloc[level], &Ulocsz[level]); CHKERRQ(ierr); // For libCeed
+    // Note: local size for libCEED
+    ierr = VecGetSize(Uloc[level], &Ulocsz[level]); CHKERRQ(ierr);
   }
 
   // -- Create residual and forcing vectors
@@ -165,10 +166,10 @@ int main(int argc, char **argv) {
 
   if (appCtx.forcingChoice != FORCE_NONE) {
     ierr = VecRestoreArray(Floc, &f); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalBegin(levelDMs[fineLevel], Floc, ADD_VALUES,
-                                F); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalEnd(levelDMs[fineLevel], Floc, ADD_VALUES,
-                              F); CHKERRQ(ierr);
+    ierr = DMLocalToGlobalBegin(levelDMs[fineLevel], Floc, ADD_VALUES, F);
+    CHKERRQ(ierr);
+    ierr = DMLocalToGlobalEnd(levelDMs[fineLevel], Floc, ADD_VALUES, F);
+    CHKERRQ(ierr);
     CeedVectorDestroy(&forceCeed);
   }
 
@@ -248,7 +249,7 @@ int main(int argc, char **argv) {
                                 (void(*)(void))GetDiag_Ceed);
 
   }
-  // FormJacobian updates the state count of the Jacobian diagonals
+  // Note: FormJacobian updates the state count of the Jacobian diagonals
   //   and assembles the Jpre matrix, if needed
   ierr = PetscMalloc1(1, &formJacobCtx); CHKERRQ(ierr);
   formJacobCtx->jacobCtx = jacobCtx;

@@ -3,14 +3,17 @@
 
 #include <stdbool.h>
 #include <string.h>
+
 #include <petsc.h>
 #include <petscdmplex.h>
 #include <petscfe.h>
+
 #include <ceed.h>
-#include "qfunctions/solid/common.h"
-#include "qfunctions/solid/linElas.h" //Linear Elasticity
-#include "qfunctions/solid/hyperSS.h" //Hyperelasticity Small SmallStrain
-#include "qfunctions/solid/hyperFS.h" //Hyperelasticity Small FiniteStrain
+
+#include "qfunctions/solid/common.h"            // Geometric factors
+#include "qfunctions/solid/linElas.h"           // Linear elasticity
+#include "qfunctions/solid/hyperSS.h"           // Hyperelasticity small strain
+#include "qfunctions/solid/hyperFS.h"           // Hyperelasticity finite strain
 #include "qfunctions/solid/constantForce.h"     // Constant forcing function
 #include "qfunctions/solid/manufacturedForce.h" // Manufactured solution forcing
 #include "qfunctions/solid/manufacturedTrue.h"  // Manufactured true solution
@@ -426,6 +429,7 @@ static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
 
   PetscErrorCode  ierr;
   const char      *filename = ctx->meshFile;
+  // Note: interpolate if polynomial degree > 1
   PetscBool       interpolate = PETSC_TRUE;
   DM              distributedMesh = NULL;
   PetscPartitioner part;
@@ -1463,4 +1467,5 @@ PetscErrorCode BCCube(PetscInt dim, PetscReal time,
 
   PetscFunctionReturn(0);
 };
+
 #endif //setup_h
