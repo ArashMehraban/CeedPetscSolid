@@ -248,8 +248,8 @@ int main(int argc, char **argv) {
                                 (void(*)(void))GetDiag_Ceed);
 
   }
-  // FormJacobian restricts the gradient of the state vector and assembles
-  //   the diagonal of each Jacobian
+  // FormJacobian updates the state count of the Jacobian diagonals
+  //   and assembles the Jpre matrix, if needed
   ierr = PetscMalloc1(1, &formJacobCtx); CHKERRQ(ierr);
   formJacobCtx->jacobCtx = jacobCtx;
   formJacobCtx->numLevels = numLevels;
@@ -266,14 +266,14 @@ int main(int argc, char **argv) {
   ierr = PetscMalloc1(numLevels, &prolongRestrCtx); CHKERRQ(ierr);
   ierr = PetscMalloc1(numLevels, &prolongRestrMat); CHKERRQ(ierr);
   for (int level = 1; level < numLevels; level++) {
-    // -- Prolongation/restriction context for level
+    // ---- Prolongation/restriction context for level
     ierr = PetscMalloc1(1, &prolongRestrCtx[level]); CHKERRQ(ierr);
     ierr = SetupProlongRestrictCtx(comm, levelDMs[level-1], levelDMs[level],
                                    Ug[level], Uloc[level-1], Uloc[level],
                                    ceedData[level-1], ceedData[level], ceed,
                                    prolongRestrCtx[level]); CHKERRQ(ierr);
 
-    // -- Form Action of Jacobian on delta_u
+    // ---- Form Action of Jacobian on delta_u
     ierr = MatCreateShell(comm, Ulsz[level], Ulsz[level-1], Ugsz[level],
                           Ugsz[level-1], prolongRestrCtx[level],
                           &prolongRestrMat[level]); CHKERRQ(ierr);
