@@ -115,7 +115,7 @@ typedef struct {
 // Data specific to each problem option
 problemData problemOptions[3] = {
   [ELAS_LIN] = {
-    .qdatasize = 10, // For linear Elasticty, 6 would be sufficient
+    .qdatasize = 10, // For linear elasticity, 6 would be sufficient
     .setupgeo = SetupGeo,
     .apply = LinElasF,
     .jacob = LinElasdF,
@@ -1381,7 +1381,7 @@ static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
 //   / \-------------------\              y
 //  /   \                   \             |
 // (  O  )                   )      x ____|
-//  \   /                   /              \    Coodinate axis
+//  \   /                   /              \    Coordinate axis
 //   \ /-------------------/                \ z
 //
 // Values on all points of the mesh is set based on given solution below
@@ -1413,7 +1413,7 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
 //   / \-------------------\              y
 //  /   \                   \             |
 // (  O  )                   )      x ____|
-//  \   /                   /              \    Coodinate axis
+//  \   /                   /              \    Coordinate axis
 //   \ /-------------------/                \ z
 //
 //  0 values on the left side of the cyl-hole (sideset 999)
@@ -1451,7 +1451,7 @@ PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
 //   / \-------------------\              y
 //  /   \                   \             |
 // (  O  )                   )      x ____|
-//  \   /                   /              \    Coodinate axis
+//  \   /                   /              \    Coordinate axis
 //   \ /-------------------/                \ z
 //
 //  0 values on the left side of the cyl-hole (sideset 999)

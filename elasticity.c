@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
                                Ugsz[fineLevel], Ulocsz[fineLevel], forceCeed,
                                qfRestrict, qfProlong);
   CHKERRQ(ierr);
-  // ---- Setup Jacobian evaluator and prolongtion/restriction
+  // ---- Setup Jacobian evaluator and prolongation/restriction
   for (int level = 0; level < numLevels; level++) {
     if (level != fineLevel) {
       ierr = PetscCalloc1(1, &ceedData[level]); CHKERRQ(ierr);
@@ -459,7 +459,7 @@ int main(int argc, char **argv) {
     ierr = VecDuplicate(U, &trueVec); CHKERRQ(ierr);
     ierr = VecSet(trueVec, 0.0); CHKERRQ(ierr);
 
-    // -- Assebmle global true soltion vector
+    // -- Assemble global true solution vector
     CeedVectorGetArrayRead(ceedData[fineLevel]->truesoln, CEED_MEM_HOST,
                            &truearray);
     ierr = VecPlaceArray(resCtx->Yloc, truearray); CHKERRQ(ierr);
