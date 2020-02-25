@@ -305,7 +305,8 @@ int main(int argc, char **argv) {
 
     if (appCtx.multigridChoice == MULTIGRID_NONE) {
       // ---- No Multigrid
-      ierr = PCSetType(pc, PCNONE); CHKERRQ(ierr);
+      ierr = PCSetType(pc, PCJACOBI); CHKERRQ(ierr);
+      ierr = PCJacobiSetType(pc, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
     } else {
       // ---- PCMG
       ierr = PCSetType(pc, PCMG); CHKERRQ(ierr);
