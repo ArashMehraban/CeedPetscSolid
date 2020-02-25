@@ -298,10 +298,12 @@ int main(int argc, char **argv) {
     ierr = KSPSetNormType(ksp, KSP_NORM_NATURAL); CHKERRQ(ierr);
     ierr = KSPSetTolerances(ksp, 1e-10, PETSC_DEFAULT, PETSC_DEFAULT,
                             PETSC_DEFAULT); CHKERRQ(ierr);
+    ierr = KSPSetOptionsPrefix(ksp, "outer_"); CHKERRQ(ierr);
 
     // -- Preconditioning
     ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
     ierr = PCSetDM(pc, levelDMs[fineLevel]); CHKERRQ(ierr);
+    ierr = PCSetOptionsPrefix(pc, "outer_"); CHKERRQ(ierr);
 
     if (appCtx.multigridChoice == MULTIGRID_NONE) {
       // ---- No Multigrid
@@ -333,39 +335,49 @@ int main(int argc, char **argv) {
         ierr = PCSetType(pcSmoother, PCJACOBI); CHKERRQ(ierr);
         ierr = PCJacobiSetType(pcSmoother, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
 
-      // -------- Work vector
-      if (level != fineLevel) {
-        ierr = PCMGSetX(pc, level, Ug[level]); CHKERRQ(ierr);
+        // -------- Work vector
+        if (level != fineLevel) {
+          ierr = PCMGSetX(pc, level, Ug[level]); CHKERRQ(ierr);
+        }
+
+        // -------- Level prolongation/restriction operator
+        if (level > 0) {
+          ierr = PCMGSetInterpolation(pc, level, prolongRestrMat[level]);
+          CHKERRQ(ierr);
+          ierr = PCMGSetRestriction(pc, level, prolongRestrMat[level]);
+          CHKERRQ(ierr);
+        }
       }
 
-      // -------- Level prolongation operator
-      if (level > 0) {
-        ierr = PCMGSetInterpolation(pc, level, prolongRestrMat[level]);
-        CHKERRQ(ierr);
-        ierr = PCMGSetRestriction(pc, level, prolongRestrMat[level]);
-        CHKERRQ(ierr);
-      }
+      // ------ PCMG coarse solve
+      KSP kspCoarse;
+      PC pcCoarse;
+
+      // -------- Coarse KSP
+      ierr = PCMGGetCoarseSolve(pc, &kspCoarse); CHKERRQ(ierr);
+      ierr = KSPSetType(kspCoarse, KSPCG); CHKERRQ(ierr);
+      ierr = KSPSetOperators(kspCoarse, jacobMat[0], jacobMat[0]);
+      CHKERRQ(ierr);
+      ierr = KSPSetTolerances(kspCoarse, 1e-10, 1e-10, PETSC_DEFAULT,
+                              PETSC_DEFAULT); CHKERRQ(ierr);
+      ierr = KSPSetOptionsPrefix(kspCoarse, "coarse_"); CHKERRQ(ierr);
+
+      // -------- Coarse preconditioner
+      ierr = KSPGetPC(kspCoarse, &pcCoarse); CHKERRQ(ierr);
+      ierr = PCSetType(pcCoarse, PCJACOBI); CHKERRQ(ierr);
+      ierr = PCJacobiSetType(pcCoarse, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
+      ierr = PCSetOptionsPrefix(pcCoarse, "coarse_"); CHKERRQ(ierr);
+
+      ierr = KSPSetFromOptions(kspCoarse); CHKERRQ(ierr);
+      ierr = PCSetFromOptions(pcCoarse); CHKERRQ(ierr);
+
+      // ------ PCMG options
+      ierr = PCMGSetType(pc, PC_MG_MULTIPLICATIVE); CHKERRQ(ierr);
+      ierr = PCMGSetNumberSmooth(pc, 3); CHKERRQ(ierr);
+      ierr = PCMGSetCycleType(pc, pcmgCycleType); CHKERRQ(ierr);
     }
-
-    // ------ PCMG coarse solve
-    KSP kspCoarse;
-    PC pcCoarse;
-    ierr = PCMGGetCoarseSolve(pc, &kspCoarse); CHKERRQ(ierr);
-    ierr = KSPSetType(kspCoarse, KSPCG); CHKERRQ(ierr);
-    ierr = KSPSetOperators(kspCoarse, jacobMat[0], jacobMat[0]); CHKERRQ(ierr);
-    ierr = KSPSetTolerances(kspCoarse, 1e-10, 1e-10, PETSC_DEFAULT,
-                            PETSC_DEFAULT); CHKERRQ(ierr);
-    ierr = KSPGetPC(kspCoarse, &pcCoarse); CHKERRQ(ierr);
-    ierr = PCSetType(pcCoarse, PCJACOBI); CHKERRQ(ierr);
-    ierr = PCJacobiSetType(pcCoarse, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
-
-    // ------ PCMG options
-    ierr = PCMGSetType(pc, PC_MG_MULTIPLICATIVE); CHKERRQ(ierr);
-    ierr = PCMGSetNumberSmooth(pc, 3); CHKERRQ(ierr);
-    ierr = PCMGSetCycleType(pc, pcmgCycleType); CHKERRQ(ierr);
-  }
-
     ierr = KSPSetFromOptions(ksp);
+    ierr = PCSetFromOptions(pc);
   }
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
 
