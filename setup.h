@@ -471,11 +471,11 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
   PetscInt        quadPointsPerEdge;
   PetscQuadrature q;  // quadrature points
   PetscQuadrature fq; // face quadrature points (For future: Nuemman boundary)
-  // For Dirichlet (Essential) Boundary
-  IS              faceSetIS;          // Index Set for Face Sets
-  const char      *name="Face Sets";  // PETSc internal requirement
-  PetscInt        numFaceSets;        // Number of FaceSets in faceSetIS
-  const PetscInt  *faceSetIds;        // id of each FaceSet
+  // Variables for Dirichlet (Essential) Boundary
+  IS              faceSetIS;           // Index Set for Face Sets
+  const char      *name = "Face Sets"; // PETSc internal requirement
+  PetscInt        numFaceSets;         // Number of FaceSets in faceSetIS
+  const PetscInt  *faceSetIds;         // id of each FaceSet
 
   PetscFunctionBeginUser;
 
