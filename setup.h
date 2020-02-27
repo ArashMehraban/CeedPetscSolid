@@ -184,6 +184,9 @@ typedef struct FormJacobCtx_private *FormJacobCtx;
 struct FormJacobCtx_private {
   UserMult     *jacobCtx;
   PetscInt     numLevels;
+  SNES         snesCoarse;
+  Mat          jacobMatMF, jacobMatCoarse;
+  Vec          Ucoarse;
 };
 
 // Data for PETSc Prolongation/Restriction Matshell
@@ -1137,6 +1140,23 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ctx) {
   PetscFunctionReturn(0);
 };
 
+// This function uses libCEED to compute the non-linear residual
+static PetscErrorCode ApplyJacobianCoarse_Ceed(SNES snes, Vec X, Vec Y,
+                                               void *ctx) {
+  PetscErrorCode ierr;
+  UserMult user = (UserMult)ctx;
+
+  PetscFunctionBeginUser;
+
+  // Use computed BCs
+  ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
+
+  // libCEED for local action of residual evaluator
+  ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
+
+  PetscFunctionReturn(0);
+};
+
 // This function uses libCEED to compute the action of the Jacobian
 static PetscErrorCode ApplyJacobian_Ceed(Mat A, Vec X, Vec Y) {
   PetscErrorCode ierr;
@@ -1352,13 +1372,22 @@ static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
 
   PetscFunctionBeginUser;
 
-  FormJacobCtx formJacobCtx = (FormJacobCtx)ctx;
-  PetscInt numLevels = formJacobCtx->numLevels;
-  UserMult *jacobCtx = formJacobCtx->jacobCtx;
+  // Context data
+  FormJacobCtx  formJacobCtx = (FormJacobCtx)ctx;
+  PetscInt      numLevels = formJacobCtx->numLevels;
+  UserMult      *jacobCtx = formJacobCtx->jacobCtx;
 
   // Update diagonal state counter
   for (int level = 0; level < numLevels; level++)
     jacobCtx[level]->diagState++;
+
+  // Form coarse assembled matrix
+  ierr = VecZeroEntries(formJacobCtx->Ucoarse); CHKERRQ(ierr);
+  ierr = SNESComputeJacobianDefaultColor(formJacobCtx->snesCoarse,
+                                         formJacobCtx->Ucoarse,
+                                         formJacobCtx->jacobMatMF,
+                                         formJacobCtx->jacobMatCoarse, NULL);
+  CHKERRQ(ierr);
 
   // Jpre might be AIJ (e.g., when using coloring), so we need to assemble it
   ierr = MatAssemblyBegin(Jpre, MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);

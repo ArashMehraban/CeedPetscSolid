@@ -40,10 +40,10 @@ int main(int argc, char **argv) {
   DM             *levelDMs;
   Vec            U, *Ug, *Uloc;          // U: solution, R: residual, F: forcing
   Vec            R, Rloc, F, Floc;       // g: global, loc: local
-  SNES           snes;
-  Mat            *jacobMat, *prolongRestrMat;
+  SNES           snes, snesCoarse;
+  Mat            *jacobMat, jacobMatCoarse, *prolongRestrMat;
   // PETSc data
-  UserMult       resCtx, *jacobCtx;
+  UserMult       resCtx, jacobCoarseCtx, *jacobCtx;
   FormJacobCtx   formJacobCtx;
   UserMultProlongRestr *prolongRestrCtx;
   PCMGCycleType  pcmgCycleType = PC_MG_CYCLE_V;
@@ -292,6 +292,32 @@ int main(int argc, char **argv) {
   }
 
   // ---------------------------------------------------------------------------
+  // Setup dummy SNES for AMG coarse solve
+  // ---------------------------------------------------------------------------
+  ierr = SNESCreate(comm, &snesCoarse); CHKERRQ(ierr);
+  ierr = SNESSetDM(snesCoarse, levelDMs[0]); CHKERRQ(ierr);
+  ierr = SNESSetSolution(snesCoarse, Ug[0]); CHKERRQ(ierr);
+
+  // -- Jacobian matrix
+  ierr = DMSetMatType(levelDMs[0], MATAIJ); CHKERRQ(ierr);
+  ierr = DMCreateMatrix(levelDMs[0], &jacobMatCoarse); CHKERRQ(ierr);
+  ierr = SNESSetJacobian(snesCoarse, jacobMatCoarse, NULL, NULL, NULL);
+  CHKERRQ(ierr);
+
+  // -- Residual evaluation function
+  ierr = PetscMalloc1(1, &jacobCoarseCtx); CHKERRQ(ierr);
+  ierr = PetscMemcpy(jacobCoarseCtx, jacobCtx[0], sizeof(*jacobCtx[0]));
+  CHKERRQ(ierr);
+  ierr = SNESSetFunction(snesCoarse, Ug[0], ApplyJacobianCoarse_Ceed,
+                         jacobCoarseCtx); CHKERRQ(ierr);
+
+  // -- Update formJacobCtx
+  formJacobCtx->Ucoarse = Ug[0];
+  formJacobCtx->snesCoarse = snesCoarse;
+  formJacobCtx->jacobMatMF = jacobMat[0];
+  formJacobCtx->jacobMatCoarse = jacobMatCoarse;
+
+  // ---------------------------------------------------------------------------
   // Setup KSP
   // ---------------------------------------------------------------------------
   {
@@ -365,17 +391,17 @@ int main(int argc, char **argv) {
 
       // -------- Coarse KSP
       ierr = PCMGGetCoarseSolve(pc, &kspCoarse); CHKERRQ(ierr);
-      ierr = KSPSetType(kspCoarse, KSPCG); CHKERRQ(ierr);
-      ierr = KSPSetOperators(kspCoarse, jacobMat[0], jacobMat[0]);
+      ierr = KSPSetType(kspCoarse, KSPPREONLY); CHKERRQ(ierr);
+      ierr = KSPSetOperators(kspCoarse, jacobMatCoarse, jacobMatCoarse);
       CHKERRQ(ierr);
-      ierr = KSPSetTolerances(kspCoarse, 1e-10, 1e-10, PETSC_DEFAULT,
-                              PETSC_DEFAULT); CHKERRQ(ierr);
+      //ierr = KSPSetTolerances(kspCoarse, 1e-10, 1e-10, PETSC_DEFAULT,
+      //                        PETSC_DEFAULT); CHKERRQ(ierr);
       ierr = KSPSetOptionsPrefix(kspCoarse, "coarse_"); CHKERRQ(ierr);
 
       // -------- Coarse preconditioner
       ierr = KSPGetPC(kspCoarse, &pcCoarse); CHKERRQ(ierr);
-      ierr = PCSetType(pcCoarse, PCJACOBI); CHKERRQ(ierr);
-      ierr = PCJacobiSetType(pcCoarse, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
+      ierr = PCSetType(pcCoarse, PCGAMG); CHKERRQ(ierr);
+      //ierr = PCJacobiSetType(pcCoarse, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
       ierr = PCSetOptionsPrefix(pcCoarse, "coarse_"); CHKERRQ(ierr);
 
       ierr = KSPSetFromOptions(kspCoarse); CHKERRQ(ierr);
@@ -561,13 +587,16 @@ int main(int argc, char **argv) {
   ierr = VecDestroy(&Rloc); CHKERRQ(ierr);
   ierr = VecDestroy(&F); CHKERRQ(ierr);
   ierr = VecDestroy(&Floc); CHKERRQ(ierr);
+  ierr = MatDestroy(&jacobMatCoarse); CHKERRQ(ierr);
   ierr = SNESDestroy(&snes); CHKERRQ(ierr);
+  ierr = SNESDestroy(&snesCoarse); CHKERRQ(ierr);
   ierr = DMDestroy(&dmOrig); CHKERRQ(ierr);
   ierr = PetscFree(levelDMs); CHKERRQ(ierr);
 
   // Structs
   ierr = PetscFree(resCtx); CHKERRQ(ierr);
   ierr = PetscFree(formJacobCtx); CHKERRQ(ierr);
+  ierr = PetscFree(jacobCoarseCtx); CHKERRQ(ierr);
   ierr = PetscFree(phys); CHKERRQ(ierr);
   ierr = PetscFree(units); CHKERRQ(ierr);
 
