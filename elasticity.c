@@ -475,6 +475,20 @@ int main(int argc, char **argv) {
   }
 
   // ---------------------------------------------------------------------------
+  // Compute solve time
+  // ---------------------------------------------------------------------------
+  if (!appCtx.testMode) {
+    ierr = MPI_Allreduce(&elapsedTime, &minTime, 1, MPI_DOUBLE, MPI_MIN, comm);
+    CHKERRQ(ierr);
+    ierr = MPI_Allreduce(&elapsedTime, &maxTime, 1, MPI_DOUBLE, MPI_MAX, comm);
+    CHKERRQ(ierr);
+    ierr = PetscPrintf(comm,
+                       "  Performance:\n"
+                       "    SNES Solve Time                    : %g (%g) sec\n",
+                           maxTime, minTime); CHKERRQ(ierr);
+  }
+
+  // ---------------------------------------------------------------------------
   // Compute error
   // ---------------------------------------------------------------------------
   if (appCtx.forcingChoice == FORCE_MMS) {
@@ -506,7 +520,6 @@ int main(int argc, char **argv) {
     // -- Output
     if (!appCtx.testMode || l2Error > 0.013) {
       ierr = PetscPrintf(comm,
-                         "  Performance:\n"
                          "    L2 Error                           : %f\n",
                          l2Error); CHKERRQ(ierr);
     }
@@ -514,19 +527,6 @@ int main(int argc, char **argv) {
     // -- Cleanup
     ierr = VecDestroy(&errorVec); CHKERRQ(ierr);
     ierr = VecDestroy(&trueVec); CHKERRQ(ierr);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Compute solve time
-  // ---------------------------------------------------------------------------
-  if (!appCtx.testMode) {
-    ierr = MPI_Allreduce(&elapsedTime, &minTime, 1, MPI_DOUBLE, MPI_MIN, comm);
-    CHKERRQ(ierr);
-    ierr = MPI_Allreduce(&elapsedTime, &maxTime, 1, MPI_DOUBLE, MPI_MAX, comm);
-    CHKERRQ(ierr);
-    ierr = PetscPrintf(comm,
-                           "    SNES Solve Time                    : %g (%g) sec\n",
-                           maxTime, minTime); CHKERRQ(ierr);
   }
 
   // ---------------------------------------------------------------------------
