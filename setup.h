@@ -94,6 +94,7 @@ typedef struct {
   char          ceedresource[PETSC_MAX_PATH_LEN]; // libCEED backend
   char          meshFile[PETSC_MAX_PATH_LEN];     // exodusII mesh file
   PetscBool     testMode;
+  PetscBool     viewSoln;
   problemType   problemChoice;
   forcingType   forcingChoice;
   boundaryType  boundaryChoice;
@@ -283,6 +284,12 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
   ierr = PetscOptionsBool("-test",
                           "Testing mode (do not print unless error is large)",
                           NULL, appCtx->testMode, &(appCtx->testMode), NULL);
+  CHKERRQ(ierr);
+
+  appCtx->viewSoln = PETSC_FALSE;
+  ierr = PetscOptionsBool("-view_soln",
+                          "Write out solution vector for viewing",
+                          NULL, appCtx->viewSoln, &(appCtx->viewSoln), NULL);
   CHKERRQ(ierr);
 
   ierr = PetscOptionsEnd(); CHKERRQ(ierr); // End of setting AppCtx

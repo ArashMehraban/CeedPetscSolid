@@ -542,6 +542,19 @@ int main(int argc, char **argv) {
   }
 
   // ---------------------------------------------------------------------------
+  // View Solution
+  // ---------------------------------------------------------------------------
+  if (appCtx.viewSoln) {
+    PetscViewer viewer;
+
+    ierr = PetscViewerVTKOpen(comm, "solution.vtu", FILE_MODE_WRITE, &viewer);
+    CHKERRQ(ierr);
+    ierr = VecView(U, viewer); CHKERRQ(ierr);
+    ierr = VecView(U, PETSC_VIEWER_STDOUT_WORLD); CHKERRQ(ierr);
+    ierr = PetscViewerDestroy(&viewer); CHKERRQ(ierr);
+  }
+
+  // ---------------------------------------------------------------------------
   // Free objects
   // ---------------------------------------------------------------------------
   // Data in arrays per level
