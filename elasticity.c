@@ -55,6 +55,8 @@ int main(int argc, char **argv) {
   PetscInt       ncompu = 3;             // 3 DoFs in 3D
   PetscInt       numLevels = 1, fineLevel = 0;
   PetscInt       *Ugsz, *Ulsz, *Ulocsz;  // sz: size
+  // Timing
+  double         startTime, elapsedTime, minTime, maxTime;
 
   ierr = PetscInitialize(&argc, &argv, NULL, help);
   if (ierr)
@@ -397,7 +399,10 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Solve SNES
   // ---------------------------------------------------------------------------
+  ierr = PetscBarrier((PetscObject)snes); CHKERRQ(ierr);
+  startTime = MPI_Wtime();
   ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+  elapsedTime = MPI_Wtime() - startTime;
 
   // ---------------------------------------------------------------------------
   // Output summary
@@ -488,6 +493,20 @@ int main(int argc, char **argv) {
     ierr = VecDestroy(&errorVec); CHKERRQ(ierr);
     ierr = VecDestroy(&trueVec); CHKERRQ(ierr);
   }
+
+  // ---------------------------------------------------------------------------
+  // Compute solve time
+  // ---------------------------------------------------------------------------
+  if (!appCtx.testMode) {
+    ierr = MPI_Allreduce(&elapsedTime, &minTime, 1, MPI_DOUBLE, MPI_MIN, comm);
+    CHKERRQ(ierr);
+    ierr = MPI_Allreduce(&elapsedTime, &maxTime, 1, MPI_DOUBLE, MPI_MAX, comm);
+    CHKERRQ(ierr);
+    ierr = PetscPrintf(comm,
+                           "    SNES Solve Time                    : %g (%g) sec\n",
+                           maxTime, minTime); CHKERRQ(ierr);
+  }
+
 
   // ---------------------------------------------------------------------------
   // Free objects
