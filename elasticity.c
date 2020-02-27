@@ -392,14 +392,11 @@ int main(int argc, char **argv) {
       ierr = KSPSetType(kspCoarse, KSPPREONLY); CHKERRQ(ierr);
       ierr = KSPSetOperators(kspCoarse, jacobMatCoarse, jacobMatCoarse);
       CHKERRQ(ierr);
-      //ierr = KSPSetTolerances(kspCoarse, 1e-10, 1e-10, PETSC_DEFAULT,
-      //                        PETSC_DEFAULT); CHKERRQ(ierr);
       ierr = KSPSetOptionsPrefix(kspCoarse, "coarse_"); CHKERRQ(ierr);
 
       // -------- Coarse preconditioner
       ierr = KSPGetPC(kspCoarse, &pcCoarse); CHKERRQ(ierr);
       ierr = PCSetType(pcCoarse, PCGAMG); CHKERRQ(ierr);
-      //ierr = PCJacobiSetType(pcCoarse, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
       ierr = PCSetOptionsPrefix(pcCoarse, "coarse_"); CHKERRQ(ierr);
 
       ierr = KSPSetFromOptions(kspCoarse); CHKERRQ(ierr);
@@ -471,6 +468,21 @@ int main(int argc, char **argv) {
                          "    PCMG Cycle Type                    : %s\n",
                          PCMGTypes[pcmgType],
                          PCMGCycleTypes[pcmgCycleType]); CHKERRQ(ierr);
+
+      // -- Coarse Solve
+      KSP kspCoarse;
+      PC pcCoarse;
+      PCType pcType;
+
+      ierr = PCMGGetCoarseSolve(pc, &kspCoarse); CHKERRQ(ierr);
+      ierr = KSPGetType(kspCoarse, &kspType); CHKERRQ(ierr);
+      ierr = KSPGetPC(kspCoarse, &pcCoarse); CHKERRQ(ierr);
+      ierr = PCGetType(pcCoarse, &pcType); CHKERRQ(ierr);
+      ierr = PetscPrintf(comm,
+                         "  Coarse Solve:\n"
+                         "    KSP Type                           : %s\n"
+                         "    PC Type                            : %s\n",
+                         kspType, pcType); CHKERRQ(ierr);
     }
   }
 
