@@ -171,9 +171,7 @@ int main(int argc, char **argv) {
 
   if (appCtx.forcingChoice != FORCE_NONE) {
     ierr = VecRestoreArray(Floc, &f); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalBegin(levelDMs[fineLevel], Floc, ADD_VALUES, F);
-    CHKERRQ(ierr);
-    ierr = DMLocalToGlobalEnd(levelDMs[fineLevel], Floc, ADD_VALUES, F);
+    ierr = DMLocalToGlobal(levelDMs[fineLevel], Floc, ADD_VALUES, F);
     CHKERRQ(ierr);
     CeedVectorDestroy(&forceCeed);
   }
@@ -494,9 +492,7 @@ int main(int argc, char **argv) {
     CeedVectorGetArrayRead(ceedData[fineLevel]->truesoln, CEED_MEM_HOST,
                            &truearray);
     ierr = VecPlaceArray(resCtx->Yloc, truearray); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalBegin(resCtx->dm, resCtx->Yloc, INSERT_VALUES,
-                                trueVec); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalEnd(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec);
+    ierr = DMLocalToGlobal(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec);
     CHKERRQ(ierr);
     ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
     CeedVectorRestoreArrayRead(ceedData[fineLevel]->truesoln, &truearray);
@@ -532,7 +528,6 @@ int main(int argc, char **argv) {
                            "    SNES Solve Time                    : %g (%g) sec\n",
                            maxTime, minTime); CHKERRQ(ierr);
   }
-
 
   // ---------------------------------------------------------------------------
   // Free objects

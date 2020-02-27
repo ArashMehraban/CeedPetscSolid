@@ -1064,9 +1064,7 @@ static PetscErrorCode GetDiag_Ceed(Mat A, Vec D) {
 
     // -- Local-to-Global
     ierr = VecZeroEntries(user->diagVec); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalBegin(user->dm, user->Xloc, ADD_VALUES,
-                                user->diagVec); CHKERRQ(ierr);
-    ierr = DMLocalToGlobalEnd(user->dm, user->Xloc, ADD_VALUES, user->diagVec);
+    ierr = DMLocalToGlobal(user->dm, user->Xloc, ADD_VALUES, user->diagVec);
     CHKERRQ(ierr);
 
     // -- Cleanup
@@ -1092,10 +1090,7 @@ static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user) {
   PetscFunctionBeginUser;
 
   // Global-to-local
-  ierr = DMGlobalToLocalBegin(user->dm, X, INSERT_VALUES, user->Xloc);
-  CHKERRQ(ierr);
-  ierr = DMGlobalToLocalEnd(user->dm, X, INSERT_VALUES, user->Xloc);
-  CHKERRQ(ierr);
+  ierr = DMGlobalToLocal(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
   ierr = VecZeroEntries(user->Yloc); CHKERRQ(ierr);
 
   // Setup CEED vectors
@@ -1115,9 +1110,7 @@ static PetscErrorCode ApplyLocalCeedOp(Vec X, Vec Y, UserMult user) {
 
   // Local-to-global
   ierr = VecZeroEntries(Y); CHKERRQ(ierr);
-  ierr = DMLocalToGlobalBegin(user->dm, user->Yloc, ADD_VALUES, Y);
-  CHKERRQ(ierr);
-  ierr = DMLocalToGlobalEnd(user->dm, user->Yloc, ADD_VALUES, Y); CHKERRQ(ierr);
+  ierr = DMLocalToGlobal(user->dm, user->Yloc, ADD_VALUES, Y); CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
 };
@@ -1186,9 +1179,7 @@ static PetscErrorCode Prolong_Ceed(Mat A, Vec X, Vec Y) {
 
   // Global-to-local
   ierr = VecZeroEntries(user->locVecC); CHKERRQ(ierr);
-  ierr = DMGlobalToLocalBegin(user->dmC, X, INSERT_VALUES, user->locVecC);
-  CHKERRQ(ierr);
-  ierr = DMGlobalToLocalEnd(user->dmC, X, INSERT_VALUES, user->locVecC);
+  ierr = DMGlobalToLocal(user->dmC, X, INSERT_VALUES, user->locVecC); 
   CHKERRQ(ierr);
   ierr = VecZeroEntries(user->locVecF); CHKERRQ(ierr);
 
@@ -1214,9 +1205,7 @@ static PetscErrorCode Prolong_Ceed(Mat A, Vec X, Vec Y) {
 
   // Local-to-global
   ierr = VecZeroEntries(Y); CHKERRQ(ierr);
-  ierr = DMLocalToGlobalBegin(user->dmF, user->locVecF, ADD_VALUES, Y);
-  CHKERRQ(ierr);
-  ierr = DMLocalToGlobalEnd(user->dmF, user->locVecF, ADD_VALUES, Y);
+  ierr = DMLocalToGlobal(user->dmF, user->locVecF, ADD_VALUES, Y);
   CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
@@ -1234,9 +1223,7 @@ static PetscErrorCode Restrict_Ceed(Mat A, Vec X, Vec Y) {
 
   // Global-to-local
   ierr = VecZeroEntries(user->locVecF); CHKERRQ(ierr);
-  ierr = DMGlobalToLocalBegin(user->dmF, X, INSERT_VALUES, user->locVecF);
-  CHKERRQ(ierr);
-  ierr = DMGlobalToLocalEnd(user->dmF, X, INSERT_VALUES, user->locVecF);
+  ierr = DMGlobalToLocal(user->dmF, X, INSERT_VALUES, user->locVecF);
   CHKERRQ(ierr);
   ierr = VecZeroEntries(user->locVecC); CHKERRQ(ierr);
 
@@ -1262,9 +1249,7 @@ static PetscErrorCode Restrict_Ceed(Mat A, Vec X, Vec Y) {
 
   // Local-to-global
   ierr = VecZeroEntries(Y); CHKERRQ(ierr);
-  ierr = DMLocalToGlobalBegin(user->dmC, user->locVecC, ADD_VALUES, Y);
-  CHKERRQ(ierr);
-  ierr = DMLocalToGlobalEnd(user->dmC, user->locVecC, ADD_VALUES, Y);
+  ierr = DMLocalToGlobal(user->dmC, user->locVecC, ADD_VALUES, Y);
   CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
@@ -1343,14 +1328,11 @@ static PetscErrorCode SetupProlongRestrictCtx(MPI_Comm comm, DM dmC, DM dmF,
 
   // -- Local-to-global
   ierr = VecZeroEntries(VF); CHKERRQ(ierr);
-  ierr = DMLocalToGlobalBegin(dmF, VlocF, ADD_VALUES, VF); CHKERRQ(ierr);
-  ierr = DMLocalToGlobalEnd(dmF, VlocF, ADD_VALUES, VF); CHKERRQ(ierr);
+  ierr = DMLocalToGlobal(dmF, VlocF, ADD_VALUES, VF); CHKERRQ(ierr);
 
   // -- Global-to-local
   ierr = VecDuplicate(VlocF, &prolongRestrCtx->multVec); CHKERRQ(ierr);
-  ierr = DMGlobalToLocalBegin(dmF, VF, INSERT_VALUES, prolongRestrCtx->multVec);
-  CHKERRQ(ierr);
-  ierr = DMGlobalToLocalEnd(dmF, VF, INSERT_VALUES, prolongRestrCtx->multVec);
+  ierr = DMGlobalToLocal(dmF, VF, INSERT_VALUES, prolongRestrCtx->multVec);
   CHKERRQ(ierr);
 
   // -- Reciprocal
