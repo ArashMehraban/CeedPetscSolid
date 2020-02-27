@@ -550,7 +550,6 @@ int main(int argc, char **argv) {
     ierr = PetscViewerVTKOpen(comm, "solution.vtu", FILE_MODE_WRITE, &viewer);
     CHKERRQ(ierr);
     ierr = VecView(U, viewer); CHKERRQ(ierr);
-    ierr = VecView(U, PETSC_VIEWER_STDOUT_WORLD); CHKERRQ(ierr);
     ierr = PetscViewerDestroy(&viewer); CHKERRQ(ierr);
   }
 
