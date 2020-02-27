@@ -275,7 +275,7 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
                           (PetscEnum *)&appCtx->multigridChoice, NULL);
   CHKERRQ(ierr);
 
-  ierr = PetscOptionsInt("-maxDiagState", "Set number of times to use Jacobian diagonal before recalculation",
+  ierr = PetscOptionsInt("-max_diag_state", "Set number of times to use Jacobian diagonal before recalculation",
                          NULL, appCtx->maxDiagState, &appCtx->maxDiagState,
                          NULL); CHKERRQ(ierr);
 
