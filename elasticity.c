@@ -483,9 +483,9 @@ int main(int argc, char **argv) {
       ierr = KSPGetPC(kspCoarse, &pcCoarse); CHKERRQ(ierr);
       ierr = PCGetType(pcCoarse, &pcType); CHKERRQ(ierr);
       ierr = PetscPrintf(comm,
-                         "  Coarse Solve:\n"
-                         "    KSP Type                           : %s\n"
-                         "    PC Type                            : %s\n",
+                         "    Coarse Solve:\n"
+                         "      KSP Type                         : %s\n"
+                         "      PC Type                          : %s\n",
                          kspType, pcType); CHKERRQ(ierr);
     }
   }
