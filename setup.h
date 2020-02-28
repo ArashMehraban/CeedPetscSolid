@@ -186,6 +186,7 @@ struct FormJacobCtx_private {
   UserMult     *jacobCtx;
   PetscInt     numLevels;
   SNES         snesCoarse;
+  PC           *levelPCSmoothers;
   Mat          jacobMatMF, jacobMatCoarse;
   Vec          Ucoarse;
 };
@@ -227,7 +228,7 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
   appCtx->degree         = 3;
   appCtx->boundaryChoice = BDRY_WALL_NONE; // Related to mesh choice
   appCtx->forcingChoice  = FORCE_NONE;     // Default - no forcing term
-  appCtx->maxDiagState   = 1;              // Default - no diagonal reuse
+  appCtx->maxDiagState   = 0;              // Default - no diagonal reuse
 
   PetscFunctionBeginUser;
 
@@ -1279,7 +1280,7 @@ static PetscErrorCode SetupJacobianCtx(MPI_Comm comm, AppCtx appCtx, DM dm,
 
   // Diagonal vector
   ierr = VecDuplicate(V, &jacobianCtx->diagVec); CHKERRQ(ierr);
-  jacobianCtx->diagState = appCtx.maxDiagState + 1; // Force initial assembly
+  jacobianCtx->diagState = appCtx.maxDiagState; // Force initial assembly
   jacobianCtx->maxDiagState = appCtx.maxDiagState;
 
   // libCEED operator
@@ -1363,10 +1364,24 @@ static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
   FormJacobCtx  formJacobCtx = (FormJacobCtx)ctx;
   PetscInt      numLevels = formJacobCtx->numLevels;
   UserMult      *jacobCtx = formJacobCtx->jacobCtx;
+  PC            *levelPCSmoothers = formJacobCtx->levelPCSmoothers;
 
-  // Update diagonal state counter
-  for (int level = 0; level < numLevels; level++)
+  // Update Jacobian PC smoother on each level
+  for (int level = 0; level < numLevels; level++) {
+    // -- Update diagonal state counter
     jacobCtx[level]->diagState++;
+
+    // -- Reset PC state to allow diagonal recomputation
+    if (level > 0 &&
+        (jacobCtx[level]->diagState > jacobCtx[level]->maxDiagState)) {
+      ierr = PCSetType(levelPCSmoothers[level], PCNONE); CHKERRQ(ierr);
+      ierr = PCSetUp(levelPCSmoothers[level]); CHKERRQ(ierr);
+      ierr = PCSetType(levelPCSmoothers[level], PCJACOBI); CHKERRQ(ierr);
+      ierr = PCJacobiSetType(levelPCSmoothers[level], PC_JACOBI_DIAGONAL);
+      CHKERRQ(ierr);
+      ierr = PCSetUp(levelPCSmoothers[level]); CHKERRQ(ierr);
+    }
+  }
 
   // Form coarse assembled matrix
   ierr = VecZeroEntries(formJacobCtx->Ucoarse); CHKERRQ(ierr);

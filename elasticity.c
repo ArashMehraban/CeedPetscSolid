@@ -257,6 +257,8 @@ int main(int argc, char **argv) {
   ierr = PetscMalloc1(1, &formJacobCtx); CHKERRQ(ierr);
   formJacobCtx->jacobCtx = jacobCtx;
   formJacobCtx->numLevels = numLevels;
+  ierr = PetscCalloc1(numLevels, &formJacobCtx->levelPCSmoothers);
+  CHKERRQ(ierr);
   ierr = SNESSetJacobian(snes, jacobMat[fineLevel], NULL,
                          FormJacobian, formJacobCtx); CHKERRQ(ierr);
 
@@ -264,6 +266,7 @@ int main(int argc, char **argv) {
   ierr = PetscMalloc1(1, &resCtx); CHKERRQ(ierr);
   ierr = PetscMemcpy(resCtx, jacobCtx[fineLevel],
                      sizeof(*jacobCtx[fineLevel])); CHKERRQ(ierr);
+  resCtx->op = ceedData[fineLevel]->opApply;
   ierr = SNESSetFunction(snes, R, FormResidual_Ceed, resCtx); CHKERRQ(ierr);
 
   // -- Prolongation/Restriction evaluation
@@ -368,6 +371,7 @@ int main(int argc, char **argv) {
         ierr = KSPGetPC(kspSmoother, &pcSmoother); CHKERRQ(ierr);
         ierr = PCSetType(pcSmoother, PCJACOBI); CHKERRQ(ierr);
         ierr = PCJacobiSetType(pcSmoother, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
+        formJacobCtx->levelPCSmoothers[level] = pcSmoother;
 
         // -------- Work vector
         if (level != fineLevel) {
