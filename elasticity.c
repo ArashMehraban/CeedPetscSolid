@@ -618,6 +618,7 @@ int main(int argc, char **argv) {
 
   // Structs
   ierr = PetscFree(resCtx); CHKERRQ(ierr);
+  ierr = PetscFree(formJacobCtx->levelPCSmoothers); CHKERRQ(ierr);
   ierr = PetscFree(formJacobCtx); CHKERRQ(ierr);
   ierr = PetscFree(jacobCoarseCtx); CHKERRQ(ierr);
   ierr = PetscFree(phys); CHKERRQ(ierr);
