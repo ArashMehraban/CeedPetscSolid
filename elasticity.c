@@ -456,7 +456,7 @@ int main(int argc, char **argv) {
     ierr = SNESGetKSP(snes, &ksp); CHKERRQ(ierr);
     ierr = KSPGetType(ksp, &kspType); CHKERRQ(ierr);
     ierr = PetscPrintf(comm,
-                       "  KSP:\n"
+                       "  Linear Solver:\n"
                        "    KSP Type                           : %s\n",
                        kspType); CHKERRQ(ierr);
 
@@ -467,7 +467,7 @@ int main(int argc, char **argv) {
       ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
       ierr = PCMGGetType(pc, &pcmgType); CHKERRQ(ierr);
       ierr = PetscPrintf(comm,
-                         "  PCMG:\n"
+                         "  P-Multigrid:\n"
                          "    PCMG Type                          : %s\n"
                          "    PCMG Cycle Type                    : %s\n",
                          PCMGTypes[pcmgType],
