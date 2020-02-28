@@ -1,5 +1,9 @@
-#ifndef __LIN_ELAS__H
-#define __LIN_ELAS__H
+#ifndef LIN_ELAS_H
+#define LIN_ELAS_H
+
+#ifndef __CUDACC__
+#  include <math.h>
+#endif
 
 #ifndef PHYSICS_STRUCT
 #define PHYSICS_STRUCT
@@ -59,7 +63,7 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // *INDENT-ON*
 
     // Compute gradu
-    // dXdx = (dx/dX)^(-1)
+    //   dXdx = (dx/dX)^(-1)
     // Apply dXdx to du = gradu
     CeedScalar gradu[3][3];
     for (int j=0; j<3; j++)     // Component
@@ -104,7 +108,7 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     //                         [                             (1-2*nu)/2            ]
     //                         [                                        (1-2*nu)/2 ]
 
-    //Above Voigt Notation is placed in a 3x3 matrix:
+    // Above Voigt Notation is placed in a 3x3 matrix:
     const CeedScalar ss      =  E/((1+nu)*(1-2*nu));
     const CeedScalar sigma00 = ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]),
                      sigma11 = ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]),
@@ -125,6 +129,7 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
         for (int m=0; m<3; m++)
           dvdX[k][j][i] += dXdx[k][m] * sigma[j][m] * wJ;
       }
+
     } // End of Quadrature Point Loop
 
   return 0;
@@ -139,7 +144,6 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                    (*qdata)[Q] = (CeedScalar(*)[Q])in[1];
                    // gradu not used for linear elasticity
                    // (*gradu)[3][Q] = (CeedScalar(*)[3][Q])in[2];
-
 
   // Outputs
   CeedScalar (*deltadvdX)[3][Q] = (CeedScalar(*)[3][Q])out[0];
@@ -179,8 +183,8 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                                    };
     // *INDENT-ON*
 
-    //Compute graddeltau
-    //dXdx = (dx/dX)^(-1)
+    // Compute graddeltau
+    //   dXdx = (dx/dX)^(-1)
     // Apply dXdx to deltadu = graddeltau
     CeedScalar graddeltau[3][3];
     for (int j=0; j<3; j++)     // Component
@@ -223,14 +227,14 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     //                         [                             (1-2*nu)/2            ]
     //                         [                                        (1-2*nu)/2 ]
 
-    //Above Voigt Notation is placed in a 3x3 matrix:
-    const CeedScalar ss      =  E/((1+nu)*(1-2*nu));
-    const CeedScalar dsigma00 = ss*((1-nu)*de[0][0] + nu*de[1][1] +nu*de[2][2]),
-                     dsigma11 = ss*(nu*de[0][0] + (1-nu)*de[1][1] +nu*de[2][2]),
-                     dsigma22 = ss*(nu*de[0][0] + nu*de[1][1] +(1-nu)*de[2][2]),
-                     dsigma12 = ss*(1-2*nu)*de[1][2]/2,
-                     dsigma02 = ss*(1-2*nu)*de[0][2]/2,
-                     dsigma01 = ss*(1-2*nu)*de[0][1]/2;
+    // Above Voigt Notation is placed in a 3x3 matrix:
+    const CeedScalar ss      =  E / ((1 + nu)*(1 - 2*nu));
+    const CeedScalar dsigma00 = ss*((1 - nu)*de[0][0] + nu*de[1][1] + nu*de[2][2]),
+                     dsigma11 = ss*(nu*de[0][0] + (1 - nu)*de[1][1] + nu*de[2][2]),
+                     dsigma22 = ss*(nu*de[0][0] + nu*de[1][1] + (1 - nu)*de[2][2]),
+                     dsigma12 = ss*(1 - 2*nu)*de[1][2] / 2,
+                     dsigma02 = ss*(1 - 2*nu)*de[0][2] / 2,
+                     dsigma01 = ss*(1 - 2*nu)*de[0][1] / 2;
     const CeedScalar dsigma[3][3] =
         { {dsigma00, dsigma01, dsigma02},
           {dsigma01, dsigma11, dsigma12},
@@ -244,9 +248,10 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
         for (int m=0; m<3; m++)
           deltadvdX[k][j][i] += dXdx[k][m] * dsigma[j][m] * wJ;
       }
+
     } // End of Quadrature Point Loop
 
    return 0;
 }
-
-#endif //End of __LIN_ELAS__H
+// -----------------------------------------------------------------------------
+#endif //End of LIN_ELAS_H

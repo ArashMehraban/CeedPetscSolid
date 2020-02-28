@@ -1467,7 +1467,7 @@ PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
     break;
   case 998:    // right side of the cyl-hol
     u[0] = 0;
-    u[1] = -1; // bend in the -y direction
+    u[1] = -0.25; // bend in the -y direction
     u[2] = 0;
     break;
   }

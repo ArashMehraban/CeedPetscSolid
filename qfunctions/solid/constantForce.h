@@ -27,18 +27,22 @@ CEED_QFUNCTION(SetupConstantForce)(void *ctx, const CeedInt Q,
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
+    // Setup
     CeedScalar rho = qdata[i];
 
     // Forcing function
     // -- Component 1
     force[i+0*Q] = 0;
+
     // -- Component 2
     force[i+1*Q] = -rho;
+
     // -- Component 3
     force[i+2*Q] = 0;
+
   } // End of Quadrature Point Loop
 
   return 0;
 }
 // -----------------------------------------------------------------------------
-#endif
+#endif // End of CONSTANT_H

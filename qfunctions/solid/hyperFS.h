@@ -1,5 +1,9 @@
-#ifndef __HYPER_FS__H
-#define __HYPER_FS__H
+#ifndef HYPER_FS_H
+#define HYPER_FS_H
+
+#ifndef __CUDACC__
+#  include <math.h>
+#endif
 
 #ifndef PHYSICS_STRUCT
 #define PHYSICS_STRUCT
@@ -20,7 +24,7 @@ CEED_QFUNCTION(HyperFSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
   // Outputs
   CeedScalar (*dvdX)[3][Q] = (CeedScalar(*)[3][Q])out[0];
-             // Store gradu to be used in HyperFSdF (Jacobian of HyperFSF)
+  // Store gradu for HyperFSdF (Jacobian of HyperFSF)
   CeedScalar  (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
   // *INDENT-ON*
 
@@ -28,10 +32,10 @@ CEED_QFUNCTION(HyperFSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
   const Physics context = ctx;
   const CeedScalar E  = context->E;
   const CeedScalar nu = context->nu;
-  const CeedScalar TwoMu = E/(1+nu);
+  const CeedScalar TwoMu = E / (1 + nu);
   const CeedScalar mu = TwoMu /2;
-  const CeedScalar Kbulk = E/(3*(1-2*nu)); //bulk Modulus
-  const CeedScalar lambda = (3*Kbulk-TwoMu)/3;
+  const CeedScalar Kbulk = E / (3*(1 - 2*nu)); // Bulk Modulus
+  const CeedScalar lambda = (3*Kbulk - TwoMu) / 3;
 
   // Formulation Terminology:
   //  I3    : 3x3 Identity matrix
@@ -77,7 +81,7 @@ CEED_QFUNCTION(HyperFSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // *INDENT-ON*
 
     // Compute gradu
-    // dXdx = (dx/dX)^(-1)
+    //   dXdx = (dx/dX)^(-1)
     // Apply dXdx to du = gradu
     for (int j=0; j<3; j++)     // Component
       for (int k=0; k<3; k++) { // Derivative
@@ -89,8 +93,6 @@ CEED_QFUNCTION(HyperFSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // I3 : 3x3 Identity matrix
     // Compute The Deformation Gradient : F = I3 + gradu
     // *INDENT-OFF*
-    //
-    //
     const CeedScalar F[3][3] =  {{gradu[0][0][i] + 1,
                                   gradu[0][1][i],
                                   gradu[0][2][i]},
@@ -112,13 +114,12 @@ CEED_QFUNCTION(HyperFSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // C : right Cauchy-Green tensor
     // C = F^T * F (^T  means Transpose)
     CeedScalar C[3][3];
-    for (int j=0; j<3; j++){
-        for (int k=0; k<3; k++){
+    for (int j=0; j<3; j++)
+        for (int k=0; k<3; k++) {
             C[j][k] = 0;
             for(int m=0; m<3; m++)
                C[j][k] += F[k][m] * F[j][m];
         }
-    }
 
 
     // Compute C^(-1) : C-Inverse
@@ -140,15 +141,15 @@ CEED_QFUNCTION(HyperFSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
     // Compute the Second Piola-Kirchhoff (S)
     const CeedScalar llnj_m = lambda *log(detF)-mu;
-    CeedScalar S[3][3] = {{mu + llnj_m* C_inv[0][0],    llnj_m* C_inv[0][1],    llnj_m* C_inv[0][2]},
-                          {     llnj_m* C_inv[1][0], mu+llnj_m* C_inv[1][1],    llnj_m* C_inv[1][2]},
-                          {     llnj_m* C_inv[2][0],    llnj_m* C_inv[2][1], mu+llnj_m* C_inv[2][2]}
+    CeedScalar S[3][3] = {{mu + llnj_m* C_inv[0][0],      llnj_m* C_inv[0][1],      llnj_m* C_inv[0][2]},
+                          {     llnj_m* C_inv[1][0], mu + llnj_m* C_inv[1][1],      llnj_m* C_inv[1][2]},
+                          {     llnj_m* C_inv[2][0],      llnj_m* C_inv[2][1], mu + llnj_m* C_inv[2][2]}
                          };
 
     // Compute the First Piola-Kirchhoff : P = F*S
     CeedScalar P[3][3];
     for(int j=0; j<3; j++)
-       for(int k=0; k<3; k++){
+       for(int k=0; k<3; k++) {
           P[j][k] = 0;
            for(int m=0; m<3; m++)
               P[j][k] += F[m][k] * S[j][m];
@@ -162,6 +163,7 @@ CEED_QFUNCTION(HyperFSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
         for (int m=0; m<3; m++)
           dvdX[k][j][i] += dXdx[k][m] * P[j][m] * wJ;
       }
+
     } // End of Quadrature Point Loop
 
   return 0;
@@ -186,10 +188,12 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
   const Physics context = ctx;
   const CeedScalar E  = context->E;
   const CeedScalar nu = context->nu;
-  const CeedScalar TwoMu = E/(1+nu);
-  const CeedScalar mu = TwoMu/2;
-  const CeedScalar Kbulk = E/(3*(1-2*nu)); //bulk Modulus
-  const CeedScalar lambda = (3*Kbulk-TwoMu)/3;
+
+  // Constants
+  const CeedScalar TwoMu = E / (1 + nu);
+  const CeedScalar mu = TwoMu / 2;
+  const CeedScalar Kbulk = E / (3*(1 - 2*nu)); //bulk Modulus
+  const CeedScalar lambda = (3*Kbulk - TwoMu) / 3;
 
   // Quadrature Point Loop
   CeedPragmaSIMD
@@ -218,8 +222,8 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                                      qdata[8][i],
                                      qdata[9][i]}
                                     };
-    //Compute graddeltau
-    //dXdx = (dx/dX)^(-1)
+    // Compute graddeltau
+    //   dXdx = (dx/dX)^(-1)
     // Apply dXdx to deltadu = graddeltau (9x1 vector [u1,x  u2,x  u3,x  u1,y ....]) to multiply by reshaped 9x9 dPdF
     CeedScalar graddeltau[9];
     for (int j=0; j<3; j++)     // Component
@@ -264,13 +268,12 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // C : right Cauchy-Green tensor
     // C = F^T * F (^T  means Transpose)
     CeedScalar C[3][3];
-    for (int j=0; j<3; j++){
-        for (int k=0; k<3; k++){
+    for (int j=0; j<3; j++)
+        for (int k=0; k<3; k++) {
             C[j][k] = 0;
             for(int m=0; m<3; m++)
                C[j][k] += F[k][m] * F[j][m];
         }
-    }
 
 
     // Compute C^(-1) : C-Inverse
@@ -292,23 +295,22 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
     // Compute the Second Piola-Kirchhoff (S)
     const CeedScalar llnj_m = lambda *log(detF)-mu;
-    CeedScalar S[3][3] = {{mu + llnj_m* C_inv[0][0],    llnj_m* C_inv[0][1],    llnj_m* C_inv[0][2]},
-                          {     llnj_m* C_inv[1][0], mu+llnj_m* C_inv[1][1],    llnj_m* C_inv[1][2]},
-                          {     llnj_m* C_inv[2][0],    llnj_m* C_inv[2][1], mu+llnj_m* C_inv[2][2]}
+    CeedScalar S[3][3] = {{mu + llnj_m*C_inv[0][0],      llnj_m*C_inv[0][1],      llnj_m*C_inv[0][2]},
+                          {     llnj_m*C_inv[1][0], mu + llnj_m*C_inv[1][1],      llnj_m*C_inv[1][2]},
+                          {     llnj_m*C_inv[2][0],      llnj_m*C_inv[2][1], mu + llnj_m*C_inv[2][2]}
                          };
 
   // dPdF is indexed as an array of 81  elements
   CeedScalar dPdF[81];
-  for (int j=0;j<3;j++){
-      for(int J=0;J<3;J++){
-          for(int a=0;a<3;a++){
-              for(int A=0;A<3;A++){
-                  dPdF[27*j+9*J+3*a+A]=(a==j?1:0)*(S[A][J]) + lambda*F_inv[A][a]*F_inv[J][j]
-                                   -(lambda*log(detF)-mu)*(F_inv[A][j]*F_inv[J][a] +(a==j?1:0)*C_inv[A][J]);
-              }
-          }
-      }
-  }
+  for (int j=0;j<3;j++)
+      for(int J=0;J<3;J++)
+          for(int a=0;a<3;a++)
+              for(int A=0;A<3;A++)
+                  dPdF[27*j+9*J+3*a+A] = (a == j ? 1 : 0) * (S[A][J]) +
+                                         lambda*F_inv[A][a]*F_inv[J][j]
+                                         - (lambda*log(detF) - mu) *
+                                          (F_inv[A][j]*F_inv[J][a] +
+                                        (a == j ? 1 : 0) * C_inv[A][J]);
 
   // dPdF is indexed as a 9x9 matrix
   CeedScalar dPdF_grad_del_u[9];
@@ -328,9 +330,10 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
         for (int m=0; m<3; m++)
           deltadvdX[k][j][i] += dXdx[k][m] * dPdF_grad_del_u[3*j+m] * wJ;
       }
+
     } // End of Quadrature Point Loop
 
    return 0;
 }
-
-#endif //End of __HYPER_FS__H
+// -----------------------------------------------------------------------------
+#endif // End of HYPER_FS_H
