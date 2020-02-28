@@ -679,7 +679,6 @@ static int SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   PetscInt      cStart, cEnd, nelem;
   const PetscScalar *coordArray;
   CeedVector    xcoord;
-  CeedBasis     basisx;
   CeedQFunction qfSetupGeo, qfApply;
   CeedOperator  opSetupGeo, opApply;
 
@@ -917,7 +916,6 @@ static int SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   // ---------------------------------------------------------------------------
   // Cleanup
   // ---------------------------------------------------------------------------
-  CeedBasisDestroy(&basisx);
   CeedVectorDestroy(&xcoord);
 
   PetscFunctionReturn(0);
