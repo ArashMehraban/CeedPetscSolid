@@ -257,8 +257,7 @@ int main(int argc, char **argv) {
   ierr = PetscMalloc1(1, &formJacobCtx); CHKERRQ(ierr);
   formJacobCtx->jacobCtx = jacobCtx;
   formJacobCtx->numLevels = numLevels;
-  ierr = PetscCalloc1(numLevels, &formJacobCtx->levelPCSmoothers);
-  CHKERRQ(ierr);
+  formJacobCtx->jacobMat = jacobMat;
   ierr = SNESSetJacobian(snes, jacobMat[fineLevel], NULL,
                          FormJacobian, formJacobCtx); CHKERRQ(ierr);
 
@@ -315,7 +314,6 @@ int main(int argc, char **argv) {
   // -- Update formJacobCtx
   formJacobCtx->Ucoarse = Ug[0];
   formJacobCtx->snesCoarse = snesCoarse;
-  formJacobCtx->jacobMatMF = jacobMat[0];
   formJacobCtx->jacobMatCoarse = jacobMatCoarse;
 
   // ---------------------------------------------------------------------------
@@ -371,7 +369,6 @@ int main(int argc, char **argv) {
         ierr = KSPGetPC(kspSmoother, &pcSmoother); CHKERRQ(ierr);
         ierr = PCSetType(pcSmoother, PCJACOBI); CHKERRQ(ierr);
         ierr = PCJacobiSetType(pcSmoother, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
-        formJacobCtx->levelPCSmoothers[level] = pcSmoother;
 
         // -------- Work vector
         if (level != fineLevel) {
@@ -568,7 +565,6 @@ int main(int argc, char **argv) {
 
     // Jacobian matrix and data
     ierr = VecDestroy(&jacobCtx[level]->Yloc); CHKERRQ(ierr);
-    ierr = VecDestroy(&jacobCtx[level]->diagVec); CHKERRQ(ierr);
     ierr = MatDestroy(&jacobMat[level]); CHKERRQ(ierr);
     ierr = PetscFree(jacobCtx[level]); CHKERRQ(ierr);
 
@@ -618,7 +614,6 @@ int main(int argc, char **argv) {
 
   // Structs
   ierr = PetscFree(resCtx); CHKERRQ(ierr);
-  ierr = PetscFree(formJacobCtx->levelPCSmoothers); CHKERRQ(ierr);
   ierr = PetscFree(formJacobCtx); CHKERRQ(ierr);
   ierr = PetscFree(jacobCoarseCtx); CHKERRQ(ierr);
   ierr = PetscFree(phys); CHKERRQ(ierr);

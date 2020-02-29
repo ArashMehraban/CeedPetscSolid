@@ -102,7 +102,6 @@ typedef struct {
   PetscInt      degree;
   PetscInt      numLevels;
   PetscInt      *levelDegrees;
-  PetscInt      maxDiagState;
 } AppCtx;
 
 // Problem specific data
@@ -173,8 +172,7 @@ typedef struct UserMult_private *UserMult;
 struct UserMult_private {
   MPI_Comm     comm;
   DM           dm;
-  Vec          Xloc, Yloc, diagVec;
-  PetscInt     diagState, maxDiagState;
+  Vec          Xloc, Yloc;
   CeedVector   Xceed, Yceed;
   CeedOperator op;
   Ceed         ceed;
@@ -186,8 +184,7 @@ struct FormJacobCtx_private {
   UserMult     *jacobCtx;
   PetscInt     numLevels;
   SNES         snesCoarse;
-  PC           *levelPCSmoothers;
-  Mat          jacobMatMF, jacobMatCoarse;
+  Mat          *jacobMat, jacobMatCoarse;
   Vec          Ucoarse;
 };
 
@@ -228,7 +225,6 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
   appCtx->degree         = 3;
   appCtx->boundaryChoice = BDRY_WALL_NONE; // Related to mesh choice
   appCtx->forcingChoice  = FORCE_NONE;     // Default - no forcing term
-  appCtx->maxDiagState   = 0;              // Default - no diagonal reuse
 
   PetscFunctionBeginUser;
 
@@ -276,10 +272,6 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
                           multigridTypes, (PetscEnum)appCtx->multigridChoice,
                           (PetscEnum *)&appCtx->multigridChoice, NULL);
   CHKERRQ(ierr);
-
-  ierr = PetscOptionsInt("-max_diag_state", "Set number of times to use Jacobian diagonal before recalculation",
-                         NULL, appCtx->maxDiagState, &appCtx->maxDiagState,
-                         NULL); CHKERRQ(ierr);
 
   appCtx->testMode = PETSC_FALSE;
   ierr = PetscOptionsBool("-test",
@@ -1055,35 +1047,26 @@ static PetscErrorCode GetDiag_Ceed(Mat A, Vec D) {
 
   ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
 
-  // Recompute diagonal if it is too stale
-  if (user->diagState > user->maxDiagState) {
-    CeedVector ceedDiagVec;
-    const CeedScalar *diagArray;
+  // Compute Diagonal via libCEED
+  CeedVector ceedDiagVec;
+  const CeedScalar *diagArray;
 
-    // -- Compute Diagonal
-    CeedOperatorAssembleLinearDiagonal(user->op, &ceedDiagVec,
-                                       CEED_REQUEST_IMMEDIATE);
+  // -- Compute Diagonal
+  CeedOperatorAssembleLinearDiagonal(user->op, &ceedDiagVec,
+                                     CEED_REQUEST_IMMEDIATE);
 
-    // -- Place in PETSc vector
-    CeedVectorGetArrayRead(ceedDiagVec, CEED_MEM_HOST, &diagArray);
-    ierr = VecPlaceArray(user->Xloc, diagArray); CHKERRQ(ierr);
+  // -- Place in PETSc vector
+  CeedVectorGetArrayRead(ceedDiagVec, CEED_MEM_HOST, &diagArray);
+  ierr = VecPlaceArray(user->Xloc, diagArray); CHKERRQ(ierr);
 
-    // -- Local-to-Global
-    ierr = VecZeroEntries(user->diagVec); CHKERRQ(ierr);
-    ierr = DMLocalToGlobal(user->dm, user->Xloc, ADD_VALUES, user->diagVec);
-    CHKERRQ(ierr);
+  // -- Local-to-Global
+  ierr = VecZeroEntries(D); CHKERRQ(ierr);
+  ierr = DMLocalToGlobal(user->dm, user->Xloc, ADD_VALUES, D); CHKERRQ(ierr);
 
-    // -- Cleanup
-    ierr = VecResetArray(user->Xloc); CHKERRQ(ierr);
-    CeedVectorRestoreArrayRead(ceedDiagVec, &diagArray);
-    CeedVectorDestroy(&ceedDiagVec);  
-
-    // -- Update state
-    user->diagState = 0;  
-  }
-
-  // Copy diagonal
-  ierr = VecCopy(user->diagVec, D); CHKERRQ(ierr);
+  // -- Cleanup
+  ierr = VecResetArray(user->Xloc); CHKERRQ(ierr);
+  CeedVectorRestoreArrayRead(ceedDiagVec, &diagArray);
+  CeedVectorDestroy(&ceedDiagVec);  
 
   PetscFunctionReturn(0);
 }
@@ -1278,11 +1261,6 @@ static PetscErrorCode SetupJacobianCtx(MPI_Comm comm, AppCtx appCtx, DM dm,
   jacobianCtx->Xceed = ceedData->xceed;
   jacobianCtx->Yceed = ceedData->yceed;
 
-  // Diagonal vector
-  ierr = VecDuplicate(V, &jacobianCtx->diagVec); CHKERRQ(ierr);
-  jacobianCtx->diagState = appCtx.maxDiagState; // Force initial assembly
-  jacobianCtx->maxDiagState = appCtx.maxDiagState;
-
   // libCEED operator
   jacobianCtx->op = ceedData->opJacob;
 
@@ -1363,31 +1341,20 @@ static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
   // Context data
   FormJacobCtx  formJacobCtx = (FormJacobCtx)ctx;
   PetscInt      numLevels = formJacobCtx->numLevels;
-  UserMult      *jacobCtx = formJacobCtx->jacobCtx;
-  PC            *levelPCSmoothers = formJacobCtx->levelPCSmoothers;
+  Mat           *jacobMat = formJacobCtx->jacobMat;
 
   // Update Jacobian PC smoother on each level
   for (int level = 0; level < numLevels; level++) {
     // -- Update diagonal state counter
-    jacobCtx[level]->diagState++;
-
-    // -- Reset PC state to allow diagonal recomputation
-    if (level > 0 &&
-        (jacobCtx[level]->diagState > jacobCtx[level]->maxDiagState)) {
-      ierr = PCSetType(levelPCSmoothers[level], PCNONE); CHKERRQ(ierr);
-      ierr = PCSetUp(levelPCSmoothers[level]); CHKERRQ(ierr);
-      ierr = PCSetType(levelPCSmoothers[level], PCJACOBI); CHKERRQ(ierr);
-      ierr = PCJacobiSetType(levelPCSmoothers[level], PC_JACOBI_DIAGONAL);
-      CHKERRQ(ierr);
-      ierr = PCSetUp(levelPCSmoothers[level]); CHKERRQ(ierr);
-    }
+    ierr = MatAssemblyBegin(jacobMat[level], MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
+    ierr = MatAssemblyEnd(jacobMat[level], MAT_FINAL_ASSEMBLY); CHKERRQ(ierr);
   }
 
   // Form coarse assembled matrix
   ierr = VecZeroEntries(formJacobCtx->Ucoarse); CHKERRQ(ierr);
   ierr = SNESComputeJacobianDefaultColor(formJacobCtx->snesCoarse,
                                          formJacobCtx->Ucoarse,
-                                         formJacobCtx->jacobMatMF,
+                                         formJacobCtx->jacobMat[0],
                                          formJacobCtx->jacobMatCoarse, NULL);
   CHKERRQ(ierr);
 
