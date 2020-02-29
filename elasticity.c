@@ -213,7 +213,8 @@ int main(int argc, char **argv) {
     if (appCtx.multigridChoice != MULTIGRID_NONE) {
       for (int i = 0; i < 2; i++) {  
         CeedInt level = i ? fineLevel : 0;
-        ierr = PetscPrintf(comm,"    Level %D (%s):\n"
+        ierr = PetscPrintf(comm,
+                           "    Level %D (%s):\n"
                            "      Number of 1D Basis Nodes (p)     : %d\n"
                            "      Global Nodes                     : %D\n"
                            "      Owned Nodes                      : %D\n",
