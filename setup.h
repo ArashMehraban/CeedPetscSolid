@@ -489,7 +489,10 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
 
   ierr = DMGetDimension(dm, &dim);
 
-  // Setup FE space (Space P) for tensor polynomials
+  // Setup FE space by polynomial order
+  // Note: This is a modification of a built in PETSc function. PETSc
+  //         has declined to add the ability to add in argument in 
+  // -- Setup FE space (Space P) for tensor polynomials
   ierr = PetscSpaceCreate(PetscObjectComm((PetscObject) dm), &P); CHKERRQ(ierr);
   ierr = PetscSpacePolynomialSetTensor(P, PETSC_TRUE); CHKERRQ(ierr);
   ierr = PetscSpaceSetFromOptions(P); CHKERRQ(ierr);
@@ -497,7 +500,7 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
   ierr = PetscSpaceSetNumVariables(P, dim); CHKERRQ(ierr);
   ierr = PetscSpaceSetDegree(P, order, order); CHKERRQ(ierr);
   ierr = PetscSpaceSetUp(P); CHKERRQ(ierr);
-  // Setup FE dual space (Space Q) for tensor polynomials
+  // -- Setup FE dual space (Space Q) for tensor polynomials
   ierr = PetscDualSpaceCreate(PetscObjectComm((PetscObject) dm), &Q);
   CHKERRQ(ierr);
   ierr = PetscDualSpaceSetType(Q,PETSCDUALSPACELAGRANGE); CHKERRQ(ierr);
@@ -510,7 +513,7 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
   ierr = PetscDualSpaceLagrangeSetTensor(Q, PETSC_TRUE); CHKERRQ(ierr);
   ierr = PetscDualSpaceSetFromOptions(Q); CHKERRQ(ierr);
   ierr = PetscDualSpaceSetUp(Q); CHKERRQ(ierr);
-  // Create element
+  // -- Create element
   ierr = PetscFECreate(PetscObjectComm((PetscObject) dm), &fe); CHKERRQ(ierr);
   ierr = PetscFESetFromOptions(fe); CHKERRQ(ierr);
   ierr = PetscFESetBasisSpace(fe, P); CHKERRQ(ierr);
@@ -519,7 +522,7 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
   ierr = PetscFESetUp(fe); CHKERRQ(ierr);
   ierr = PetscSpaceDestroy(&P); CHKERRQ(ierr);
   ierr = PetscDualSpaceDestroy(&Q); CHKERRQ(ierr);
-  // Create quadrature
+  // -- Create quadrature
   quadPointsPerEdge = PetscMax(order + 1,1);
   ierr = PetscDTGaussTensorQuadrature(dim, 1, quadPointsPerEdge, -1.0, 1.0, &q);
   CHKERRQ(ierr);
@@ -529,30 +532,32 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
   ierr = PetscFESetFaceQuadrature(fe, fq); CHKERRQ(ierr);
   ierr = PetscQuadratureDestroy(&q); CHKERRQ(ierr);
   ierr = PetscQuadratureDestroy(&fq); CHKERRQ(ierr);
+
   // Setup DM
   ierr = DMSetFromOptions(dm); CHKERRQ(ierr);
   ierr = DMAddField(dm, NULL, (PetscObject)fe); CHKERRQ(ierr);
-
-  // Add Dirichlet (Essential) boundray
   ierr = DMCreateDS(dm); CHKERRQ(ierr);
+
+  // Add Dirichlet (Essential) boundary
   if (appCtx.testMode) {
-    // Test mode - box mesh
+    // -- Test mode - box mesh
     PetscBool hasLabel;
     PetscInt marker_ids[1] = {1};
     DMHasLabel(dm, "marker", &hasLabel);
-    if (!hasLabel)
-      createBCLabel(dm, "marker");
+    if (!hasLabel) {
+      ierr = createBCLabel(dm, "marker"); CHKERRQ(ierr);
+    }
     ierr = DMAddBoundary(dm, DM_BC_ESSENTIAL, "wall", "marker", 0, 0, NULL,
                          (void(*)(void))boundaryOptions[appCtx.boundaryChoice],
                          1, marker_ids, NULL); CHKERRQ(ierr);
   } else {
-    // ExodusII mesh
+    // -- ExodusII mesh
     ierr = DMGetLabelIdIS(dm, name, &faceSetIS); CHKERRQ(ierr);
     ierr = ISGetLocalSize(faceSetIS,&numFaceSets); CHKERRQ(ierr);
     ierr = ISGetIndices(faceSetIS, &faceSetIds); CHKERRQ(ierr);
 
     for (PetscInt i=0; i<numFaceSets; i++) {
-      ierr = DMAddBoundary(dm,DM_BC_ESSENTIAL,NULL,"Face Sets",0,0,NULL,
+      ierr = DMAddBoundary(dm, DM_BC_ESSENTIAL, NULL, "Face Sets", 0, 0, NULL,
                            (void(*)(void))boundaryOptions[appCtx.boundaryChoice],
                            1, &faceSetIds[i], (void *)(&faceSetIds[i]));
       CHKERRQ(ierr);
@@ -562,6 +567,8 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
   }
   ierr = DMPlexSetClosurePermutationTensor(dm, PETSC_DETERMINE, NULL);
   CHKERRQ(ierr);
+
+  // Cleanup
   ierr = PetscFEDestroy(&fe); CHKERRQ(ierr);
 
   PetscFunctionReturn(0);
