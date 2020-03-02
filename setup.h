@@ -467,7 +467,7 @@ static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
   PetscFunctionReturn(0);
 };
 
-// Setup DM with FE space of apropriate degree
+// Setup DM with FE space of appropriate degree
 static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
                            PetscInt ncompu) {
   PetscErrorCode  ierr;
@@ -490,8 +490,8 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
   ierr = DMGetDimension(dm, &dim);
 
   // Setup FE space by polynomial order
-  // Note: This is a modification of a built in PETSc function. PETSc
-  //         has declined to add the ability to add in argument in 
+  // Note: This is a modification of the built in PETSc function
+  //         PetscFECreateDefault(). PETSc declined to add a 'degree' option.
   // -- Setup FE space (Space P) for tensor polynomials
   ierr = PetscSpaceCreate(PetscObjectComm((PetscObject) dm), &P); CHKERRQ(ierr);
   ierr = PetscSpacePolynomialSetTensor(P, PETSC_TRUE); CHKERRQ(ierr);
@@ -532,6 +532,7 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
   ierr = PetscFESetFaceQuadrature(fe, fq); CHKERRQ(ierr);
   ierr = PetscQuadratureDestroy(&q); CHKERRQ(ierr);
   ierr = PetscQuadratureDestroy(&fq); CHKERRQ(ierr);
+  // -- End of modified PetscFECreateDefault()
 
   // Setup DM
   ierr = DMSetFromOptions(dm); CHKERRQ(ierr);
@@ -556,11 +557,11 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
     ierr = ISGetLocalSize(faceSetIS,&numFaceSets); CHKERRQ(ierr);
     ierr = ISGetIndices(faceSetIS, &faceSetIds); CHKERRQ(ierr);
 
-    for (PetscInt i=0; i<numFaceSets; i++) {
+    for (PetscInt faceSet = 0; faceSet < numFaceSets; faceSet++) {
       ierr = DMAddBoundary(dm, DM_BC_ESSENTIAL, NULL, "Face Sets", 0, 0, NULL,
                            (void(*)(void))boundaryOptions[appCtx.boundaryChoice],
-                           1, &faceSetIds[i], (void *)(&faceSetIds[i]));
-      CHKERRQ(ierr);
+                           1, &faceSetIds[faceSet],
+                           (void *)(&faceSetIds[faceSet])); CHKERRQ(ierr);
     }
     ierr = ISRestoreIndices(faceSetIS, &faceSetIds); CHKERRQ(ierr);
     ierr = ISDestroy(&faceSetIS); CHKERRQ(ierr);
