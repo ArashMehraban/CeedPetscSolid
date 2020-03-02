@@ -417,7 +417,7 @@ static int processPhysics(MPI_Comm comm, Physics phys, Units units) {
 // -----------------------------------------------------------------------------
 // Setup DM
 // -----------------------------------------------------------------------------
-static PetscErrorCode CreateBCLabel(DM dm, const char name[]) {
+static PetscErrorCode createBCLabel(DM dm, const char name[]) {
   int ierr;
   DMLabel label;
 
@@ -541,15 +541,14 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
     PetscInt marker_ids[1] = {1};
     DMHasLabel(dm, "marker", &hasLabel);
     if (!hasLabel)
-      CreateBCLabel(dm, "marker");
+      createBCLabel(dm, "marker");
     ierr = DMAddBoundary(dm, DM_BC_ESSENTIAL, "wall", "marker", 0, 0, NULL,
                          (void(*)(void))boundaryOptions[appCtx.boundaryChoice],
-                         1, marker_ids, NULL);
-    CHKERRQ(ierr);
+                         1, marker_ids, NULL); CHKERRQ(ierr);
   } else {
     // ExodusII mesh
     ierr = DMGetLabelIdIS(dm, name, &faceSetIS); CHKERRQ(ierr);
-    ierr = ISGetLocalSize(faceSetIS,&numFaceSets);
+    ierr = ISGetLocalSize(faceSetIS,&numFaceSets); CHKERRQ(ierr);
     ierr = ISGetIndices(faceSetIS, &faceSetIds); CHKERRQ(ierr);
 
     for (PetscInt i=0; i<numFaceSets; i++) {
