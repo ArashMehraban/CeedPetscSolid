@@ -90,7 +90,8 @@ struct Units_private {
 };
 
 // Application context from user command line options
-typedef struct {
+typedef struct AppCtx_private *AppCtx;
+struct AppCtx_private {
   char          ceedResource[PETSC_MAX_PATH_LEN];     // libCEED backend
   char          ceedResourceFine[PETSC_MAX_PATH_LEN]; // libCEED for fine grid
   char          meshFile[PETSC_MAX_PATH_LEN];         // exodusII mesh file
@@ -103,7 +104,7 @@ typedef struct {
   PetscInt      degree;
   PetscInt      numLevels;
   PetscInt      *levelDegrees;
-} AppCtx;
+};
 
 // Problem specific data
 typedef struct {
@@ -215,7 +216,7 @@ struct CeedData_private {
 // Process command line options
 // -----------------------------------------------------------------------------
 // Process general command line options
-static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
+static int processCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
 
   PetscErrorCode ierr;
   PetscBool meshFileFlag = PETSC_FALSE;
@@ -338,12 +339,12 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
 
   switch (appCtx->multigridChoice) {
   case MULTIGRID_LOGARITHMIC:
-    for (int i=0; i<appCtx->numLevels-1; i++)
+    for (int i = 0; i < appCtx->numLevels-1; i++)
       appCtx->levelDegrees[i] = pow(2,i);
     appCtx->levelDegrees[appCtx->numLevels-1] = appCtx->degree;
     break;
   case MULTIGRID_UNIFORM:
-    for (int i=0; i<appCtx->numLevels; i++)
+    for (int i = 0; i < appCtx->numLevels; i++)
       appCtx->levelDegrees[i] = i + 1;
     break;
   case MULTIGRID_NONE:
@@ -432,10 +433,10 @@ static PetscErrorCode createBCLabel(DM dm, const char name[]) {
 };
 
 // Read mesh and distribute DM in parallel
-static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
+static int createDistributedDM(MPI_Comm comm, AppCtx appCtx, DM *dm) {
 
   PetscErrorCode  ierr;
-  const char      *filename = ctx->meshFile;
+  const char      *filename = appCtx->meshFile;
   // Note: interpolate if polynomial degree > 1
   PetscBool       interpolate = PETSC_TRUE;
   DM              distributedMesh = NULL;
@@ -444,10 +445,10 @@ static int createDistributedDM(MPI_Comm comm, AppCtx *ctx, DM *dm) {
   PetscFunctionBeginUser;
 
   // Read mesh
-  if (ctx->degree >= 2)
+  if (appCtx->degree >= 2)
     interpolate = PETSC_TRUE;
 
-  if (ctx->testMode) {
+  if (appCtx->testMode) {
     PetscInt dim = 3, cells[3] = {3, 3, 3};
     ierr = DMPlexCreateBoxMesh(comm, dim, PETSC_FALSE, cells, NULL,
                                NULL, NULL, interpolate, dm); CHKERRQ(ierr);
@@ -540,7 +541,7 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
   ierr = DMCreateDS(dm); CHKERRQ(ierr);
 
   // Add Dirichlet (Essential) boundary
-  if (appCtx.testMode) {
+  if (appCtx->testMode) {
     // -- Test mode - box mesh
     PetscBool hasLabel;
     PetscInt marker_ids[1] = {1};
@@ -549,7 +550,7 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
       ierr = createBCLabel(dm, "marker"); CHKERRQ(ierr);
     }
     ierr = DMAddBoundary(dm, DM_BC_ESSENTIAL, "wall", "marker", 0, 0, NULL,
-                         (void(*)(void))boundaryOptions[appCtx.boundaryChoice],
+                         (void(*)(void))boundaryOptions[appCtx->boundaryChoice],
                          1, marker_ids, NULL); CHKERRQ(ierr);
   } else {
     // -- ExodusII mesh
@@ -559,7 +560,7 @@ static int SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
 
     for (PetscInt faceSet = 0; faceSet < numFaceSets; faceSet++) {
       ierr = DMAddBoundary(dm, DM_BC_ESSENTIAL, NULL, "Face Sets", 0, 0, NULL,
-                           (void(*)(void))boundaryOptions[appCtx.boundaryChoice],
+                           (void(*)(void))boundaryOptions[appCtx->boundaryChoice],
                            1, &faceSetIds[faceSet],
                            (void *)(&faceSetIds[faceSet])); CHKERRQ(ierr);
     }
@@ -630,7 +631,7 @@ static int CreateRestrictionPlex(Ceed ceed, CeedInterlaceMode imode, CeedInt P,
 
   // Get Nelem
   ierr = DMGetSection(dm, &section); CHKERRQ(ierr);
-  ierr = DMPlexGetHeightStratum(dm, 0, &cStart,& cEnd); CHKERRQ(ierr);
+  ierr = DMPlexGetHeightStratum(dm, 0, &cStart, &cEnd); CHKERRQ(ierr);
   nelem = cEnd - cStart;
 
   // Get indices
@@ -673,13 +674,13 @@ static int SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
                                  CeedVector forceCeed, CeedQFunction qfRestrict,
                                  CeedQFunction qfProlong) {
   int           ierr;
-  CeedInt       P = appCtx.levelDegrees[fineLevel] + 1;
-  CeedInt       Q = appCtx.levelDegrees[fineLevel] + 1;
+  CeedInt       P = appCtx->levelDegrees[fineLevel] + 1;
+  CeedInt       Q = appCtx->levelDegrees[fineLevel] + 1;
   CeedInt       dim, ncompx;
   CeedInt       nqpts;
-  CeedInt       qdatasize = problemOptions[appCtx.problemChoice].qdatasize;
-  problemType   problemChoice = appCtx.problemChoice;
-  forcingType   forcingChoice = appCtx.forcingChoice;
+  CeedInt       qdatasize = problemOptions[appCtx->problemChoice].qdatasize;
+  problemType   problemChoice = appCtx->problemChoice;
+  forcingType   forcingChoice = appCtx->forcingChoice;
   DM            dmcoord;
   PetscSection  section;
   Vec           coords;
@@ -935,12 +936,12 @@ static int SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
                              CeedVector forceCeed, CeedQFunction qfRestrict,
                              CeedQFunction qfProlong) {
   int           ierr;
-  CeedInt       fineLevel = appCtx.numLevels - 1;
-  CeedInt       P = appCtx.levelDegrees[level] + 1;
-  CeedInt       Q = appCtx.levelDegrees[fineLevel] + 1;
+  CeedInt       fineLevel = appCtx->numLevels - 1;
+  CeedInt       P = appCtx->levelDegrees[level] + 1;
+  CeedInt       Q = appCtx->levelDegrees[fineLevel] + 1;
   CeedInt       dim;
-  CeedInt       qdatasize = problemOptions[appCtx.problemChoice].qdatasize;
-  problemType   problemChoice = appCtx.problemChoice;
+  CeedInt       qdatasize = problemOptions[appCtx->problemChoice].qdatasize;
+  problemType   problemChoice = appCtx->problemChoice;
   CeedQFunction qfJacob;
   CeedOperator  opJacob, opProlong = NULL, opRestrict = NULL;
 
@@ -969,7 +970,7 @@ static int SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   // -- Prolongation basis
   if (level != 0)
     CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompu,
-                                    appCtx.levelDegrees[level-1] + 1, P,
+                                    appCtx->levelDegrees[level-1] + 1, P,
                                     CEED_GAUSS_LOBATTO,
                                     &data[level]->basisCtoF);
 
@@ -1015,7 +1016,7 @@ static int SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   // Create the QFunction and Operator that computes the prolongation and
   //   restriction between the p-multigrid levels.
   // ---------------------------------------------------------------------------
-  if ((level != 0) && appCtx.multigridChoice != MULTIGRID_NONE) {
+  if ((level != 0) && appCtx->multigridChoice != MULTIGRID_NONE) {
     // -- Restriction
     CeedOperatorCreate(ceed, qfRestrict, CEED_QFUNCTION_NONE,
                        CEED_QFUNCTION_NONE, &opRestrict);

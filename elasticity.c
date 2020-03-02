@@ -68,8 +68,9 @@ int main(int argc, char **argv) {
   comm = PETSC_COMM_WORLD;
 
   // -- Set mesh file, polynomial degree, problem type
-  ierr = processCommandLineOptions(comm, &appCtx); CHKERRQ(ierr);
-  numLevels = appCtx.numLevels;
+  ierr = PetscMalloc1(1, &appCtx); CHKERRQ(ierr);
+  ierr = processCommandLineOptions(comm, appCtx); CHKERRQ(ierr);
+  numLevels = appCtx->numLevels;
   fineLevel = numLevels - 1;
 
   // -- Set Poison's ratio, Young's Modulus
@@ -81,13 +82,13 @@ int main(int argc, char **argv) {
   // Setup DM
   // ---------------------------------------------------------------------------
   // -- Create distributed DM from mesh file
-  ierr = createDistributedDM(comm, &appCtx, &dmOrig); CHKERRQ(ierr);
+  ierr = createDistributedDM(comm, appCtx, &dmOrig); CHKERRQ(ierr);
 
   // -- Setup DM by polynomial degree
   ierr = PetscMalloc1(numLevels, &levelDMs); CHKERRQ(ierr);
   for (int level = 0; level < numLevels; level++) {
     ierr = DMClone(dmOrig, &levelDMs[level]); CHKERRQ(ierr);
-    ierr = SetupDMByDegree(levelDMs[level], appCtx, appCtx.levelDegrees[level],
+    ierr = SetupDMByDegree(levelDMs[level], appCtx, appCtx->levelDegrees[level],
                            ncompu); CHKERRQ(ierr);
   }
 
@@ -125,21 +126,21 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Set up libCEED
   // ---------------------------------------------------------------------------
-  CeedInit(appCtx.ceedResource, &ceed);
-  if (appCtx.degree > 4 && appCtx.ceedResourceFine[0])
-    CeedInit(appCtx.ceedResourceFine, &ceedFine);
+  CeedInit(appCtx->ceedResource, &ceed);
+  if (appCtx->degree > 4 && appCtx->ceedResourceFine[0])
+    CeedInit(appCtx->ceedResourceFine, &ceedFine);
 
   // -- Create libCEED local forcing vector
   CeedVector forceCeed;
   CeedScalar *f;
-  if (appCtx.forcingChoice != FORCE_NONE) {
+  if (appCtx->forcingChoice != FORCE_NONE) {
     ierr = VecGetArray(Floc, &f); CHKERRQ(ierr);
     CeedVectorCreate(ceed, Ulocsz[fineLevel], &forceCeed);
     CeedVectorSetArray(forceCeed, CEED_MEM_HOST, CEED_USE_POINTER, f);
   }
 
   // -- Restriction and prolongation QFunction
-  if (appCtx.multigridChoice != MULTIGRID_NONE) {
+  if (appCtx->multigridChoice != MULTIGRID_NONE) {
     CeedQFunctionCreateIdentity(ceed, ncompu, CEED_EVAL_NONE, CEED_EVAL_INTERP,
                                 &qfRestrict);
     CeedQFunctionCreateIdentity(ceed, ncompu, CEED_EVAL_INTERP, CEED_EVAL_NONE,
@@ -151,7 +152,7 @@ int main(int argc, char **argv) {
   // ---- Setup residual evaluator and geometric information
   ierr = PetscCalloc1(1, &ceedData[fineLevel]); CHKERRQ(ierr);
   {
-    bool highOrder = (appCtx.levelDegrees[fineLevel] > 4 && ceedFine);
+    bool highOrder = (appCtx->levelDegrees[fineLevel] > 4 && ceedFine);
     Ceed levelCeed = highOrder ? ceedFine : ceed;
     ierr = SetupLibceedFineLevel(levelDMs[fineLevel], levelCeed, appCtx,
                                  phys, ceedData, fineLevel, ncompu, 
@@ -166,7 +167,7 @@ int main(int argc, char **argv) {
     }
 
     // Note: use high order ceed, if specified and degree > 3
-    bool highOrder = (appCtx.levelDegrees[level] > 4 && ceedFine);
+    bool highOrder = (appCtx->levelDegrees[level] > 4 && ceedFine);
     Ceed levelCeed = highOrder ? ceedFine : ceed;
     ierr = SetupLibceedLevel(levelDMs[level], levelCeed, appCtx, phys,
                              ceedData,  level, ncompu, Ugsz[level],
@@ -179,7 +180,7 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   ierr = VecZeroEntries(F); CHKERRQ(ierr);
 
-  if (appCtx.forcingChoice != FORCE_NONE) {
+  if (appCtx->forcingChoice != FORCE_NONE) {
     ierr = VecRestoreArray(Floc, &f); CHKERRQ(ierr);
     ierr = DMLocalToGlobal(levelDMs[fineLevel], Floc, ADD_VALUES, F);
     CHKERRQ(ierr);
@@ -189,7 +190,7 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Print problem summary
   // ---------------------------------------------------------------------------
-  if (!appCtx.testMode) {
+  if (!appCtx->testMode) {
     const char *usedresource;
     CeedGetResource(ceed, &usedresource);
 
@@ -202,7 +203,7 @@ int main(int argc, char **argv) {
     if (ceedFine) {
       ierr = PetscPrintf(comm,
                          "    libCEED Backend - high order       : %s\n",
-                         appCtx.ceedResourceFine); CHKERRQ(ierr);
+                         appCtx->ceedResourceFine); CHKERRQ(ierr);
     }
 
     ierr = PetscPrintf(comm,
@@ -220,16 +221,16 @@ int main(int argc, char **argv) {
                        "  Multigrid:\n"
                        "    Type                               : %s\n"
                        "    Number of Levels                   : %d\n",
-                       problemTypesForDisp[appCtx.problemChoice],
-                       forcingTypesForDisp[appCtx.forcingChoice],
-                       boundaryTypesForDisp[appCtx.boundaryChoice],
-                       appCtx.meshFile ? appCtx.meshFile : "Box Mesh",
-                       appCtx.degree + 1, appCtx.degree + 1,
+                       problemTypesForDisp[appCtx->problemChoice],
+                       forcingTypesForDisp[appCtx->forcingChoice],
+                       boundaryTypesForDisp[appCtx->boundaryChoice],
+                       appCtx->meshFile ? appCtx->meshFile : "Box Mesh",
+                       appCtx->degree + 1, appCtx->degree + 1,
                        Ugsz[fineLevel]/ncompu, Ulsz[fineLevel]/ncompu, ncompu,
-                       multigridTypesForDisp[appCtx.multigridChoice],
+                       multigridTypesForDisp[appCtx->multigridChoice],
                        numLevels); CHKERRQ(ierr);
 
-    if (appCtx.multigridChoice != MULTIGRID_NONE) {
+    if (appCtx->multigridChoice != MULTIGRID_NONE) {
       for (int i = 0; i < 2; i++) {  
         CeedInt level = i ? fineLevel : 0;
         ierr = PetscPrintf(comm,
@@ -238,7 +239,7 @@ int main(int argc, char **argv) {
                            "      Global Nodes                     : %D\n"
                            "      Owned Nodes                      : %D\n",
                            level, i ? "fine" : "coarse",
-                           appCtx.levelDegrees[level] + 1,
+                           appCtx->levelDegrees[level] + 1,
                            Ugsz[level]/ncompu, Ulsz[level]/ncompu);
                            CHKERRQ(ierr);
       }
@@ -356,7 +357,7 @@ int main(int argc, char **argv) {
     ierr = PCSetDM(pc, levelDMs[fineLevel]); CHKERRQ(ierr);
     ierr = PCSetOptionsPrefix(pc, "outer_"); CHKERRQ(ierr);
 
-    if (appCtx.multigridChoice == MULTIGRID_NONE) {
+    if (appCtx->multigridChoice == MULTIGRID_NONE) {
       // ---- No Multigrid
       ierr = PCSetType(pc, PCJACOBI); CHKERRQ(ierr);
       ierr = PCJacobiSetType(pc, PC_JACOBI_DIAGONAL); CHKERRQ(ierr);
@@ -449,7 +450,7 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Output summary
   // ---------------------------------------------------------------------------
-  if (!appCtx.testMode) {
+  if (!appCtx->testMode) {
     // -- SNES
     SNESType snesType;
     SNESConvergedReason reason;
@@ -478,7 +479,7 @@ int main(int argc, char **argv) {
                        kspType); CHKERRQ(ierr);
 
     // -- PC
-    if (appCtx.multigridChoice != MULTIGRID_NONE) {
+    if (appCtx->multigridChoice != MULTIGRID_NONE) {
       PC pc;
       PCMGType pcmgType;
       ierr = KSPGetPC(ksp, &pc); CHKERRQ(ierr);
@@ -510,7 +511,7 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Compute solve time
   // ---------------------------------------------------------------------------
-  if (!appCtx.testMode) {
+  if (!appCtx->testMode) {
     ierr = MPI_Allreduce(&elapsedTime, &minTime, 1, MPI_DOUBLE, MPI_MIN, comm);
     CHKERRQ(ierr);
     ierr = MPI_Allreduce(&elapsedTime, &maxTime, 1, MPI_DOUBLE, MPI_MAX, comm);
@@ -524,7 +525,7 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Compute error
   // ---------------------------------------------------------------------------
-  if (appCtx.forcingChoice == FORCE_MMS) {
+  if (appCtx->forcingChoice == FORCE_MMS) {
     CeedScalar l2Error = 1., l2Unorm = 1.;
     const CeedScalar *truearray;
     Vec errorVec, trueVec;
@@ -551,7 +552,7 @@ int main(int argc, char **argv) {
     l2Error /= l2Unorm;
 
     // -- Output
-    if (!appCtx.testMode || l2Error > 0.013) {
+    if (!appCtx->testMode || l2Error > 0.013) {
       ierr = PetscPrintf(comm,
                          "    L2 Error                           : %f\n",
                          l2Error); CHKERRQ(ierr);
@@ -565,7 +566,7 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // View Solution
   // ---------------------------------------------------------------------------
-  if (appCtx.viewSoln) {
+  if (appCtx->viewSoln) {
     PetscViewer viewer;
 
     ierr = PetscViewerVTKOpen(comm, "solution.vtu", FILE_MODE_WRITE, &viewer);
@@ -612,7 +613,7 @@ int main(int argc, char **argv) {
   ierr = PetscFree(jacobMat); CHKERRQ(ierr);
   ierr = PetscFree(prolongRestrCtx); CHKERRQ(ierr);
   ierr = PetscFree(prolongRestrMat); CHKERRQ(ierr);
-  ierr = PetscFree(appCtx.levelDegrees); CHKERRQ(ierr);
+  ierr = PetscFree(appCtx->levelDegrees); CHKERRQ(ierr);
   ierr = PetscFree(ceedData); CHKERRQ(ierr);
 
   // libCEED Objects
@@ -637,6 +638,7 @@ int main(int argc, char **argv) {
   ierr = PetscFree(resCtx); CHKERRQ(ierr);
   ierr = PetscFree(formJacobCtx); CHKERRQ(ierr);
   ierr = PetscFree(jacobCoarseCtx); CHKERRQ(ierr);
+  ierr = PetscFree(appCtx); CHKERRQ(ierr);
   ierr = PetscFree(phys); CHKERRQ(ierr);
   ierr = PetscFree(units); CHKERRQ(ierr);
 
