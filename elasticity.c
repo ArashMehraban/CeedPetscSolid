@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
   UserMultProlongRestr *prolongRestrCtx;
   PCMGCycleType  pcmgCycleType = PC_MG_CYCLE_V;
   // libCEED objects
-  Ceed           ceed;
+  Ceed           ceed, ceedFine;
   CeedData       *ceedData;
   CeedQFunction  qfRestrict, qfProlong;
   // Parameters
@@ -125,7 +125,9 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Set up libCEED
   // ---------------------------------------------------------------------------
-  CeedInit(appCtx.ceedresource, &ceed);
+  CeedInit(appCtx.ceedResource, &ceed);
+  if (appCtx.degree > 4 && appCtx.ceedResourceFine[0])
+    CeedInit(appCtx.ceedResourceFine, &ceedFine);
 
   // -- Create libCEED local forcing vector
   CeedVector forceCeed;
@@ -148,17 +150,25 @@ int main(int argc, char **argv) {
   ierr = PetscMalloc1(numLevels, &ceedData); CHKERRQ(ierr);
   // ---- Setup residual evaluator and geometric information
   ierr = PetscCalloc1(1, &ceedData[fineLevel]); CHKERRQ(ierr);
-  ierr = SetupLibceedFineLevel(levelDMs[fineLevel], ceed, appCtx,
-                               phys, ceedData, fineLevel, ncompu, 
-                               Ugsz[fineLevel], Ulocsz[fineLevel], forceCeed,
-                               qfRestrict, qfProlong);
-  CHKERRQ(ierr);
+  {
+    bool highOrder = (appCtx.levelDegrees[fineLevel] > 4 && ceedFine);
+    Ceed levelCeed = highOrder ? ceedFine : ceed;
+    ierr = SetupLibceedFineLevel(levelDMs[fineLevel], levelCeed, appCtx,
+                                 phys, ceedData, fineLevel, ncompu, 
+                                 Ugsz[fineLevel], Ulocsz[fineLevel], forceCeed,
+                                 qfRestrict, qfProlong);
+    CHKERRQ(ierr);
+  }
   // ---- Setup Jacobian evaluator and prolongation/restriction
   for (int level = 0; level < numLevels; level++) {
     if (level != fineLevel) {
       ierr = PetscCalloc1(1, &ceedData[level]); CHKERRQ(ierr);
     }
-    ierr = SetupLibceedLevel(levelDMs[level], ceed, appCtx, phys,
+
+    // Note: use high order ceed, if specified and degree > 3
+    bool highOrder = (appCtx.levelDegrees[level] > 4 && ceedFine);
+    Ceed levelCeed = highOrder ? ceedFine : ceed;
+    ierr = SetupLibceedLevel(levelDMs[level], levelCeed, appCtx, phys,
                              ceedData,  level, ncompu, Ugsz[level],
                              Ulocsz[level], forceCeed, qfRestrict,
                              qfProlong); CHKERRQ(ierr);
@@ -186,7 +196,16 @@ int main(int argc, char **argv) {
     ierr = PetscPrintf(comm,
                        "\n-- Elastisticy Example - libCEED + PETSc --\n"
                        "  libCEED:\n"
-                       "    libCEED Backend                    : %s\n"
+                       "    libCEED Backend                    : %s\n",
+                       usedresource); CHKERRQ(ierr);
+
+    if (ceedFine) {
+      ierr = PetscPrintf(comm,
+                         "    libCEED Backend - high order       : %s\n",
+                         appCtx.ceedResourceFine); CHKERRQ(ierr);
+    }
+
+    ierr = PetscPrintf(comm,
                        "  Problem:\n"
                        "    Problem Name                       : %s\n"
                        "    Forcing Function                   : %s\n"
@@ -201,7 +220,7 @@ int main(int argc, char **argv) {
                        "  Multigrid:\n"
                        "    Type                               : %s\n"
                        "    Number of Levels                   : %d\n",
-                       usedresource, problemTypesForDisp[appCtx.problemChoice],
+                       problemTypesForDisp[appCtx.problemChoice],
                        forcingTypesForDisp[appCtx.forcingChoice],
                        boundaryTypesForDisp[appCtx.boundaryChoice],
                        appCtx.meshFile ? appCtx.meshFile : "Box Mesh",
@@ -600,6 +619,7 @@ int main(int argc, char **argv) {
   CeedQFunctionDestroy(&qfRestrict);
   CeedQFunctionDestroy(&qfProlong);
   CeedDestroy(&ceed);
+  CeedDestroy(&ceedFine);
 
   // PETSc Objects
   ierr = VecDestroy(&U); CHKERRQ(ierr);

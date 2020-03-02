@@ -91,8 +91,9 @@ struct Units_private {
 
 // Application context from user command line options
 typedef struct {
-  char          ceedresource[PETSC_MAX_PATH_LEN]; // libCEED backend
-  char          meshFile[PETSC_MAX_PATH_LEN];     // exodusII mesh file
+  char          ceedResource[PETSC_MAX_PATH_LEN];     // libCEED backend
+  char          ceedResourceFine[PETSC_MAX_PATH_LEN]; // libCEED for fine grid
+  char          meshFile[PETSC_MAX_PATH_LEN];         // exodusII mesh file
   PetscBool     testMode;
   PetscBool     viewSoln;
   problemType   problemChoice;
@@ -233,8 +234,14 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
                            NULL); CHKERRQ(ierr);
 
   ierr = PetscOptionsString("-ceed", "CEED resource specifier",
-                            NULL, appCtx->ceedresource, appCtx->ceedresource,
-                            sizeof(appCtx->ceedresource), &ceedFlag);
+                            NULL, appCtx->ceedResource, appCtx->ceedResource,
+                            sizeof(appCtx->ceedResource), &ceedFlag);
+  CHKERRQ(ierr);
+
+  ierr = PetscOptionsString("-ceed_fine", "CEED resource specifier for high order elements",
+                            NULL, appCtx->ceedResourceFine,
+                            appCtx->ceedResourceFine,
+                            sizeof(appCtx->ceedResourceFine), NULL);
   CHKERRQ(ierr);
 
   ierr = PetscOptionsInt("-degree", "Polynomial degree of tensor product basis",
@@ -308,8 +315,8 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx *appCtx) {
 
   // Provide default ceed resource if not specified
   if (!ceedFlag) {
-    const char* ceedresource = "/cpu/self";
-    strncpy(appCtx->ceedresource, ceedresource, 10);
+    const char* ceedResource = "/cpu/self";
+    strncpy(appCtx->ceedResource, ceedResource, 10);
   }
 
   // Determine number of levels
