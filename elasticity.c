@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
   UserMultProlongRestr *prolongRestrCtx;
   PCMGCycleType  pcmgCycleType = PC_MG_CYCLE_V;
   // libCEED objects
-  Ceed           ceed, ceedFine;
+  Ceed           ceed, ceedFine = NULL;
   CeedData       *ceedData;
   CeedQFunction  qfRestrict, qfProlong;
   // Parameters
@@ -616,13 +616,14 @@ int main(int argc, char **argv) {
   ierr = PetscFree(appCtx->levelDegrees); CHKERRQ(ierr);
   ierr = PetscFree(ceedData); CHKERRQ(ierr);
 
-  // libCEED Objects
+  // libCEED objects
   CeedQFunctionDestroy(&qfRestrict);
   CeedQFunctionDestroy(&qfProlong);
   CeedDestroy(&ceed);
-  CeedDestroy(&ceedFine);
+  if (ceedFine)
+    CeedDestroy(&ceedFine);
 
-  // PETSc Objects
+  // PETSc objects
   ierr = VecDestroy(&U); CHKERRQ(ierr);
   ierr = VecDestroy(&R); CHKERRQ(ierr);
   ierr = VecDestroy(&Rloc); CHKERRQ(ierr);
