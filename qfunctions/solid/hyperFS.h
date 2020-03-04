@@ -25,7 +25,7 @@ CEED_QFUNCTION(HyperFSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
   // Outputs
   CeedScalar (*dvdX)[3][Q] = (CeedScalar(*)[3][Q])out[0];
   // Store gradu for HyperFSdF (Jacobian of HyperFSF)
-  CeedScalar  (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
+  CeedScalar (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
   // *INDENT-ON*
 
   // Context
@@ -178,9 +178,8 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
   // Inputs
   const CeedScalar (*deltaug)[3][Q] = (CeedScalar(*)[3][Q])in[0],
                    (*qdata)[Q] = (CeedScalar(*)[Q])in[1];
-
-    const CeedScalar (*gradu)[3][Q] = (CeedScalar(*)[3][Q])in[2];
-
+  // gradu is used for hyperelasticity (non-linear)
+  const CeedScalar (*gradu)[3][Q] = (CeedScalar(*)[3][Q])in[2];
 
   // Outputs
   CeedScalar (*deltadvdX)[3][Q] = (CeedScalar(*)[3][Q])out[0];
