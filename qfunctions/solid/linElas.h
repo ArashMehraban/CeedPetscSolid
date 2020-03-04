@@ -49,27 +49,27 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                                     ug[2][2][i]}
                                   };
     // -- Qdata
-    const CeedScalar wJ         =    qdata[0][i];
-    const CeedScalar dXdx[3][3] =  {{qdata[1][i],
-                                     qdata[2][i],
-                                     qdata[3][i]},
-                                    {qdata[4][i],
-                                     qdata[5][i],
-                                     qdata[6][i]},
-                                    {qdata[7][i],
-                                     qdata[8][i],
-                                     qdata[9][i]}
-                                   };
+    const CeedScalar wJ         =   qdata[0][i];
+    const CeedScalar dXdx[3][3] = {{qdata[1][i],
+                                    qdata[2][i],
+                                    qdata[3][i]},
+                                   {qdata[4][i],
+                                    qdata[5][i],
+                                    qdata[6][i]},
+                                   {qdata[7][i],
+                                    qdata[8][i],
+                                    qdata[9][i]}
+                                  };
     // *INDENT-ON*
 
     // Compute gradu
     //   dXdx = (dx/dX)^(-1)
     // Apply dXdx to du = gradu
     CeedScalar gradu[3][3];
-    for (int j=0; j<3; j++)     // Component
-      for (int k=0; k<3; k++) { // Derivative
+    for (int j = 0; j < 3; j++)     // Component
+      for (int k = 0; k < 3; k++) { // Derivative
         gradu[j][k] = 0;
-        for (int m=0; m<3; m++)
+        for (int m = 0; m < 3; m++)
           gradu[j][k] += dXdx[m][k] * du[j][m];
       }
 
@@ -109,24 +109,25 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     //                         [                                        (1-2*nu)/2 ]
 
     // Above Voigt Notation is placed in a 3x3 matrix:
-    const CeedScalar ss      =  E/((1+nu)*(1-2*nu));
-    const CeedScalar sigma00 = ss*((1-nu)*e[0][0] + nu*e[1][1] +nu*e[2][2]),
-                     sigma11 = ss*(nu*e[0][0] + (1-nu)*e[1][1] +nu*e[2][2]),
-                     sigma22 = ss*(nu*e[0][0] + nu*e[1][1] +(1-nu)*e[2][2]),
-                     sigma12 = ss*(1-2*nu)*e[1][2]*0.5,
-                     sigma02 = ss*(1-2*nu)*e[0][2]*0.5,
-                     sigma01 = ss*(1-2*nu)*e[0][1]*0.5;
-    const CeedScalar sigma[3][3] = {
-        {sigma00, sigma01, sigma02},
-        {sigma01, sigma11, sigma12},
-        {sigma02, sigma12, sigma22}
-       };
+    const CeedScalar ss      =  E / ((1 + nu)*(1 - 2*nu));
+    const CeedScalar sigma00 = ss*((1 - nu)*e[0][0] + nu*e[1][1] + nu*e[2][2]),
+                     sigma11 = ss*(nu*e[0][0] + (1 - nu)*e[1][1] + nu*e[2][2]),
+                     sigma22 = ss*(nu*e[0][0] + nu*e[1][1] + (1 - nu)*e[2][2]),
+                     sigma12 = ss*(1 - 2*nu)*e[1][2]*0.5,
+                     sigma02 = ss*(1 - 2*nu)*e[0][2]*0.5,
+                     sigma01 = ss*(1 - 2*nu)*e[0][1]*0.5;
+    // *INDENT-OFF*
+    const CeedScalar sigma[3][3] = {{sigma00, sigma01, sigma02},
+                                    {sigma01, sigma11, sigma12},
+                                    {sigma02, sigma12, sigma22}
+                                   };
+    // *INDENT-ON*
 
     // Apply dXdx^T and weight to sigma
-    for (int j=0; j<3; j++)     // Component
-      for (int k=0; k<3; k++) { // Derivative
+    for (int j = 0; j < 3; j++)     // Component
+      for (int k = 0; k < 3; k++) { // Derivative
         dvdX[k][j][i] = 0;
-        for (int m=0; m<3; m++)
+        for (int m = 0; m < 3; m++)
           dvdX[k][j][i] += dXdx[k][m] * sigma[j][m] * wJ;
       }
 
@@ -170,27 +171,27 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                                        deltaug[2][2][i]}
                                      };
     // -- Qdata
-    const CeedScalar wJ         =    qdata[0][i];
-    const CeedScalar dXdx[3][3] =  {{qdata[1][i],
-                                     qdata[2][i],
-                                     qdata[3][i]},
-                                    {qdata[4][i],
-                                     qdata[5][i],
-                                     qdata[6][i]},
-                                    {qdata[7][i],
-                                     qdata[8][i],
-                                     qdata[9][i]}
-                                   };
+    const CeedScalar wJ         =      qdata[0][i];
+    const CeedScalar dXdx[3][3] =    {{qdata[1][i],
+                                       qdata[2][i],
+                                       qdata[3][i]},
+                                      {qdata[4][i],
+                                       qdata[5][i],
+                                       qdata[6][i]},
+                                      {qdata[7][i],
+                                       qdata[8][i],
+                                       qdata[9][i]}
+                                     };
     // *INDENT-ON*
 
     // Compute graddeltau
     //   dXdx = (dx/dX)^(-1)
     // Apply dXdx to deltadu = graddeltau
     CeedScalar graddeltau[3][3];
-    for (int j=0; j<3; j++)     // Component
-      for (int k=0; k<3; k++) { // Derivative
+    for (int j = 0; j < 3; j++)     // Component
+      for (int k = 0; k < 3; k++) { // Derivative
         graddeltau[j][k] = 0;
-        for (int m=0; m<3; m++)
+        for (int m = 0; m < 3; m++)
           graddeltau[j][k] += dXdx[m][k] * deltadu[j][m];
       }
 
@@ -235,17 +236,18 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                      dsigma12 = ss*(1 - 2*nu)*de[1][2] / 2,
                      dsigma02 = ss*(1 - 2*nu)*de[0][2] / 2,
                      dsigma01 = ss*(1 - 2*nu)*de[0][1] / 2;
-    const CeedScalar dsigma[3][3] =
-        { {dsigma00, dsigma01, dsigma02},
-          {dsigma01, dsigma11, dsigma12},
-          {dsigma02, dsigma12, dsigma22}
-        };
+    // *INDENT-OFF*
+    const CeedScalar dsigma[3][3] = {{dsigma00, dsigma01, dsigma02},
+                                     {dsigma01, dsigma11, dsigma12},
+                                     {dsigma02, dsigma12, dsigma22}
+                                    };
+    // *INDENT-ON*
 
     // Apply dXdx^T and weight
-    for (int j=0; j<3; j++)     // Component
-      for (int k=0; k<3; k++) { // Derivative
+    for (int j = 0; j < 3; j++)     // Component
+      for (int k = 0; k < 3 ; k++) { // Derivative
         deltadvdX[k][j][i] = 0;
-        for (int m=0; m<3; m++)
+        for (int m = 0; m < 3; m++)
           deltadvdX[k][j][i] += dXdx[k][m] * dsigma[j][m] * wJ;
       }
 
