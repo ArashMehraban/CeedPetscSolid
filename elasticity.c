@@ -620,8 +620,7 @@ int main(int argc, char **argv) {
   CeedQFunctionDestroy(&qfRestrict);
   CeedQFunctionDestroy(&qfProlong);
   CeedDestroy(&ceed);
-  if (ceedFine)
-    CeedDestroy(&ceedFine);
+  CeedDestroy(&ceedFine);
 
   // PETSc objects
   ierr = VecDestroy(&U); CHKERRQ(ierr);
