@@ -279,7 +279,7 @@ int main(int argc, char **argv) {
   formJacobCtx->jacobCtx = jacobCtx;
   formJacobCtx->numLevels = numLevels;
   formJacobCtx->jacobMat = jacobMat;
-  ierr = SNESSetJacobian(snes, jacobMat[fineLevel], NULL,
+  ierr = SNESSetJacobian(snes, jacobMat[fineLevel], jacobMat[fineLevel],
                          FormJacobian, formJacobCtx); CHKERRQ(ierr);
 
   // -- Residual evaluation function
