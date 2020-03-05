@@ -322,8 +322,8 @@ int main(int argc, char **argv) {
   // -- Jacobian matrix
   ierr = DMSetMatType(levelDMs[0], MATAIJ); CHKERRQ(ierr);
   ierr = DMCreateMatrix(levelDMs[0], &jacobMatCoarse); CHKERRQ(ierr);
-  ierr = SNESSetJacobian(snesCoarse, jacobMatCoarse, NULL, NULL, NULL);
-  CHKERRQ(ierr);
+  ierr = SNESSetJacobian(snesCoarse, jacobMatCoarse, jacobMatCoarse, NULL,
+                         NULL); CHKERRQ(ierr);
 
   // -- Residual evaluation function
   ierr = PetscMalloc1(1, &jacobCoarseCtx); CHKERRQ(ierr);
