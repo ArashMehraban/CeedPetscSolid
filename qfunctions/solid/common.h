@@ -1,4 +1,7 @@
-// *****************************************************************************
+#ifndef COMMON_H
+#define COMMON_H
+
+// -----------------------------------------------------------------------------
 // This QFunction sets up the geometric factors required for integration and
 //   coordinate transformations
 //
@@ -21,10 +24,9 @@
 //  (detJ^-1) * [A21 A22 A23]
 //              [A31 A32 A33]
 //
-// *****************************************************************************
+// -----------------------------------------------------------------------------
 CEED_QFUNCTION(SetupGeo)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                          CeedScalar *const *out) {
-
     // *INDENT-OFF*
      // Inputs
      const CeedScalar (*J)[3][Q] = (CeedScalar(*)[3][Q])in[0],
@@ -61,6 +63,7 @@ CEED_QFUNCTION(SetupGeo)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // Qdata
     // -- Interp-to-Interp qdata
     qdata[0][i] = w[i] * detJ;
+
     // -- Interp-to-Grad qdata
     // Inverse of change of coordinate matrix: X_i,j
     qdata[1][i] = A11 / detJ;
@@ -78,3 +81,4 @@ CEED_QFUNCTION(SetupGeo)(void *ctx, CeedInt Q, const CeedScalar *const *in,
   return 0;
 }
 // -----------------------------------------------------------------------------
+#endif // End of COMMON_H

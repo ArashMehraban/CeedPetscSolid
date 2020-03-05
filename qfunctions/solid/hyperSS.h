@@ -1,7 +1,9 @@
-#ifndef __HYPER_SS__H
-#define __HYPER_SS__H
+#ifndef HYPER_SS_H
+#define HYPER_SS_H
 
-#include<math.h>
+#ifndef __CUDACC__
+#  include <math.h>
+#endif
 
 #ifndef PHYSICS_STRUCT
 #define PHYSICS_STRUCT
@@ -22,7 +24,7 @@ CEED_QFUNCTION(HyperSSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
   // Outputs
   CeedScalar (*dvdX)[3][Q] = (CeedScalar(*)[3][Q])out[0];
-  // gradu is used for hyperelasticity small strain (non-linear)
+  // Store gradu for HyperFSdF (Jacobian of HyperFSF)
   CeedScalar (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
   // *INDENT-ON*
 
@@ -30,9 +32,11 @@ CEED_QFUNCTION(HyperSSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
   const Physics context = ctx;
   const CeedScalar E  = context->E;
   const CeedScalar nu = context->nu;
-  const CeedScalar TwoMu = E/(1+nu);
-  const CeedScalar Kbulk = E/(3*(1-2*nu)); //bulk Modulus
-  const CeedScalar lambda = (3*Kbulk-TwoMu)/3;
+
+  // Constants
+  const CeedScalar TwoMu = E / (1 + nu);
+  const CeedScalar Kbulk = E / (3*(1 - 2*nu)); // Bulk modulus
+  const CeedScalar lambda = (3*Kbulk - TwoMu) / 3;
 
   // Quadrature Point Loop
   CeedPragmaSIMD
@@ -50,88 +54,86 @@ CEED_QFUNCTION(HyperSSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                                     ug[2][2][i]}
                                   };
     // -- Qdata
-    const CeedScalar wJ         =    qdata[0][i];
-    const CeedScalar dXdx[3][3] =  {{qdata[1][i],
-                                     qdata[2][i],
-                                     qdata[3][i]},
-                                    {qdata[4][i],
-                                     qdata[5][i],
-                                     qdata[6][i]},
-                                    {qdata[7][i],
-                                     qdata[8][i],
-                                     qdata[9][i]}
-                                   };
+    const CeedScalar wJ         =   qdata[0][i];
+    const CeedScalar dXdx[3][3] = {{qdata[1][i],
+                                    qdata[2][i],
+                                    qdata[3][i]},
+                                   {qdata[4][i],
+                                    qdata[5][i],
+                                    qdata[6][i]},
+                                   {qdata[7][i],
+                                    qdata[8][i],
+                                    qdata[9][i]}
+                                  };
     // *INDENT-ON*
 
     // Compute gradu
-    // dXdx = (dx/dX)^(-1)
+    //   dXdx = (dx/dX)^(-1)
     // Apply dXdx to du = gradu
-    for (int j=0; j<3; j++)     // Component
-      for (int k=0; k<3; k++) { // Derivative
+    for (int j = 0; j < 3; j++)     // Component
+      for (int k = 0; k < 3; k++) { // Derivative
         gradu[j][k][i] = 0;
-        for (int m=0; m<3; m++)
+        for (int m = 0; m < 3; m++)
           gradu[j][k][i] += dXdx[m][k] * du[j][m];
       }
 
     // Compute Strain : e (epsilon)
     // e = 1/2 (grad u + (grad u)^T)
-     // *INDENT-OFF*
-     const CeedScalar e[3][3] =  {{(gradu[0][0][i] + gradu[0][0][i])*0.5,
-                                   (gradu[0][1][i] + gradu[1][0][i])*0.5,
-                                   (gradu[0][2][i] + gradu[2][0][i])*0.5},
-                                  {(gradu[1][0][i] + gradu[0][1][i])*0.5,
-                                   (gradu[1][1][i] + gradu[1][1][i])*0.5,
-                                   (gradu[1][2][i] + gradu[2][1][i])*0.5},
-                                  {(gradu[2][0][i] + gradu[0][2][i])*0.5,
-                                   (gradu[2][1][i] + gradu[1][2][i])*0.5,
-                                   (gradu[2][2][i] + gradu[2][2][i])*0.5}
-                                 };
+    // *INDENT-OFF*
+    const CeedScalar e[3][3] =  {{(gradu[0][0][i] + gradu[0][0][i])*0.5,
+                                  (gradu[0][1][i] + gradu[1][0][i])*0.5,
+                                  (gradu[0][2][i] + gradu[2][0][i])*0.5},
+                                 {(gradu[1][0][i] + gradu[0][1][i])*0.5,
+                                  (gradu[1][1][i] + gradu[1][1][i])*0.5,
+                                  (gradu[1][2][i] + gradu[2][1][i])*0.5},
+                                 {(gradu[2][0][i] + gradu[0][2][i])*0.5,
+                                  (gradu[2][1][i] + gradu[1][2][i])*0.5,
+                                  (gradu[2][2][i] + gradu[2][2][i])*0.5}
+                                };
 
     // *INDENT-ON*
-    //strain (epsilon)
+    // strain (epsilon)
     //    and
-    //stress (sigma) in Voigt notation:
+    // stress (sigma) in Voigt notation:
+    //           [e00]              [sigma00]
     //           [e11]              [sigma11]
-    //           [e22]              [sigma22]
-    // epsilon = [e33]  ,   sigma = [sigma33]
-    //           [e23]              [sigma23]
-    //           [e13]              [sigma13]
+    // epsilon = [e22]  ,   sigma = [sigma22]
     //           [e12]              [sigma12]
+    //           [e02]              [sigma02]
+    //           [e01]              [sigma01]
     //
-    // Sigma = S * epsilon
-    //                         [1-nu   nu    nu                                    ]
-    //                         [ nu   1-nu   nu                                    ]
-    //                         [ nu    nu   1-nu                                   ]
-    // S = E/((1+nu)*(1-2*nu)) [                  (1-2*nu)/2                       ]
-    //                         [                             (1-2*nu)/2            ]
-    //                         [                                        (1-2*nu)/2 ]
-
-
-
-
-
-    //Above Voigt Notation is placed in a 3x3 matrix:
-    //Volumetric Strain
+    // mu = E / (2 * (1 + nu))
+    // bulk modulus = E / (2 * (1 - 2 * nu))
+    // lambda = (3 * bulk modulus - 2 * mu) / 3
+    // e_v = volumetric strain = e00 + e11 + e22
+    //
+    // sigma = lambda * log(1 + e_v) + 2 * mu * epsilon
+    // 
+    // Above Voigt Notation is placed in a 3x3 matrix:
+    // Volumetric strain
     const CeedScalar strain_vol = e[0][0] + e[1][1] + e[2][2];
+
     const CeedScalar sigma00 = lambda*log(1+strain_vol) + TwoMu*e[0][0],
                      sigma11 = lambda*log(1+strain_vol) + TwoMu*e[1][1],
                      sigma22 = lambda*log(1+strain_vol) + TwoMu*e[2][2],
                      sigma12 = TwoMu*e[1][2],
                      sigma02 = TwoMu*e[0][2],
                      sigma01 = TwoMu*e[0][1];
-    const CeedScalar sigma[3][3] = {
-      {sigma00, sigma01, sigma02},
-      {sigma01, sigma11, sigma12},
-      {sigma02, sigma12, sigma22}
-    };
+    // *INDENT-OFF*
+    const CeedScalar sigma[3][3] = {{sigma00, sigma01, sigma02},
+                                    {sigma01, sigma11, sigma12},
+                                    {sigma02, sigma12, sigma22}
+                                   };
+    // *INDENT-ON*
 
     // Apply dXdx^T and weight to sigma
-    for (int j=0; j<3; j++)     // Component
-      for (int k=0; k<3; k++) { // Derivative
+    for (int j = 0; j < 3; j++)     // Component
+      for (int k = 0; k < 3; k++) { // Derivative
         dvdX[k][j][i] = 0;
-        for (int m=0; m<3; m++)
+        for (int m = 0; m < 3; m++)
           dvdX[k][j][i] += dXdx[k][m] * sigma[j][m] * wJ;
       }
+
   } // End of Quadrature Point Loop
 
   return 0;
@@ -155,9 +157,11 @@ CEED_QFUNCTION(HyperSSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
   const Physics context = ctx;
   const CeedScalar E  = context->E;
   const CeedScalar nu = context->nu;
-  const CeedScalar TwoMu = E/(1+nu);
-  const CeedScalar Kbulk = E/(3*(1-2*nu)); //bulk Modulus
-  const CeedScalar lambda = (3*Kbulk-TwoMu)/3;
+
+  // Constants
+  const CeedScalar TwoMu = E / (1 + nu);
+  const CeedScalar Kbulk = E / (3*(1 - 2*nu)); // Bulk modulus
+  const CeedScalar lambda = (3*Kbulk - TwoMu) / 3;
 
   // Quadrature Point Loop
   CeedPragmaSIMD
@@ -175,26 +179,26 @@ CEED_QFUNCTION(HyperSSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                                        deltaug[2][2][i]}
                                      };
     // -- Qdata
-    const CeedScalar wJ         =    qdata[0][i];
-    const CeedScalar dXdx[3][3] =  {{qdata[1][i],
-                                     qdata[2][i],
-                                     qdata[3][i]},
-                                    {qdata[4][i],
-                                     qdata[5][i],
-                                     qdata[6][i]},
-                                    {qdata[7][i],
-                                     qdata[8][i],
-                                     qdata[9][i]}
-                                   };
+    const CeedScalar wJ         =      qdata[0][i];
+    const CeedScalar dXdx[3][3] =    {{qdata[1][i],
+                                       qdata[2][i],
+                                       qdata[3][i]},
+                                      {qdata[4][i],
+                                       qdata[5][i],
+                                       qdata[6][i]},
+                                      {qdata[7][i],
+                                       qdata[8][i],
+                                       qdata[9][i]}
+                                     };
     // *INDENT-ON*
 
-    //Compute graddeltau
+    // Compute graddeltau
     // Apply dXdx^-1 to deltadu = graddeltau
     CeedScalar graddeltau[3][3];
-    for (int j=0; j<3; j++)     // Component
-      for (int k=0; k<3; k++) { // Derivative
+    for (int j = 0; j < 3; j++)     // Component
+      for (int k = 0; k < 3; k++) { // Derivative
         graddeltau[j][k] = 0;
-        for (int m=0; m<3; m++)
+        for (int m = 0; m < 3; m++)
           graddeltau[j][k] += dXdx[m][k] * deltadu[j][m];
       }
 
@@ -216,47 +220,60 @@ CEED_QFUNCTION(HyperSSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     //strain (epsilon)
     //    and
     //stress (sigma) in Voigt notation:
-    //           [e11]              [sigma11]
-    //           [e22]              [sigma22]
-    // epsilon = [e33]  ,   sigma = [sigma33]
-    //           [e23]              [sigma23]
-    //           [e13]              [sigma13]
-    //           [e12]              [sigma12]
+    //            [e00]               [sigma00]
+    //            [e11]               [sigma11]
+    // depsilon = [e22]  ,   dsigma = [sigma22]
+    //            [e12]               [sigma12]
+    //            [e02]               [sigma02]
+    //            [e01]               [sigma01]
     //
-    // Sigma = S * epsilon
-    //                         [1-nu   nu    nu                                    ]
-    //                         [ nu   1-nu   nu                                    ]
-    //                         [ nu    nu   1-nu                                   ]
-    // S = E/((1+nu)*(1-2*nu)) [                  (1-2*nu)/2                       ]
-    //                         [                             (1-2*nu)/2            ]
-    //                         [                                        (1-2*nu)/2 ]
-
-    //Above Voigt Notation is placed in a 3x3 matrix:
+    // mu = E / (2 * (1 + nu))
+    // bulk modulus = E / (2 * (1 - 2 * nu))
+    // lambda = (3 * bulk modulus - 2 * mu) / 3
+    // e_v = volumetric strain = e00 + e11 + e22
+    // lambda bar = lambda / (1 + e_v)
+    // 
+    // dSigma = S * epsilon
+    //
+    // S_ijkl = lambda bar * delta_ij * delta_kl + 2 * mu * delta_ik * delta_jl
+    //
+    // Matrix form:
+    //
+    //     [2 mu + lambda bar     lambda bar         lambda bar                       ]
+    //     [   lambda bar      2 mu + lambda bar     lambda bar                       ]
+    //     [   lambda bar         lambda bar      2 mu + lambda bar                   ]
+    // S = [                                                           mu             ]
+    //     [                                                                 mu       ]
+    //     [                                                                       mu ]
+    //
+    // Above Voigt Notation is placed in a 3x3 matrix:
     const CeedScalar strain_vol = gradu[0][0][i] + gradu[1][1][i] + gradu[2][2][i];
-    const CeedScalar lambda_bar = lambda/(1+strain_vol);
+    const CeedScalar lambda_bar = lambda / (1 + strain_vol);
 
-    const CeedScalar dsigma00 = (TwoMu+lambda_bar)*de[0][0] + lambda_bar*de[1][1] + lambda_bar*de[2][2],
-                     dsigma11 = lambda_bar*de[0][0] + (TwoMu+lambda_bar)*de[1][1] + lambda_bar*de[2][2],
-                     dsigma22 = lambda_bar*de[0][0] + lambda_bar*de[1][1] + (TwoMu+lambda_bar)*de[2][2],
+    const CeedScalar dsigma00 = (TwoMu + lambda_bar)*de[0][0] + lambda_bar*de[1][1] + lambda_bar*de[2][2],
+                     dsigma11 = lambda_bar*de[0][0] + (TwoMu + lambda_bar)*de[1][1] + lambda_bar*de[2][2],
+                     dsigma22 = lambda_bar*de[0][0] + lambda_bar*de[1][1] + (TwoMu + lambda_bar)*de[2][2],
                      dsigma12 = 0.5*TwoMu*de[1][2],
                      dsigma02 = 0.5*TwoMu*de[0][2],
                      dsigma01 = 0.5*TwoMu*de[0][1];
-    const CeedScalar dsigma[3][3] = {
-        {dsigma00, dsigma01, dsigma02},
-        {dsigma01, dsigma11, dsigma12},
-        {dsigma02, dsigma12, dsigma22}
-      };
+    // *INDENT-OFF*
+    const CeedScalar dsigma[3][3] = {{dsigma00, dsigma01, dsigma02},
+                                     {dsigma01, dsigma11, dsigma12},
+                                     {dsigma02, dsigma12, dsigma22}
+                                    };
+    // *INDENT-ON*
 
     // Apply dXdx^-T and weight
-    for (int j=0; j<3; j++)     // Component
-      for (int k=0; k<3; k++) { // Derivative
+    for (int j = 0; j < 3; j++)     // Component
+      for (int k = 0; k < 3; k++) { // Derivative
         deltadvdX[k][j][i] = 0;
-        for (int m=0; m<3; m++)
+        for (int m = 0; m < 3; m++)
           deltadvdX[k][j][i] += dXdx[k][m] * dsigma[j][m] * wJ;
       }
+
   } // End of Quadrature Point Loop
 
   return 0;
 }
-
-#endif //End of __HYPER_SS__H
+// -----------------------------------------------------------------------------
+#endif // End of HYPER_SS_H
