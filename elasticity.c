@@ -554,7 +554,7 @@ int main(int argc, char **argv) {
     // -- Output
     if (!appCtx->testMode || l2Error > 0.013) {
       ierr = PetscPrintf(comm,
-                         "    L2 Error                           : %f\n",
+                         "    L2 Error                           : %e\n",
                          l2Error); CHKERRQ(ierr);
     }
 
