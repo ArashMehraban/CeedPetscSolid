@@ -36,9 +36,8 @@ int main(int argc, char **argv) {
   Physics        phys;                   // Contains physical constants
   Units          units;                  // Contains units scaling
   // PETSc objects
-  PetscLogStage  stagePetscSetup,
-                 stageLibceedSetup,
-                 stageSnesSolve;
+  PetscLogStage  stageDMSetup, stageLibceedSetup,
+                 stageSnesSetup, stageSnesSolve;
   DM             dmOrig;                 // Distributed DM to clone
   DM             *levelDMs;
   Vec            U, *Ug, *Uloc;          // U: solution, R: residual, F: forcing
@@ -58,6 +57,7 @@ int main(int argc, char **argv) {
   PetscInt       ncompu = 3;             // 3 DoFs in 3D
   PetscInt       numLevels = 1, fineLevel = 0;
   PetscInt       *Ugsz, *Ulsz, *Ulocsz;  // sz: size
+  PetscInt       snesIts = 0;
   // Timing
   double         startTime, elapsedTime, minTime, maxTime;
 
@@ -85,9 +85,9 @@ int main(int argc, char **argv) {
   // Setup DM
   // ---------------------------------------------------------------------------
   // Performance logging
-  ierr = PetscLogStageRegister("PETSc Setup Stage", &stagePetscSetup);
+  ierr = PetscLogStageRegister("DM and Vector Setup Stage", &stageDMSetup);
   CHKERRQ(ierr);
-  ierr = PetscLogStagePush(stagePetscSetup); CHKERRQ(ierr);
+  ierr = PetscLogStagePush(stageDMSetup); CHKERRQ(ierr);
 
   // -- Create distributed DM from mesh file
   ierr = createDistributedDM(comm, appCtx, &dmOrig); CHKERRQ(ierr);
@@ -192,6 +192,9 @@ int main(int argc, char **argv) {
                              qfProlong); CHKERRQ(ierr);
   }
 
+  // Performance logging
+  ierr = PetscLogStagePop();
+
   // ---------------------------------------------------------------------------
   // Setup global forcing vector
   // ---------------------------------------------------------------------------
@@ -266,6 +269,12 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Setup SNES
   // ---------------------------------------------------------------------------
+  // Performance logging
+  ierr = PetscLogStageRegister("SNES Setup Stage", &stageSnesSetup);
+  CHKERRQ(ierr);
+  ierr = PetscLogStagePush(stageSnesSetup); CHKERRQ(ierr);
+
+  // Create SNES
   ierr = SNESCreate(comm, &snes); CHKERRQ(ierr);
   ierr = SNESSetDM(snes, levelDMs[fineLevel]); CHKERRQ(ierr);
 
@@ -451,10 +460,18 @@ int main(int argc, char **argv) {
   }
   ierr = SNESSetFromOptions(snes); CHKERRQ(ierr);
 
+  // Performance logging
+  ierr = PetscLogStagePop();
+
   // ---------------------------------------------------------------------------
   // Set initial guess
   // ---------------------------------------------------------------------------
   ierr = VecSet(U, 0.0); CHKERRQ(ierr);
+
+  // View solution
+  if (appCtx->viewSoln) {
+    ierr = ViewSolution(comm, U, 0, 0.0); CHKERRQ(ierr);
+  }
 
   // ---------------------------------------------------------------------------
   // Solve SNES
@@ -469,20 +486,31 @@ int main(int argc, char **argv) {
   startTime = MPI_Wtime();
 
   // Solve for each load increment
-  for (PetscInt increment = 0; increment < appCtx->numIncrements; increment++) {
-    // Scale the problem
-    PetscScalar loadIncrement = (increment + 1.0) / appCtx->numIncrements,
+  for (PetscInt increment = 1; increment <= appCtx->numIncrements; increment++) {
+    // -- Scale the problem
+    PetscScalar loadIncrement = 1.0*increment / appCtx->numIncrements,
                 scalingFactor = loadIncrement /
-                                (increment == 0 ? 1 : resCtx->loadIncrement);
+                                (increment == 1 ? 1 : resCtx->loadIncrement);
     resCtx->loadIncrement = loadIncrement;
-    if (appCtx->numIncrements > 1) {
+    if (appCtx->numIncrements > 1 && appCtx->forcingChoice != FORCE_NONE) {
       ierr = VecScale(F, scalingFactor); CHKERRQ(ierr);
     }
 
-    // Solve
+    // -- Solve
     ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+
+    // -- View solution
+    if (appCtx->viewSoln) {
+      ierr = ViewSolution(comm, U, increment, loadIncrement); CHKERRQ(ierr);
+    }
+
+    // -- Update SNES iteration count
+    PetscInt its;
+    ierr = SNESGetIterationNumber(snes, &its); CHKERRQ(ierr);
+    snesIts += its;
   }
 
+  // Timing
   elapsedTime = MPI_Wtime() - startTime;
 
   // Performance logging
@@ -495,11 +523,9 @@ int main(int argc, char **argv) {
     // -- SNES
     SNESType snesType;
     SNESConvergedReason reason;
-    PetscInt its;
     PetscReal rnorm;
     ierr = SNESGetType(snes, &snesType); CHKERRQ(ierr);
     ierr = SNESGetConvergedReason(snes, &reason); CHKERRQ(ierr);
-    ierr = SNESGetIterationNumber(snes, &its); CHKERRQ(ierr);
     ierr = SNESGetFunctionNorm(snes, &rnorm); CHKERRQ(ierr);
     ierr = PetscPrintf(comm,
                        "  SNES:\n"
@@ -509,7 +535,7 @@ int main(int argc, char **argv) {
                        "    Total SNES Iterations              : %D\n"
                        "    Final rnorm                        : %e\n",
                        snesType, SNESConvergedReasons[reason],
-                       appCtx->numIncrements, its, (double)rnorm);
+                       appCtx->numIncrements, snesIts, (double)rnorm);
     CHKERRQ(ierr);
 
     // -- KSP
@@ -605,18 +631,6 @@ int main(int argc, char **argv) {
     // -- Cleanup
     ierr = VecDestroy(&errorVec); CHKERRQ(ierr);
     ierr = VecDestroy(&trueVec); CHKERRQ(ierr);
-  }
-
-  // ---------------------------------------------------------------------------
-  // View Solution
-  // ---------------------------------------------------------------------------
-  if (appCtx->viewSoln) {
-    PetscViewer viewer;
-
-    ierr = PetscViewerVTKOpen(comm, "solution.vtu", FILE_MODE_WRITE, &viewer);
-    CHKERRQ(ierr);
-    ierr = VecView(U, viewer); CHKERRQ(ierr);
-    ierr = PetscViewerDestroy(&viewer); CHKERRQ(ierr);
   }
 
   // ---------------------------------------------------------------------------

@@ -1389,6 +1389,35 @@ static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
 };
 
 // -----------------------------------------------------------------------------
+// SNES Monitor
+// -----------------------------------------------------------------------------
+static PetscErrorCode ViewSolution(MPI_Comm comm, Vec U, PetscInt increment,
+                                   PetscScalar loadIncrement) {
+  PetscErrorCode ierr;
+  DM dm;
+  PetscViewer viewer;
+  char outputFilename[PETSC_MAX_PATH_LEN];
+
+  PetscFunctionBeginUser;
+
+  // Build file name
+  ierr = PetscSNPrintf(outputFilename, sizeof outputFilename,
+                       "solution-%03D.vtu", increment); CHKERRQ(ierr);
+
+  // Increment senquence
+  ierr = VecGetDM(U, &dm); CHKERRQ(ierr);
+  ierr = DMSetOutputSequenceNumber(dm, increment, loadIncrement); CHKERRQ(ierr);
+
+  // Output solution vector
+  ierr = PetscViewerVTKOpen(comm, outputFilename, FILE_MODE_WRITE, &viewer);
+  CHKERRQ(ierr);
+  ierr = VecView(U, viewer); CHKERRQ(ierr);
+  ierr = PetscViewerDestroy(&viewer); CHKERRQ(ierr);
+
+  PetscFunctionReturn(0);
+}
+
+// -----------------------------------------------------------------------------
 // Boundary Functions
 // -----------------------------------------------------------------------------
 // BCMMS boundary function
@@ -1397,7 +1426,7 @@ static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
 // Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
 // Also check ..\meshes\cyl-hol.8.jou
 //
-// left: sideset 999
+// left:  sideset 999
 // right: sideset 998
 // outer: sideset 997
 // inner: sideset 996
@@ -1432,7 +1461,7 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal loadIncrement,
 // Cylinder with a whole in the middle (see figure ..\meshes\surface999-9.png)
 // Also check ..\meshes\cyl-hol.8.jou
 //
-// left: sideset 999
+// left:  sideset 999
 // right: sideset 998
 //
 //   / \-------------------\              y
@@ -1451,12 +1480,12 @@ PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal loadIncrement,
   PetscFunctionBeginUser;
 
   switch (*faceID) {
-  case 999:                       // left side of the cyl-hol
+  case 999:                      // left side of the cyl-hol
     u[0] = 0;
     u[1] = 0;
     u[2] = 0;
     break;
-  case 998:                       // right side of the cyl-hol
+  case 998:                      // right side of the cyl-hol
     u[0] = 0;
     u[1] = -1.0 * loadIncrement; // bend in the -y direction
     u[2] = 0;
