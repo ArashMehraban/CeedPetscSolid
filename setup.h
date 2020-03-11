@@ -104,6 +104,7 @@ struct AppCtx_private {
   PetscInt      degree;
   PetscInt      numLevels;
   PetscInt      *levelDegrees;
+  PetscInt      numIncrements;                         // Number of steps
 };
 
 // Problem specific data
@@ -178,6 +179,7 @@ struct UserMult_private {
   CeedVector   Xceed, Yceed;
   CeedOperator op;
   Ceed         ceed;
+  PetscScalar  loadIncrement;
 };
 
 // Data for Jacobian setup routine
@@ -263,6 +265,11 @@ static int processCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
                           NULL, problemTypes, (PetscEnum)appCtx->problemChoice,
                           (PetscEnum *)&appCtx->problemChoice, NULL);
   CHKERRQ(ierr);
+
+  appCtx->numIncrements = appCtx->problemChoice == ELAS_LIN ? 1 : 5;
+  ierr = PetscOptionsInt("-num_steps", "Number of pseudo-time steps",
+                         NULL, appCtx->numIncrements, &appCtx->numIncrements,
+                         NULL); CHKERRQ(ierr);
 
   ierr = PetscOptionsEnum("-forcing", "Set forcing function option", NULL,
                           forcingTypes, (PetscEnum)appCtx->forcingChoice,
@@ -1128,8 +1135,9 @@ static PetscErrorCode FormResidual_Ceed(SNES snes, Vec X, Vec Y, void *ctx) {
 
   // Use computed BCs
   ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
-  ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc, 0, NULL,
-                                    NULL, NULL); CHKERRQ(ierr);
+  ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc,
+                                    user->loadIncrement, NULL, NULL, NULL);
+  CHKERRQ(ierr);
 
   // libCEED for local action of residual evaluator
   ierr = ApplyLocalCeedOp(X, Y, user); CHKERRQ(ierr);
@@ -1402,17 +1410,18 @@ static PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre,
 //
 // Values on all points of the mesh is set based on given solution below
 // for u[0], u[1], u[2]
-PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
-                     PetscInt ncompu, PetscScalar *u, void *ctx) {
+PetscErrorCode BCMMS(PetscInt dim, PetscReal loadIncrement,
+                     const PetscReal coords[], PetscInt ncompu,
+                     PetscScalar *u, void *ctx) {
   PetscScalar x = coords[0];
   PetscScalar y = coords[1];
   PetscScalar z = coords[2];
 
   PetscFunctionBeginUser;
 
-  u[0] = exp(2*x)*sin(3*y)*cos(4*z)/1e8;
-  u[1] = exp(3*y)*sin(4*z)*cos(2*x)/1e8;
-  u[2] = exp(4*z)*sin(2*x)*cos(3*y)/1e8;
+  u[0] = exp(2*x)*sin(3*y)*cos(4*z) / 1e8 * loadIncrement;
+  u[1] = exp(3*y)*sin(4*z)*cos(2*x) / 1e8 * loadIncrement;
+  u[2] = exp(4*z)*sin(2*x)*cos(3*y) / 1e8 * loadIncrement;
 
   PetscFunctionReturn(0);
 };
@@ -1434,25 +1443,26 @@ PetscErrorCode BCMMS(PetscInt dim, PetscReal time, const PetscReal coords[],
 //
 //  0 values on the left side of the cyl-hole (sideset 999)
 // -1 values on y direction of the right side of the cyl-hole (sideset 999)
-PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
-                          const PetscReal coords[],
-                          PetscInt ncompu, PetscScalar *u, void *ctx) {
+PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal loadIncrement,
+                          const PetscReal coords[], PetscInt ncompu,
+                          PetscScalar *u, void *ctx) {
   PetscInt *faceID = (PetscInt *)ctx;
 
   PetscFunctionBeginUser;
 
   switch (*faceID) {
-  case 999:    // left side of the cyl-hol
+  case 999:                       // left side of the cyl-hol
     u[0] = 0;
     u[1] = 0;
     u[2] = 0;
     break;
-  case 998:    // right side of the cyl-hol
+  case 998:                       // right side of the cyl-hol
     u[0] = 0;
-    u[1] = -0.25; // bend in the -y direction
+    u[1] = -1.0 * loadIncrement; // bend in the -y direction
     u[2] = 0;
     break;
   }
+
   PetscFunctionReturn(0);
 };
 
@@ -1471,9 +1481,9 @@ PetscErrorCode BCBend2_ss(PetscInt dim, PetscReal time,
 //   \ /-------------------/                \ z
 //
 //  0 values on the left side of the cyl-hole (sideset 999)
-PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal time,
-                          const PetscReal coords[],
-                          PetscInt ncompu, PetscScalar *u, void *ctx) {
+PetscErrorCode BCBend1_ss(PetscInt dim, PetscReal loadIncrement,
+                          const PetscReal coords[], PetscInt ncompu,
+                          PetscScalar *u, void *ctx) {
   PetscFunctionBeginUser;
 
   u[0] = 0;

@@ -444,7 +444,22 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   ierr = PetscBarrier((PetscObject)snes); CHKERRQ(ierr);
   startTime = MPI_Wtime();
-  ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+
+  // Solve for each load increment
+  for (PetscInt increment = 0; increment < appCtx->numIncrements; increment++) {
+    // Scale the problem
+    PetscScalar loadIncrement = (increment + 1.0) / appCtx->numIncrements,
+                scalingFactor = loadIncrement /
+                                (increment == 0 ? 1 : resCtx->loadIncrement);
+    resCtx->loadIncrement = loadIncrement;
+    if (appCtx->numIncrements > 1) {
+      ierr = VecScale(F, scalingFactor); CHKERRQ(ierr);
+    }
+
+    // Solve
+    ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
+  }
+
   elapsedTime = MPI_Wtime() - startTime;
 
   // ---------------------------------------------------------------------------
@@ -464,10 +479,13 @@ int main(int argc, char **argv) {
                        "  SNES:\n"
                        "    SNES Type                          : %s\n"
                        "    SNES Convergence                   : %s\n"
+                       "    Number of Load Increments          : %d\n"
                        "    Total SNES Iterations              : %D\n"
                        "    Final rnorm                        : %e\n",
-                       snesType, SNESConvergedReasons[reason], its,
-                       (double)rnorm); CHKERRQ(ierr);
+                       snesType, SNESConvergedReasons[reason],
+                       appCtx->numIncrements, its, (double)rnorm);
+    CHKERRQ(ierr);
+
     // -- KSP
     KSP ksp;
     KSPType kspType;
