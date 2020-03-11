@@ -1081,7 +1081,7 @@ static PetscErrorCode GetDiag_Ceed(Mat A, Vec D) {
   // -- Cleanup
   ierr = VecResetArray(user->Xloc); CHKERRQ(ierr);
   CeedVectorRestoreArrayRead(ceedDiagVec, &diagArray);
-  CeedVectorDestroy(&ceedDiagVec);  
+  CeedVectorDestroy(&ceedDiagVec);
 
   PetscFunctionReturn(0);
 }
@@ -1183,7 +1183,7 @@ static PetscErrorCode Prolong_Ceed(Mat A, Vec X, Vec Y) {
 
   // Global-to-local
   ierr = VecZeroEntries(user->locVecC); CHKERRQ(ierr);
-  ierr = DMGlobalToLocal(user->dmC, X, INSERT_VALUES, user->locVecC); 
+  ierr = DMGlobalToLocal(user->dmC, X, INSERT_VALUES, user->locVecC);
   CHKERRQ(ierr);
   ierr = VecZeroEntries(user->locVecF); CHKERRQ(ierr);
 

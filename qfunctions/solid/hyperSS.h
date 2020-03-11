@@ -108,7 +108,7 @@ CEED_QFUNCTION(HyperSSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // e_v = volumetric strain = e00 + e11 + e22
     //
     // sigma = lambda * log(1 + e_v) + 2 * mu * epsilon
-    // 
+    //
     // Above Voigt Notation is placed in a 3x3 matrix:
     // Volumetric strain
     const CeedScalar strain_vol = e[0][0] + e[1][1] + e[2][2];
@@ -232,7 +232,7 @@ CEED_QFUNCTION(HyperSSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // lambda = (3 * bulk modulus - 2 * mu) / 3
     // e_v = volumetric strain = e00 + e11 + e22
     // lambda bar = lambda / (1 + e_v)
-    // 
+    //
     // dSigma = S * epsilon
     //
     // S_ijkl = lambda bar * delta_ij * delta_kl + 2 * mu * delta_ik * delta_jl

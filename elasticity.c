@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
     bool highOrder = (appCtx->levelDegrees[fineLevel] > 4 && ceedFine);
     Ceed levelCeed = highOrder ? ceedFine : ceed;
     ierr = SetupLibceedFineLevel(levelDMs[fineLevel], levelCeed, appCtx,
-                                 phys, ceedData, fineLevel, ncompu, 
+                                 phys, ceedData, fineLevel, ncompu,
                                  Ugsz[fineLevel], Ulocsz[fineLevel], forceCeed,
                                  qfRestrict, qfProlong);
     CHKERRQ(ierr);
@@ -231,7 +231,7 @@ int main(int argc, char **argv) {
                        numLevels); CHKERRQ(ierr);
 
     if (appCtx->multigridChoice != MULTIGRID_NONE) {
-      for (int i = 0; i < 2; i++) {  
+      for (int i = 0; i < 2; i++) {
         CeedInt level = i ? fineLevel : 0;
         ierr = PetscPrintf(comm,
                            "    Level %D (%s):\n"
