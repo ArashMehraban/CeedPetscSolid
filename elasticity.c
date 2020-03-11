@@ -36,6 +36,9 @@ int main(int argc, char **argv) {
   Physics        phys;                   // Contains physical constants
   Units          units;                  // Contains units scaling
   // PETSc objects
+  PetscLogStage  stagePetscSetup,
+                 stageLibceedSetup,
+                 stageSnesSolve;
   DM             dmOrig;                 // Distributed DM to clone
   DM             *levelDMs;
   Vec            U, *Ug, *Uloc;          // U: solution, R: residual, F: forcing
@@ -81,6 +84,11 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Setup DM
   // ---------------------------------------------------------------------------
+  // Performance logging
+  ierr = PetscLogStageRegister("PETSc Setup Stage", &stagePetscSetup);
+  CHKERRQ(ierr);
+  ierr = PetscLogStagePush(stagePetscSetup); CHKERRQ(ierr);
+
   // -- Create distributed DM from mesh file
   ierr = createDistributedDM(comm, appCtx, &dmOrig); CHKERRQ(ierr);
 
@@ -123,9 +131,18 @@ int main(int argc, char **argv) {
   ierr = VecDuplicate(Uloc[fineLevel], &Rloc); CHKERRQ(ierr);
   ierr = VecDuplicate(Uloc[fineLevel], &Floc); CHKERRQ(ierr);
 
+  // Performance logging
+  ierr = PetscLogStagePop();
+
   // ---------------------------------------------------------------------------
   // Set up libCEED
   // ---------------------------------------------------------------------------
+  // Performance logging
+  ierr = PetscLogStageRegister("libCEED Setup Stage", &stageLibceedSetup);
+  CHKERRQ(ierr);
+  ierr = PetscLogStagePush(stageLibceedSetup); CHKERRQ(ierr);
+
+  // Initalize backend
   CeedInit(appCtx->ceedResource, &ceed);
   if (appCtx->degree > 4 && appCtx->ceedResourceFine[0])
     CeedInit(appCtx->ceedResourceFine, &ceedFine);
@@ -442,6 +459,12 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Solve SNES
   // ---------------------------------------------------------------------------
+  // Performance logging
+  ierr = PetscLogStageRegister("SNES Solve Stage", &stageSnesSolve);
+  CHKERRQ(ierr);
+  ierr = PetscLogStagePush(stageSnesSolve); CHKERRQ(ierr);
+
+  // Timing
   ierr = PetscBarrier((PetscObject)snes); CHKERRQ(ierr);
   startTime = MPI_Wtime();
 
@@ -461,6 +484,9 @@ int main(int argc, char **argv) {
   }
 
   elapsedTime = MPI_Wtime() - startTime;
+
+  // Performance logging
+  ierr = PetscLogStagePop();
 
   // ---------------------------------------------------------------------------
   // Output summary
