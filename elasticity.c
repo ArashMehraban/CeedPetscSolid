@@ -1,3 +1,19 @@
+// Copyright (c) 2017, Lawrence Livermore National Security, LLC. Produced at
+// the Lawrence Livermore National Laboratory. LLNL-CODE-734707. All Rights
+// reserved. See files LICENSE and NOTICE for details.
+//
+// This file is part of CEED, a collection of benchmarks, miniapps, software
+// libraries and APIs for efficient high-order finite element and spectral
+// element discretizations for exascale applications. For more information and
+// source code availability see http://github.com/ceed.
+//
+// The CEED research is supported by the Exascale Computing Project 17-SC-20-SC,
+// a collaborative effort of two U.S. Department of Energy organizations (Office
+// of Science and the National Nuclear Security Administration) responsible for
+// the planning and preparation of a capable exascale ecosystem, including
+// software, applications, hardware, advanced system engineering and early
+// testbed platforms, in support of the nation's exascale computing imperative.
+
 //                        libCEED + PETSc Example: Elasticity
 //
 // This example demonstrates a simple usage of libCEED with PETSc to solve
@@ -26,7 +42,7 @@ const char help[] = "Solve solid Problems with CEED and PETSc DMPlex\n";
 #include <petscksp.h>
 #include <petscdmplex.h>
 #include <ceed.h>
-#include "setup.h"
+#include "elasticity.h"
 
 int main(int argc, char **argv) {
   PetscInt       ierr;
@@ -72,14 +88,14 @@ int main(int argc, char **argv) {
 
   // -- Set mesh file, polynomial degree, problem type
   ierr = PetscMalloc1(1, &appCtx); CHKERRQ(ierr);
-  ierr = processCommandLineOptions(comm, appCtx); CHKERRQ(ierr);
+  ierr = ProcessCommandLineOptions(comm, appCtx); CHKERRQ(ierr);
   numLevels = appCtx->numLevels;
   fineLevel = numLevels - 1;
 
   // -- Set Poison's ratio, Young's Modulus
   ierr = PetscMalloc1(1, &phys); CHKERRQ(ierr);
   ierr = PetscMalloc1(1, &units); CHKERRQ(ierr);
-  ierr = processPhysics(comm, phys, units); CHKERRQ(ierr);
+  ierr = ProcessPhysics(comm, phys, units); CHKERRQ(ierr);
 
   // ---------------------------------------------------------------------------
   // Setup DM
@@ -90,7 +106,7 @@ int main(int argc, char **argv) {
   ierr = PetscLogStagePush(stageDMSetup); CHKERRQ(ierr);
 
   // -- Create distributed DM from mesh file
-  ierr = createDistributedDM(comm, appCtx, &dmOrig); CHKERRQ(ierr);
+  ierr = CreateDistributedDM(comm, appCtx, &dmOrig); CHKERRQ(ierr);
 
   // -- Setup DM by polynomial degree
   ierr = PetscMalloc1(numLevels, &levelDMs); CHKERRQ(ierr);
@@ -261,7 +277,7 @@ int main(int argc, char **argv) {
                            level, i ? "fine" : "coarse",
                            appCtx->levelDegrees[level] + 1,
                            Ugsz[level]/ncompu, Ulsz[level]/ncompu);
-                           CHKERRQ(ierr);
+        CHKERRQ(ierr);
       }
     }
   }
@@ -589,7 +605,7 @@ int main(int argc, char **argv) {
     ierr = PetscPrintf(comm,
                        "  Performance:\n"
                        "    SNES Solve Time                    : %g (%g) sec\n",
-                           maxTime, minTime); CHKERRQ(ierr);
+                       maxTime, minTime); CHKERRQ(ierr);
   }
 
   // ---------------------------------------------------------------------------
@@ -622,7 +638,7 @@ int main(int argc, char **argv) {
     l2Error /= l2Unorm;
 
     // -- Output
-    if (!appCtx->testMode || l2Error > 0.013) {
+    if (!appCtx->testMode || l2Error > 0.05) {
       ierr = PetscPrintf(comm,
                          "    L2 Error                           : %e\n",
                          l2Error); CHKERRQ(ierr);

@@ -1,5 +1,3 @@
-old_*
+build/*
 elasticity
-compile_commands.json
-.idea
-*.m
+solution*
