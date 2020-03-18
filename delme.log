@@ -1,0 +1,43 @@
+
+-- Elastisticy Example - libCEED + PETSc --
+  libCEED:
+    libCEED Backend                    : /cpu/self/avx/blocked
+  Problem:
+    Problem Name                       : Linear elasticity
+    Forcing Function                   : Manufactured solution
+    Boundary Condition                 : Manufactured solution
+  Mesh:
+    File                               : ./meshes/cyl-hole_672e_4ss_us.exo
+    Number of 1D Basis Nodes (p)       : 3
+    Number of 1D Quadrature Points (q) : 3
+    Global nodes                       : 4136
+    Owned nodes                        : 4136
+    DoF per node                       : 3
+  Multigrid:
+    Type                               : P-multigrid, logarithmic coarsening
+    Number of Levels                   : 2
+    Level 0 (coarse):
+      Number of 1D Basis Nodes (p)     : 2
+      Global Nodes                     : 368
+      Owned Nodes                      : 368
+    Level 1 (fine):
+      Number of 1D Basis Nodes (p)     : 3
+      Global Nodes                     : 4136
+      Owned Nodes                      : 4136
+  SNES:
+    SNES Type                          : newtonls
+    SNES Convergence                   : CONVERGED_FNORM_RELATIVE
+    Number of Load Increments          : 1
+    Total SNES Iterations              : 1
+    Final rnorm                        : 1.873905e-04
+  Linear Solver:
+    KSP Type                           : cg
+  P-Multigrid:
+    PCMG Type                          : MULTIPLICATIVE
+    PCMG Cycle Type                    : v
+    Coarse Solve:
+      KSP Type                         : preonly
+      PC Type                          : gamg
+  Performance:
+    SNES Solve Time                    : 5.40998 (5.40998) sec
+    L2 Error                           : 2.466037e-02
