@@ -27,9 +27,9 @@
 //
 // Sample runs:
 //
-//     ./elasticity -problem linElas -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672e_4ss_us.exo
-//     ./elasticity -problem hyperSS -ceed /cpu/self -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672e_4ss_us.exo
-//     ./elasticity -problem hyperFS -ceed /gpu/occa -degree 2 -nu 0.3 -E 1 -forcing mms -boundary mms -mesh ./meshes/cylinder8_672e_4ss_us.exo
+//     ./elasticity -problem linElas -degree 2 -nu 0.3 -E 1 -forcing mms -mesh ./meshes/cylinder8_672e_4ss_us.exo
+//     ./elasticity -problem hyperSS -ceed /cpu/self -degree 2 -nu 0.3 -E 1 -forcing mms -mesh ./meshes/cylinder8_672e_4ss_us.exo
+//     ./elasticity -problem hyperFS -ceed /gpu/occa -degree 2 -nu 0.3 -E 1 -forcing mms -mesh ./meshes/cylinder8_672e_4ss_us.exo
 //
 //TESTARGS -ceed {ceed_resource} -test -degree 2 -nu 0.3 -E 1
 
@@ -37,11 +37,6 @@
 /// CEED elasticity example using PETSc with DMPlex
 const char help[] = "Solve solid Problems with CEED and PETSc DMPlex\n";
 
-#include <stdbool.h>
-#include <string.h>
-#include <petscksp.h>
-#include <petscdmplex.h>
-#include <ceed.h>
 #include "elasticity.h"
 
 int main(int argc, char **argv) {
@@ -87,7 +82,7 @@ int main(int argc, char **argv) {
   comm = PETSC_COMM_WORLD;
 
   // -- Set mesh file, polynomial degree, problem type
-  ierr = PetscMalloc1(1, &appCtx); CHKERRQ(ierr);
+  ierr = PetscCalloc1(1, &appCtx); CHKERRQ(ierr);
   ierr = ProcessCommandLineOptions(comm, appCtx); CHKERRQ(ierr);
   numLevels = appCtx->numLevels;
   fineLevel = numLevels - 1;
@@ -246,7 +241,6 @@ int main(int argc, char **argv) {
                        "  Problem:\n"
                        "    Problem Name                       : %s\n"
                        "    Forcing Function                   : %s\n"
-                       "    Boundary Condition                 : %s\n"
                        "  Mesh:\n"
                        "    File                               : %s\n"
                        "    Number of 1D Basis Nodes (p)       : %d\n"
@@ -259,8 +253,7 @@ int main(int argc, char **argv) {
                        "    Number of Levels                   : %d\n",
                        problemTypesForDisp[appCtx->problemChoice],
                        forcingTypesForDisp[appCtx->forcingChoice],
-                       boundaryTypesForDisp[appCtx->boundaryChoice],
-                       appCtx->meshFile ? appCtx->meshFile : "Box Mesh",
+                       appCtx->meshFile[0] ? appCtx->meshFile : "Box Mesh",
                        appCtx->degree + 1, appCtx->degree + 1,
                        Ugsz[fineLevel]/ncompu, Ulsz[fineLevel]/ncompu, ncompu,
                        multigridTypesForDisp[appCtx->multigridChoice],

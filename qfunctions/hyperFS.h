@@ -293,12 +293,12 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
     // C : right Cauchy-Green tensor
     // C = F^T * F (^T  means Transpose)
-    const CeedScalar C00 = F[0][0]*F[0][0] + F[0][1]*F[0][1] + F[0][2]*F[0][2];
-    const CeedScalar C01 = F[0][0]*F[1][0] + F[0][1]*F[1][1] + F[0][2]*F[1][2];
-    const CeedScalar C02 = F[0][0]*F[2][0] + F[0][1]*F[2][1] + F[0][2]*F[2][2];
-    const CeedScalar C11 = F[1][0]*F[1][0] + F[1][1]*F[1][1] + F[1][2]*F[1][2];
-    const CeedScalar C12 = F[1][0]*F[2][0] + F[1][1]*F[2][1] + F[1][2]*F[2][2];
-    const CeedScalar C22 = F[2][0]*F[2][0] + F[2][1]*F[2][1] + F[2][2]*F[2][2];
+    const CeedScalar C00 = F[0][0]*F[0][0] + F[0][1]*F[1][0] + F[0][2]*F[2][0];
+    const CeedScalar C01 = F[0][0]*F[0][1] + F[0][1]*F[1][1] + F[0][2]*F[2][1];
+    const CeedScalar C02 = F[0][0]*F[0][2] + F[0][1]*F[1][2] + F[0][2]*F[2][2];
+    const CeedScalar C11 = F[1][0]*F[0][1] + F[1][1]*F[1][1] + F[1][2]*F[2][1];
+    const CeedScalar C12 = F[1][0]*F[0][2] + F[1][1]*F[1][2] + F[1][2]*F[2][2];
+    const CeedScalar C22 = F[2][0]*F[0][2] + F[2][1]*F[1][2] + F[2][2]*F[2][2];
     // *INDENT-OFF*
     const CeedScalar C[3][3] = {{C00, C01, C02},
                                 {C01, C11, C12},
