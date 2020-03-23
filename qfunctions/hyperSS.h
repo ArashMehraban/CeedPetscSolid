@@ -95,19 +95,19 @@ CEED_QFUNCTION(HyperSSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
     // Compute Strain : e (epsilon)
     // e = 1/2 (grad u + (grad u)^T)
+    const CeedScalar e00 = (gradu[0][0][i] + gradu[0][0][i])/2.,
+                     e01 = (gradu[0][1][i] + gradu[1][0][i])/2.,
+                     e02 = (gradu[0][2][i] + gradu[2][0][i])/2.,
+                     e11 = (gradu[1][1][i] + gradu[1][1][i])/2.,
+                     e12 = (gradu[1][2][i] + gradu[2][1][i])/2.,
+                     e22 = (gradu[2][2][i] + gradu[2][2][i])/2.;
     // *INDENT-OFF*
-    const CeedScalar e[3][3] =  {{(gradu[0][0][i] + gradu[0][0][i])*0.5,
-                                  (gradu[0][1][i] + gradu[1][0][i])*0.5,
-                                  (gradu[0][2][i] + gradu[2][0][i])*0.5},
-                                 {(gradu[1][0][i] + gradu[0][1][i])*0.5,
-                                  (gradu[1][1][i] + gradu[1][1][i])*0.5,
-                                  (gradu[1][2][i] + gradu[2][1][i])*0.5},
-                                 {(gradu[2][0][i] + gradu[0][2][i])*0.5,
-                                  (gradu[2][1][i] + gradu[1][2][i])*0.5,
-                                  (gradu[2][2][i] + gradu[2][2][i])*0.5}
+    const CeedScalar e[3][3] =  {{e00, e01, e02},
+                                 {e01, e11, e12},
+                                 {e02, e12, e22}
                                 };
-
     // *INDENT-ON*
+    
     // strain (epsilon)
     //    and
     // stress (sigma) in Voigt notation:
@@ -220,19 +220,19 @@ CEED_QFUNCTION(HyperSSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
     // Compute Strain : e (epsilon)
     // e = 1/2 (grad u + (grad u)^T)
+    const CeedScalar de00 = (graddeltau[0][0] + graddeltau[0][0])/2.,
+                     de01 = (graddeltau[0][1] + graddeltau[1][0])/2.,
+                     de02 = (graddeltau[0][2] + graddeltau[2][0])/2.,
+                     de11 = (graddeltau[1][1] + graddeltau[1][1])/2.,
+                     de12 = (graddeltau[1][2] + graddeltau[2][1])/2.,
+                     de22 = (graddeltau[2][2] + graddeltau[2][2])/2.;
     // *INDENT-OFF*
-    const CeedScalar de[3][3]     =  {{(graddeltau[0][0] + graddeltau[0][0])*0.5,
-                                       (graddeltau[0][1] + graddeltau[1][0])*0.5,
-                                       (graddeltau[0][2] + graddeltau[2][0])*0.5},
-                                      {(graddeltau[1][0] + graddeltau[0][1])*0.5,
-                                       (graddeltau[1][1] + graddeltau[1][1])*0.5,
-                                       (graddeltau[1][2] + graddeltau[2][1])*0.5},
-                                      {(graddeltau[2][0] + graddeltau[0][2])*0.5,
-                                       (graddeltau[2][1] + graddeltau[1][2])*0.5,
-                                       (graddeltau[2][2] + graddeltau[2][2])*0.5}
-                                     };
-
+    const CeedScalar de[3][3] =  {{de00, de01, de02},
+                                  {de01, de11, de12},
+                                  {de02, de12, de22}
+                                 };
     // *INDENT-ON*
+    
     //strain (epsilon)
     //    and
     //stress (sigma) in Voigt notation:
