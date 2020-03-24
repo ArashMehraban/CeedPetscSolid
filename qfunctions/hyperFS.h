@@ -128,39 +128,26 @@ CEED_QFUNCTION(HyperFSF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
     // E - Green-Lagrange strain tensor
     //     E = 1/2 (gradu + gradu^T + gradu^T*gradu)
-    const CeedScalar E00 = gradu[0][0][i]*gradu[0][0][i] +
-                           gradu[0][1][i]*gradu[0][1][i] +
-                           gradu[0][2][i]*gradu[0][2][i] + 2.*gradu[0][0][i];
-    const CeedScalar E01 = gradu[0][0][i]*gradu[1][0][i] +
-                           gradu[0][1][i]*gradu[1][1][i] +
-                           gradu[0][2][i]*gradu[1][2][i] +
-                           gradu[0][1][i] + gradu[1][0][i];
-    const CeedScalar E02 = gradu[0][0][i]*gradu[2][0][i] +
-                           gradu[0][1][i]*gradu[2][1][i] +
-                           gradu[0][2][i]*gradu[2][2][i] +
-                           gradu[0][2][i] + gradu[2][0][i];
-    const CeedScalar E11 = gradu[1][0][i]*gradu[1][0][i] +
-                           gradu[1][1][i]*gradu[1][1][i] +
-                           gradu[1][2][i]*gradu[1][2][i] + 2.*gradu[1][1][i];
-    const CeedScalar E12 = gradu[1][0][i]*gradu[2][0][i] +
-                           gradu[1][1][i]*gradu[2][1][i] +
-                           gradu[1][2][i]*gradu[2][2][i] +
-                           gradu[1][2][i] + gradu[2][1][i];
-    const CeedScalar E22 = gradu[2][0][i]*gradu[2][0][i] +
-                           gradu[2][1][i]*gradu[2][1][i] +
-                           gradu[2][2][i]*gradu[2][2][i] + 2.*gradu[2][2][i];
+    const CeedInt indj[6] = {0, 1, 2, 1, 0, 0}, indk[6] = {0, 1, 2, 2, 2, 1};
+    CeedScalar E2work[6];
+    for (CeedInt m = 0; m < 6; m++) {
+      E2work[m] = gradu[indj[m]][indk[m]][i] + gradu[indk[m]][indj[m]][i];
+      for (CeedInt n = 0; n < 3; n++)
+        E2work[m] += gradu[indj[m]][n][i]*gradu[indk[m]][n][i];
+    }           
     // *INDENT-OFF*
-    CeedScalar E2[3][3] = {{E00, E01, E02},
-                           {E01, E11, E12},
-                           {E02, E12, E22}
+    CeedScalar E2[3][3] = {{E2work[0], E2work[5], E2work[4]},
+                           {E2work[5], E2work[1], E2work[3]},
+                           {E2work[4], E2work[3], E2work[2]}
                           };
     // *INDENT-ON*
-    const CeedScalar detC_m1 = E00*(E11*E22 - E12*E12) +
-                               E01*(E02*E12 - E01*E22) +
-                               E02*(E01*E12 - E02*E11) +
-                               E00 + E11 + E22 +
-                               E00*E11 + E00*E22 + E11*E22 -
-                               E01*E01 - E02*E02 - E12*E12;
+    const CeedScalar detC_m1 = E2[0][0]*(E2[1][1]*E2[2][2]-E2[1][2]*E2[1][2]) +
+                               E2[0][1]*(E2[0][2]*E2[1][2]-E2[0][1]*E2[2][2]) +
+                               E2[0][2]*(E2[0][1]*E2[1][2]-E2[0][2]*E2[1][1]) +
+                               E2[0][0] + E2[1][1] + E2[2][2] +
+                               E2[0][0]*E2[1][1] + E2[0][0]*E2[2][2] +
+                               E2[1][1]*E2[2][2] - E2[0][1]*E2[0][1] -
+                               E2[0][2]*E2[0][2] - E2[1][2]*E2[1][2];
 
     // C : right Cauchy-Green tensor
     // C = F^T * F (^T  means Transpose)
@@ -327,81 +314,39 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
     // E - Green-Lagrange strain tensor
     //     E = 1/2 (gradu + gradu^T + gradu^T*gradu)
-    const CeedScalar E00 = gradu[0][0][i]*gradu[0][0][i] +
-                           gradu[0][1][i]*gradu[0][1][i] +
-                           gradu[0][2][i]*gradu[0][2][i] + 2.*gradu[0][0][i];
-    const CeedScalar E01 = gradu[0][0][i]*gradu[1][0][i] +
-                           gradu[0][1][i]*gradu[1][1][i] +
-                           gradu[0][2][i]*gradu[1][2][i] +
-                           gradu[0][1][i] + gradu[1][0][i];
-    const CeedScalar E02 = gradu[0][0][i]*gradu[2][0][i] +
-                           gradu[0][1][i]*gradu[2][1][i] +
-                           gradu[0][2][i]*gradu[2][2][i] +
-                           gradu[0][2][i] + gradu[2][0][i];
-    const CeedScalar E11 = gradu[1][0][i]*gradu[1][0][i] +
-                           gradu[1][1][i]*gradu[1][1][i] +
-                           gradu[1][2][i]*gradu[1][2][i] + 2.*gradu[1][1][i];
-    const CeedScalar E12 = gradu[1][0][i]*gradu[2][0][i] +
-                           gradu[1][1][i]*gradu[2][1][i] +
-                           gradu[1][2][i]*gradu[2][2][i] +
-                           gradu[1][2][i] + gradu[2][1][i];
-    const CeedScalar E22 = gradu[2][0][i]*gradu[2][0][i] +
-                           gradu[2][1][i]*gradu[2][1][i] +
-                           gradu[2][2][i]*gradu[2][2][i] + 2.*gradu[2][2][i];
+    const CeedInt indj[6] = {0, 1, 2, 1, 0, 0}, indk[6] = {0, 1, 2, 2, 2, 1};
+    CeedScalar E2work[6];
+    for (CeedInt m = 0; m < 6; m++) {
+      E2work[m] = gradu[indj[m]][indk[m]][i] + gradu[indk[m]][indj[m]][i];
+      for (CeedInt n = 0; n < 3; n++)
+        E2work[m] += gradu[indj[m]][n][i]*gradu[indk[m]][n][i];
+    }           
     // *INDENT-OFF*
-    CeedScalar E2[3][3] = {{E00, E01, E02},
-                           {E01, E11, E12},
-                           {E02, E12, E22}
+    CeedScalar E2[3][3] = {{E2work[0], E2work[5], E2work[4]},
+                           {E2work[5], E2work[1], E2work[3]},
+                           {E2work[4], E2work[3], E2work[2]}
                           };
     // *INDENT-ON*
-    const CeedScalar detC_m1 = E00*(E11*E22 - E12*E12) +
-                               E01*(E02*E12 - E01*E22) +
-                               E02*(E01*E12 - E02*E11) +
-                               E00 + E11 + E22 +
-                               E00*E11 + E00*E22 + E11*E22 -
-                               E01*E01 - E02*E02 - E12*E12;
+    const CeedScalar detC_m1 = E2[0][0]*(E2[1][1]*E2[2][2]-E2[1][2]*E2[1][2]) +
+                               E2[0][1]*(E2[0][2]*E2[1][2]-E2[0][1]*E2[2][2]) +
+                               E2[0][2]*(E2[0][1]*E2[1][2]-E2[0][2]*E2[1][1]) +
+                               E2[0][0] + E2[1][1] + E2[2][2] +
+                               E2[0][0]*E2[1][1] + E2[0][0]*E2[2][2] +
+                               E2[1][1]*E2[2][2] - E2[0][1]*E2[0][1] -
+                               E2[0][2]*E2[0][2] - E2[1][2]*E2[1][2];
 
     // deltaE - Green-Lagrange strain tensor
-    const CeedScalar deltaE00 = (graddeltau[0][0]*F[0][0] +
-                                 graddeltau[1][0]*F[1][0] +
-                                 graddeltau[2][0]*F[2][0] +
-                                 F[0][0]*graddeltau[0][0] +
-                                 F[1][0]*graddeltau[1][0] +
-                                 F[2][0]*graddeltau[2][0])/2.;
-    const CeedScalar deltaE01 = (graddeltau[0][0]*F[0][1] +
-                                 graddeltau[1][0]*F[1][1] +
-                                 graddeltau[2][0]*F[2][1] +
-                                 F[0][0]*graddeltau[0][1] +
-                                 F[1][0]*graddeltau[1][1] +
-                                 F[2][0]*graddeltau[2][1])/2.;
-    const CeedScalar deltaE02 = (graddeltau[0][0]*F[0][2] +
-                                 graddeltau[1][0]*F[1][2] +
-                                 graddeltau[2][0]*F[2][2] +
-                                 F[0][0]*graddeltau[0][2] +
-                                 F[1][0]*graddeltau[1][2] +
-                                 F[2][0]*graddeltau[2][2])/2.;
-    const CeedScalar deltaE11 = (graddeltau[0][1]*F[0][1] +
-                                 graddeltau[1][1]*F[1][1] +
-                                 graddeltau[2][1]*F[2][1] +
-                                 F[0][1]*graddeltau[0][1] +
-                                 F[1][1]*graddeltau[1][1] +
-                                 F[2][1]*graddeltau[2][1])/2.;
-    const CeedScalar deltaE12 = (graddeltau[0][1]*F[0][2] +
-                                 graddeltau[1][1]*F[1][2] +
-                                 graddeltau[2][1]*F[2][2] +
-                                 F[0][1]*graddeltau[0][2] +
-                                 F[1][1]*graddeltau[1][2] +
-                                 F[2][1]*graddeltau[2][2])/2.;
-    const CeedScalar deltaE22 = (graddeltau[0][2]*F[0][2] +
-                                 graddeltau[1][2]*F[1][2] +
-                                 graddeltau[2][2]*F[2][2] +
-                                 F[0][2]*graddeltau[0][2] +
-                                 F[1][2]*graddeltau[1][2] +
-                                 F[2][2]*graddeltau[2][2])/2.;
+    CeedScalar deltaEwork[6];
+    for (CeedInt m = 0; m < 6; m++) {
+      deltaEwork[m] = 0;
+      for (CeedInt n = 0; n < 3; n++)
+        deltaEwork[m] += (graddeltau[n][indj[m]]*F[n][indk[m]] +
+                          F[n][indj[m]]*graddeltau[n][indk[m]])/2.;
+    }           
     // *INDENT-OFF*
-    CeedScalar deltaE[3][3] = {{deltaE00, deltaE01, deltaE02},
-                               {deltaE01, deltaE11, deltaE12},
-                               {deltaE02, deltaE12, deltaE22}
+    CeedScalar deltaE[3][3] = {{deltaEwork[0], deltaEwork[5], deltaEwork[4]},
+                               {deltaEwork[5], deltaEwork[1], deltaEwork[3]},
+                               {deltaEwork[4], deltaEwork[3], deltaEwork[2]}
                               };
     // *INDENT-ON*
 
@@ -439,28 +384,16 @@ CEED_QFUNCTION(HyperFSdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 
     // Compute the Second Piola-Kirchhoff (S)
     const CeedScalar llnj = lambda*log1p(detC_m1)/2.;
-    const CeedScalar S00 = llnj*C_inv[0][0] +
-                           mu*(C_inv[0][0]*E2[0][0] + C_inv[0][1]*E2[1][0] +
-                               C_inv[0][2]*E2[2][0]),
-                     S01 = llnj*C_inv[0][1] +
-                           mu*(C_inv[0][0]*E2[0][1] + C_inv[0][1]*E2[1][1] +
-                               C_inv[0][2]*E2[2][1]),
-                     S02 = llnj*C_inv[0][2] +
-                           mu*(C_inv[0][0]*E2[0][2] + C_inv[0][1]*E2[1][2] +
-                               C_inv[0][2]*E2[2][2]),
-                     S11 = llnj*C_inv[1][1] +
-                           mu*(C_inv[1][0]*E2[0][1] + C_inv[1][1]*E2[1][1] +
-                               C_inv[1][2]*E2[2][1]),
-                     S12 = llnj*C_inv[1][2] +
-                           mu*(C_inv[1][0]*E2[0][2] + C_inv[1][1]*E2[1][2] +
-                               C_inv[1][2]*E2[2][2]),
-                     S22 = llnj*C_inv[2][2] +
-                           mu*(C_inv[2][0]*E2[0][2] + C_inv[2][1]*E2[1][2] +
-                               C_inv[2][2]*E2[2][2]);
+    CeedScalar Swork[6];
+    for (CeedInt m = 0; m < 6; m++) {
+      Swork[m] = llnj*C_inv[indj[m]][indk[m]];
+      for (CeedInt n = 0; n < 3; n++)
+        Swork[m] += mu*C_inv[indj[m]][n]*E2[n][indk[m]];
+    }           
     // *INDENT-OFF*
-    CeedScalar S[3][3] = {{S00, S01, S02},
-                          {S01, S11, S12},
-                          {S02, S12, S22}
+    CeedScalar S[3][3] = {{Swork[0], Swork[5], Swork[4]},
+                          {Swork[5], Swork[1], Swork[3]},
+                          {Swork[4], Swork[3], Swork[2]}
                          };
     // *INDENT-ON*
 
