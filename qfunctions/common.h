@@ -14,6 +14,9 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
+/// @file
+/// Geometric factors for solid mechanics example using PETSc
+
 #ifndef COMMON_H
 #define COMMON_H
 
@@ -45,11 +48,11 @@ CEED_QFUNCTION(SetupGeo)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                          CeedScalar *const *out) {
     // *INDENT-OFF*
      // Inputs
-     const CeedScalar (*J)[3][Q] = (CeedScalar(*)[3][Q])in[0],
+     const CeedScalar (*J)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])in[0],
                       (*w) = in[1];
 
      // Outputs
-     CeedScalar (*qdata)[Q] = (CeedScalar(*)[Q])out[0];
+     CeedScalar (*qdata)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];
      // *INDENT-ON*
 
   CeedPragmaSIMD

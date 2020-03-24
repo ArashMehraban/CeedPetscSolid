@@ -14,6 +14,9 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
+/// @file
+/// Linear elasticity for solid mechanics example using PETSc
+
 #ifndef LIN_ELAS_H
 #define LIN_ELAS_H
 
@@ -25,27 +28,29 @@
 #define PHYSICS_STRUCT
 typedef struct Physics_private *Physics;
 struct Physics_private {
-  PetscScalar   nu;      // Poisson's ratio
-  PetscScalar   E;       // Young's Modulus
+  CeedScalar   nu;      // Poisson's ratio
+  CeedScalar   E;       // Young's Modulus
 };
 #endif
 
+// -----------------------------------------------------------------------------
+// Residual evaluation for linear elasticity
 // -----------------------------------------------------------------------------
 CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                          CeedScalar *const *out) {
   // *INDENT-OFF*
   // Inputs
-  const CeedScalar (*ug)[3][Q] = (CeedScalar(*)[3][Q])in[0],
-                   (*qdata)[Q] = (CeedScalar(*)[Q])in[1];
+  const CeedScalar (*ug)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])in[0],
+                   (*qdata)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])in[1];
 
   // Outputs
-  CeedScalar (*dvdX)[3][Q] = (CeedScalar(*)[3][Q])out[0];
+  CeedScalar (*dvdX)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])out[0];
              // gradu not used for linear elasticity
-             // (*gradu)[3][Q] = (CeedScalar(*)[3][Q])out[1];
+             // (*gradu)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])out[1];
   // *INDENT-ON*
 
   // Context
-  const Physics context = ctx;
+  const Physics context = (Physics)ctx;
   const CeedScalar E  = context->E;
   const CeedScalar nu = context->nu;
 
@@ -82,10 +87,10 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     //   dXdx = (dx/dX)^(-1)
     // Apply dXdx to du = gradu
     CeedScalar gradu[3][3];
-    for (int j = 0; j < 3; j++)     // Component
-      for (int k = 0; k < 3; k++) { // Derivative
+    for (CeedInt j = 0; j < 3; j++)     // Component
+      for (CeedInt k = 0; k < 3; k++) { // Derivative
         gradu[j][k] = 0;
-        for (int m = 0; m < 3; m++)
+        for (CeedInt m = 0; m < 3; m++)
           gradu[j][k] += dXdx[m][k] * du[j][m];
       }
 
@@ -140,10 +145,10 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // *INDENT-ON*
 
     // Apply dXdx^T and weight to sigma
-    for (int j = 0; j < 3; j++)     // Component
-      for (int k = 0; k < 3; k++) { // Derivative
+    for (CeedInt j = 0; j < 3; j++)     // Component
+      for (CeedInt k = 0; k < 3; k++) { // Derivative
         dvdX[k][j][i] = 0;
-        for (int m = 0; m < 3; m++)
+        for (CeedInt m = 0; m < 3; m++)
           dvdX[k][j][i] += dXdx[k][m] * sigma[j][m] * wJ;
       }
 
@@ -153,21 +158,23 @@ CEED_QFUNCTION(LinElasF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
 }
 
 // -----------------------------------------------------------------------------
+// Jacobian evaluation for linear elasticity
+// -----------------------------------------------------------------------------
 CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                           CeedScalar *const *out) {
   // *INDENT-OFF*
   // Inputs
-  const CeedScalar (*deltaug)[3][Q] = (CeedScalar(*)[3][Q])in[0],
-                   (*qdata)[Q] = (CeedScalar(*)[Q])in[1];
+  const CeedScalar (*deltaug)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])in[0],
+                   (*qdata)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])in[1];
                    // gradu not used for linear elasticity
                    // (*gradu)[3][Q] = (CeedScalar(*)[3][Q])in[2];
 
   // Outputs
-  CeedScalar (*deltadvdX)[3][Q] = (CeedScalar(*)[3][Q])out[0];
+  CeedScalar (*deltadvdX)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])out[0];
   // *INDENT-ON*
 
   // Context
-  const Physics context = ctx;
+  const Physics context = (Physics)ctx;
   const CeedScalar E  = context->E;
   const CeedScalar nu = context->nu;
 
@@ -204,10 +211,10 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     //   dXdx = (dx/dX)^(-1)
     // Apply dXdx to deltadu = graddeltau
     CeedScalar graddeltau[3][3];
-    for (int j = 0; j < 3; j++)     // Component
-      for (int k = 0; k < 3; k++) { // Derivative
+    for (CeedInt j = 0; j < 3; j++)     // Component
+      for (CeedInt k = 0; k < 3; k++) { // Derivative
         graddeltau[j][k] = 0;
-        for (int m = 0; m < 3; m++)
+        for (CeedInt m = 0; m < 3; m++)
           graddeltau[j][k] += dXdx[m][k] * deltadu[j][m];
       }
 
@@ -260,10 +267,10 @@ CEED_QFUNCTION(LinElasdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // *INDENT-ON*
 
     // Apply dXdx^T and weight
-    for (int j = 0; j < 3; j++)     // Component
-      for (int k = 0; k < 3 ; k++) { // Derivative
+    for (CeedInt j = 0; j < 3; j++)     // Component
+      for (CeedInt k = 0; k < 3 ; k++) { // Derivative
         deltadvdX[k][j][i] = 0;
-        for (int m = 0; m < 3; m++)
+        for (CeedInt m = 0; m < 3; m++)
           deltadvdX[k][j][i] += dXdx[k][m] * dsigma[j][m] * wJ;
       }
 

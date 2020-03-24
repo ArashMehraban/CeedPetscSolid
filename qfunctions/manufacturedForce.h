@@ -14,6 +14,9 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
+/// @file
+/// Linear elasticity manufactured solution forcing term for solid mechanics example using PETSc
+
 #ifndef MANUFACTURED_H
 #define MANUFACTURED_H
 
@@ -25,11 +28,13 @@
 #define PHYSICS_STRUCT
 typedef struct Physics_private *Physics;
 struct Physics_private {
-  PetscScalar   nu;      // Poisson's ratio
-  PetscScalar   E;       // Young's Modulus
+  CeedScalar   nu;      // Poisson's ratio
+  CeedScalar   E;       // Young's Modulus
 };
 #endif
 
+// -----------------------------------------------------------------------------
+// Forcing term for linear elasticity manufactured solution
 // -----------------------------------------------------------------------------
 CEED_QFUNCTION(SetupMMSForce)(void *ctx, const CeedInt Q,
                               const CeedScalar *const *in,
@@ -41,7 +46,7 @@ CEED_QFUNCTION(SetupMMSForce)(void *ctx, const CeedInt Q,
   CeedScalar *force = out[0];
 
   // Context
-  const Physics context = ctx;
+  const Physics context = (Physics)ctx;
   const CeedScalar E  = context->E;
   const CeedScalar nu = context->nu;
 

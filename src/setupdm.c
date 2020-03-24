@@ -14,6 +14,9 @@
 // software, applications, hardware, advanced system engineering and early
 // testbed platforms, in support of the nation's exascale computing imperative.
 
+/// @file
+/// DM setup for solid mechanics example using PETSc
+
 #include "../elasticity.h"
 
 // -----------------------------------------------------------------------------
@@ -174,8 +177,8 @@ PetscErrorCode SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
     ierr = ISGetSize(faceSetIS,&numFaceSets); CHKERRQ(ierr);
     ierr = ISGetIndices(faceSetIS, &faceSetIds); CHKERRQ(ierr);
     ierr = DMAddBoundary(dm, DM_BC_ESSENTIAL, NULL, "Face Sets", 0, 0, NULL,
-                         (void(*)(void))BCMMS, numFaceSets, faceSetIds,
-                         NULL); CHKERRQ(ierr);
+                         (void(*)(void))BCMMS, numFaceSets, faceSetIds, NULL);
+    CHKERRQ(ierr);
     ierr = ISRestoreIndices(faceSetIS, &faceSetIds); CHKERRQ(ierr);
     ierr = ISDestroy(&faceSetIS); CHKERRQ(ierr);
   } else {
