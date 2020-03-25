@@ -76,19 +76,21 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
   CHKERRQ(ierr);
 
   appCtx->bcZeroCount = 16;
-  ierr = PetscOptionsIntArray("-bc_zero","Face IDs to apply zero Dirichlet BC",
+  ierr = PetscOptionsIntArray("-bc_zero", "Face IDs to apply zero Dirichlet BC",
                               NULL, appCtx->bcZeroFaces, &appCtx->bcZeroCount,
                               NULL); CHKERRQ(ierr);
   appCtx->bcClampCount = 16;
-  ierr = PetscOptionsIntArray("-bc_clamp","Face IDs to apply incremental Dirichlet BC",
+  ierr = PetscOptionsIntArray("-bc_clamp",
+                              "Face IDs to apply incremental Dirichlet BC",
                               NULL, appCtx->bcClampFaces, &appCtx->bcClampCount,
                               NULL); CHKERRQ(ierr);
 
   appCtx->bcClampMax = -1;
-  ierr = PetscOptionsScalar("-bc_clamp_max", "Maximum value to displace clamped boundary",
+  ierr = PetscOptionsScalar("-bc_clamp_max",
+                            "Maximum value to displace clamped boundary",
                             NULL, appCtx->bcClampMax, &appCtx->bcClampMax,
                             NULL); CHKERRQ(ierr);
-  
+
   appCtx->multigridChoice = MULTIGRID_LOGARITHMIC;
   ierr = PetscOptionsEnum("-multigrid", "Set multigrid type option", NULL,
                           multigridTypes, (PetscEnum)appCtx->multigridChoice,
@@ -198,12 +200,12 @@ PetscErrorCode ProcessPhysics(MPI_Comm comm, Physics phys, Units units) {
   CHKERRQ(ierr);
   units->meter = fabs(units->meter);
 
-  ierr = PetscOptionsScalar("-units_second","1 second in scaled time units",
+  ierr = PetscOptionsScalar("-units_second", "1 second in scaled time units",
                             NULL, units->second, &units->second, NULL);
   CHKERRQ(ierr);
   units->second = fabs(units->second);
 
-  ierr = PetscOptionsScalar("-units_kilogram","1 kilogram in scaled mass units",
+  ierr = PetscOptionsScalar("-units_kilogram", "1 kilogram in scaled mass units",
                             NULL, units->kilogram, &units->kilogram, NULL);
   CHKERRQ(ierr);
   units->kilogram = fabs(units->kilogram);
