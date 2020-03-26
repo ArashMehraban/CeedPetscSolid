@@ -19,23 +19,27 @@ Due to the nonlinearity of material models in Neo-Hookean hyperelasticity, the N
 
    .. math::
       \begin{matrix}
-      \text{Finite Strain Hyperelastic} & \underset{\bm S = \mathsf C \bm E}{\overset{\text{constitutive}}{\LARGE \longrightarrow}} & \text{St. Venant-Kirchoff} \\
+      \text{Finite Strain Hyperelastic} & \underset{\bm S = \mathsf C \bm E}{\overset{\text{constitutive}}{\longrightarrow}} & \text{St. Venant-Kirchoff} \\
       \text{\scriptsize geometric} {\LARGE \ \downarrow\ } \scriptsize{\bm E \to \bm \epsilon} & & \text{\scriptsize geometric} {\LARGE \ \downarrow\ } \scriptsize{\bm E \to \bm \epsilon} \\
-      \text{Small Strain Hyperelastic} & \underset{\bm \sigma = \mathsf C \bm \epsilon}{\overset{\text{constitutive}}{\LARGE \longrightarrow}} & \text{Linear Elastic} \\
+      \text{Small Strain Hyperelastic} & \underset{\bm \sigma = \mathsf C \bm \epsilon}{\overset{\text{constitutive}}{\longrightarrow}} & \text{Linear Elastic} \\
       \end{matrix}
+
 
 .. _running-elasticity:
 
 Running the mini-app
 ----------------------------------------
 
-.. toctree::
-   :hidden:
+.. only:: html
 
-   README
+   .. toctree::
+      :hidden:
+
+      README
 
 .. include:: README.rst
-   :start-after: inclusion-marker-do-not-remove
+   :start-after: inclusion-solids-marker
+
 
 .. _problem-linear-elasticity:
 
@@ -55,9 +59,9 @@ We multiply :math:numref:`lin-elas` by a test function :math:`\bm v` and integra
 .. math::
    :label: lin-elas-weak
 
-   \int_{\Omega}{ \nabla \boldsymbol{v} \colon \boldsymbol{\sigma}}
-   - \int_{\partial \Omega}{\boldsymbol{v} \cdot \left(\boldsymbol{\sigma} \cdot \hat{\boldsymbol{n}}\right)}
-   - \int_{\Omega}{\boldsymbol{v} \cdot \boldsymbol{g}}
+   \int_{\Omega}{ \nabla \boldsymbol{v} \colon \boldsymbol{\sigma}} \, dV
+   - \int_{\partial \Omega}{\boldsymbol{v} \cdot \left(\boldsymbol{\sigma} \cdot \hat{\boldsymbol{n}}\right)} \, dS
+   - \int_{\Omega}{\boldsymbol{v} \cdot \boldsymbol{g}} \, dV
    = 0, \quad \forall \bm v \in \mathcal V,
 
 where :math:`\boldsymbol{\sigma} \cdot \hat{\boldsymbol{n}}|_{\partial \Omega}` is replaced by an applied force/traction boundary condition.
@@ -94,6 +98,7 @@ Hence, the fourth order elasticity tensor :math:`\mathsf C` (also known as elast
    \end{pmatrix},
 
 where :math:`E` is the Young’s modulus and :math:`\nu` is the Poisson’s ratio.
+
 
 Lamé parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -143,6 +148,7 @@ However, the constitutive law differs and is given as follows:
 
 where :math:`\boldsymbol{\epsilon}` is defined as in :math:numref:`small-strain`.
 
+
 Newton linearization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -157,13 +163,13 @@ where
 
 .. math::
 
-   \diff \boldsymbol{\epsilon} = \dfrac{1}{2}\left( \nabla \boldsymbol{\diff u} + \nabla \boldsymbol{\diff u}^T \right)
+   \diff \boldsymbol{\epsilon} = \dfrac{1}{2}\left( \nabla \diff \boldsymbol{u} + \nabla \diff \boldsymbol{u}^T \right)
 
 and 
 
 .. math::
 
-   \diff \nabla \boldsymbol{u} = \nabla \boldsymbol{\diff u} .
+   \diff \nabla \boldsymbol{u} = \nabla \diff \boldsymbol{u} .
 
 Therefore,
 
@@ -209,6 +215,7 @@ Equation :math:numref:`derss` can be written in Voigt matrix notation as follows
      2 \diff \epsilon_{13} \\
      2 \diff \epsilon_{12}
    \end{pmatrix}.
+
 
 .. _problem-hyperelasticity-finite-strain:
 
@@ -350,6 +357,7 @@ Carrying through the differentiation :math:numref:`strain-energy-grad` for the m
 
    Alternatively, one can drop geometric nonlinearities, :math:`\bm E \to \bm \epsilon` and :math:`\bm C \to \bm I_3`, while retaining the nonlinear dependence on :math:`J \to 1 + \operatorname{trace} \bm \epsilon`, thereby yielding :math:numref:`eq-neo-hookean-small-strain`.
 
+
 Weak form
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -359,9 +367,9 @@ find :math:`\bm u \in \mathcal V \subset H^1(\Omega_0)` such that
 .. math::
    :label: hyperelastic-weak-form
 
-    \int_{\Omega_0}{\nabla_X \boldsymbol{v} \colon \boldsymbol{P}}
-    - \int_{\Omega_0}{\boldsymbol{v} \cdot \rho_0 \boldsymbol{g}}
-    - \int_{\partial \Omega_0}{\boldsymbol{v} \cdot (\boldsymbol{P} \cdot \hat{\boldsymbol{N}})}
+    \int_{\Omega_0}{\nabla_X \boldsymbol{v} \colon \boldsymbol{P}} \, dV
+    - \int_{\Omega_0}{\boldsymbol{v} \cdot \rho_0 \boldsymbol{g}} \, dV
+    - \int_{\partial \Omega_0}{\boldsymbol{v} \cdot (\boldsymbol{P} \cdot \hat{\boldsymbol{N}})} \, dS
     = 0, \quad \forall \bm v \in \mathcal V,
     
 where :math:`\boldsymbol{P} \cdot \hat{\boldsymbol{N}}|_{\partial\Omega}` is replaced by any prescribed force/traction boundary conditions written in terms of the reference configuration.

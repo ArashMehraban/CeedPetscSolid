@@ -27,9 +27,11 @@
 //
 // Sample runs:
 //
-//     ./elasticity -mesh ./meshes/cylinder8_672e_4ss_us.exo -degree 2 -E 1 -nu 0.3 -problem linElas -forcing mms
-//     ./elasticity -mesh ./meshes/cylinder8_672e_4ss_us.exo -degree 2 -E 1 -nu 0.3 -bc_zero 999 -bc_clamp 998 -problem hyperSS -forcing none -ceed /cpu/self
-//     ./elasticity -mesh ./meshes/cylinder8_672e_4ss_us.exo -degree 2 -E 1 -nu 0.3 -bc_zero 999 -bc_clamp 998 -problem hyperFS -forcing none -ceed /gpu/occa
+//     ./elasticity -mesh [.exo file] -degree 2 -E 1 -nu 0.3 -problem linElas -forcing mms
+//     ./elasticity -mesh [.exo file] -degree 2 -E 1 -nu 0.3 -bc_zero 999 -bc_clamp 998 -problem hyperSS -forcing none -ceed /cpu/self
+//     ./elasticity -mesh [.exo file] -degree 2 -E 1 -nu 0.3 -bc_zero 999 -bc_clamp 998 -problem hyperFS -forcing none -ceed /gpu/occa
+//
+// Sample meshes can be found at https://github.com/jeremylt/ceedSampleMeshes
 //
 //TESTARGS -ceed {ceed_resource} -test -degree 2 -nu 0.3 -E 1
 
@@ -405,7 +407,7 @@ int main(int argc, char **argv) {
       ierr = PCMGSetLevels(pc, numLevels, NULL); CHKERRQ(ierr);
       for (int level = 0; level < numLevels; level++) {
         // -------- Smoother
-        KSP kspSmoother;
+        KSP kspSmoother, kspEst;
         PC pcSmoother;
 
         // ---------- Smoother KSP
@@ -417,6 +419,8 @@ int main(int argc, char **argv) {
         ierr = KSPSetType(kspSmoother, KSPCHEBYSHEV); CHKERRQ(ierr);
         ierr = KSPChebyshevEstEigSet(kspSmoother, 0, 0.1, 0, 1.1);
         CHKERRQ(ierr);
+        ierr = KSPChebyshevEstEigGetKSP(kspSmoother, &kspEst); CHKERRQ(ierr);
+        ierr = KSPSetType(kspEst, KSPCG); CHKERRQ(ierr);
         ierr = KSPChebyshevEstEigSetUseNoisy(kspSmoother, PETSC_TRUE);
         CHKERRQ(ierr);
         ierr = KSPSetOperators(kspSmoother, jacobMat[level], jacobMat[level]);
