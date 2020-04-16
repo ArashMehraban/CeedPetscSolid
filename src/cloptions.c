@@ -25,11 +25,8 @@
 // Process general command line options
 PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
   PetscErrorCode ierr;
-  PetscBool degreeFalg   = PETSC_FALSE;
+  PetscBool degreeFlag   = PETSC_FALSE;
   PetscBool ceedFlag     = PETSC_FALSE;
-  appCtx->problemChoice  = ELAS_LIN;       // Default - Linear Elasticity
-  appCtx->degree         = 3;
-  appCtx->forcingChoice  = FORCE_NONE;     // Default - no forcing term
 
   PetscFunctionBeginUser;
 
@@ -49,14 +46,16 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
                             sizeof(appCtx->ceedResourceFine), NULL);
   CHKERRQ(ierr);
 
+  appCtx->degree         = 3;
   ierr = PetscOptionsInt("-degree", "Polynomial degree of tensor product basis",
                          NULL, appCtx->degree, &appCtx->degree,
-                         &degreeFalg); CHKERRQ(ierr);
+                         &degreeFlag); CHKERRQ(ierr);
 
   ierr = PetscOptionsString("-mesh", "Read mesh from file", NULL,
                             appCtx->meshFile, appCtx->meshFile,
                             sizeof(appCtx->meshFile), NULL); CHKERRQ(ierr);
 
+  appCtx->problemChoice  = ELAS_LIN;       // Default - Linear Elasticity
   ierr = PetscOptionsEnum("-problem",
                           "Solves Elasticity & Hyperelasticity Problems",
                           NULL, problemTypes, (PetscEnum)appCtx->problemChoice,
@@ -68,15 +67,27 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
                          NULL, appCtx->numIncrements, &appCtx->numIncrements,
                          NULL); CHKERRQ(ierr);
 
+  appCtx->forcingChoice  = FORCE_NONE;     // Default - no forcing term
   ierr = PetscOptionsEnum("-forcing", "Set forcing function option", NULL,
                           forcingTypes, (PetscEnum)appCtx->forcingChoice,
                           (PetscEnum *)&appCtx->forcingChoice, NULL);
   CHKERRQ(ierr);
 
-  appCtx->bcZeroCount = 16;
-  ierr = PetscOptionsIntArray("-bc_zero", "Face IDs to apply zero Dirichlet BC",
-                              NULL, appCtx->bcZeroFaces, &appCtx->bcZeroCount,
-                              NULL); CHKERRQ(ierr);
+  PetscInt maxn = 3;
+  appCtx->forcingVector[0] = 0;
+  appCtx->forcingVector[1] = -1;
+  appCtx->forcingVector[2] = 0;
+  ierr = PetscOptionsScalarArray("-forcing_vec",
+                                 "Direction to apply constant force", NULL,
+                                 appCtx->forcingVector, &maxn, NULL);
+  CHKERRQ(ierr);
+
+  if (appCtx->problemChoice == ELAS_HYPER_FS &&
+      appCtx->forcingChoice == FORCE_CONST)
+    SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP,
+            "Cannot use constant forcing and finite strain formulation. "
+            "Constant forcing in reference frame currently unavaliable.");
+
   appCtx->bcClampCount = 16;
   ierr = PetscOptionsIntArray("-bc_clamp",
                               "Face IDs to apply incremental Dirichlet BC",
@@ -86,40 +97,34 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
   for (PetscInt i = 0; i < appCtx->bcClampCount; i++) {
     // Translation vector
     char optionName[25];
+    for (PetscInt j = 0; j < 7; j++)
+      appCtx->bcClampMax[i][j] = 0.;
     snprintf(optionName, sizeof optionName, "-bc_clamp_%d_translate",
              appCtx->bcClampFaces[i]);
-    PetscInt maxn = 3;
-    appCtx->bcClampTranslate[i] = PETSC_FALSE;
+    maxn = 3;
+
     ierr = PetscOptionsScalarArray(optionName,
                                    "Vector to translate clamped end by", NULL,
-                                   appCtx->bcClampMax[i], &maxn,
-                                   &appCtx->bcClampTranslate[i]);
+                                   appCtx->bcClampMax[i], &maxn, NULL);
     CHKERRQ(ierr);
 
     // Rotation vector
-    if (!appCtx->bcClampTranslate[i]) {
-      PetscBool bcFlag = PETSC_FALSE;
-      maxn = 4;
-      snprintf(optionName, sizeof optionName, "-bc_clamp_%d_rotate",
-               appCtx->bcClampFaces[i]);
-      ierr = PetscOptionsScalarArray(optionName,
-                                     "Rodrigues vector to rotate clamped end by, in radians",
-                                     NULL, appCtx->bcClampMax[i], &maxn,
-                                     &bcFlag); CHKERRQ(ierr);
+    maxn = 4;
+    snprintf(optionName, sizeof optionName, "-bc_clamp_%d_rotate",
+             appCtx->bcClampFaces[i]);
+    ierr = PetscOptionsScalarArray(optionName,
+                                   "Vector with axis of rotation and rotation, in radians",
+                                   NULL, &appCtx->bcClampMax[i][3], &maxn, NULL);
+    CHKERRQ(ierr);
 
-      // Normalize
-      PetscScalar norm = sqrt(appCtx->bcClampMax[i][0]*appCtx->bcClampMax[i][0]+
-                              appCtx->bcClampMax[i][1]*appCtx->bcClampMax[i][1]+
-                              appCtx->bcClampMax[i][2]*appCtx->bcClampMax[i][2]);
-      for (PetscInt j = 0; j < 3; j++)
-        appCtx->bcClampMax[i][j] /= norm;
-
-      // Error if neither were set
-      if (!bcFlag) {
-        SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP,
-                "-bc_clamp additional option needed");
-      }
-    }
+    // Normalize
+    PetscScalar norm = sqrt(appCtx->bcClampMax[i][3]*appCtx->bcClampMax[i][3] +
+                            appCtx->bcClampMax[i][4]*appCtx->bcClampMax[i][4] +
+                            appCtx->bcClampMax[i][5]*appCtx->bcClampMax[i][5]);
+    if (fabs(norm) < 1e-16)
+      norm = 1;
+    for (PetscInt j = 0; j < 3; j++)
+      appCtx->bcClampMax[i][3 + j] /= norm;
   }
 
   appCtx->multigridChoice = MULTIGRID_LOGARITHMIC;
@@ -135,8 +140,7 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
   CHKERRQ(ierr);
 
   appCtx->viewSoln = PETSC_FALSE;
-  ierr = PetscOptionsBool("-view_soln",
-                          "Write out solution vector for viewing",
+  ierr = PetscOptionsBool("-view_soln", "Write out solution vector for viewing",
                           NULL, appCtx->viewSoln, &(appCtx->viewSoln), NULL);
   CHKERRQ(ierr);
 
@@ -144,11 +148,10 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
 
   // Check for all required values set
   if (!appCtx->testMode) {
-    if (!degreeFalg) {
+    if (!degreeFlag) {
       SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "-degree option needed");
     }
-    if (!(appCtx->bcZeroCount + appCtx->bcClampCount) &&
-        appCtx->forcingChoice != FORCE_MMS) {
+    if (!appCtx->bcClampCount && (appCtx->forcingChoice != FORCE_MMS)) {
       SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "-boundary options needed");
     }
   } else {

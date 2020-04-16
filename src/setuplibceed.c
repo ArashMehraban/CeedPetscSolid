@@ -37,11 +37,11 @@ problemData problemOptions[3] = {
     .setupgeo = SetupGeo,
     .apply = LinElasF,
     .jacob = LinElasdF,
-    .energy = HyperFSEnergy,          // TODO: Update with linear strain energy
+    .energy = LinElasEnergy,
     .setupgeofname = SetupGeo_loc,
     .applyfname = LinElasF_loc,
     .jacobfname = LinElasdF_loc,
-    .energyfname = HyperFSEnergy_loc, // TODO: Update with linear strain energy
+    .energyfname = LinElasEnergy_loc,
     .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_SS] = {
@@ -49,11 +49,11 @@ problemData problemOptions[3] = {
     .setupgeo = SetupGeo,
     .apply = HyperSSF,
     .jacob = HyperSSdF,
-    .energy = HyperFSEnergy,       // TODO: Update with linear strain energy
+    .energy = HyperSSEnergy,
     .setupgeofname = SetupGeo_loc,
     .applyfname = HyperSSF_loc,
     .jacobfname = HyperSSdF_loc,
-    .energyfname = HyperFSEnergy_loc, // TODO: Update with linear strain energy
+    .energyfname = HyperSSEnergy_loc,
     .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_FS] = {
@@ -368,7 +368,11 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
     CeedQFunctionAddInput(qfSetupForce, "x", ncompx, CEED_EVAL_INTERP);
     CeedQFunctionAddInput(qfSetupForce, "qdata", qdatasize, CEED_EVAL_NONE);
     CeedQFunctionAddOutput(qfSetupForce, "force", ncompu, CEED_EVAL_INTERP);
-    CeedQFunctionSetContext(qfSetupForce, phys, sizeof(phys));
+    if (forcingChoice == FORCE_MMS)
+      CeedQFunctionSetContext(qfSetupForce, phys, sizeof(phys));
+    else
+      CeedQFunctionSetContext(qfSetupForce, appCtx->forcingVector,
+                              sizeof(appCtx->forcingVector));
 
     // -- Operator
     CeedOperatorCreate(ceed, qfSetupForce, CEED_QFUNCTION_NONE,
