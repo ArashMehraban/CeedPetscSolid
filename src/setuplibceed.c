@@ -111,6 +111,7 @@ PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   CeedVectorDestroy(&data->qdata);
   CeedVectorDestroy(&data->qdataPressure);
   CeedVectorDestroy(&data->gradu);
+  CeedVectorDestroy(&data->graduPressure);
   CeedVectorDestroy(&data->xceed);
   CeedVectorDestroy(&data->yceed);
   CeedVectorDestroy(&data->truesoln);
@@ -120,6 +121,7 @@ PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   CeedElemRestrictionDestroy(&data->Erestrictu);
   CeedElemRestrictionDestroy(&data->Erestrictx);
   CeedElemRestrictionDestroy(&data->ErestrictGradui);
+  CeedElemRestrictionDestroy(&data->ErestrictGraduPressurei);
   CeedElemRestrictionDestroy(&data->Erestrictqdi);
   CeedElemRestrictionDestroy(&data->Erestrictqdpi);
   CeedElemRestrictionDestroy(&data->ErestrictEnergy);
@@ -367,7 +369,7 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
                        data[fineLevel]->basisu, CEED_VECTOR_ACTIVE);
   if (problemChoice != ELAS_LIN)
     CeedOperatorSetField(opApply, "gradu", data[fineLevel]->ErestrictGradui,
-                         data[fineLevel]->basisu, data[fineLevel]->gradu);
+                         CEED_BASIS_COLLOCATED, data[fineLevel]->gradu);
   // -- Save libCEED data
   data[fineLevel]->qfApply = qfApply;
   data[fineLevel]->opApply = opApply;
@@ -475,10 +477,18 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   // ---------------------------------------------------------------------------
   if (appCtx->problemChoice == ELAS_HYPER_FS_INCOMP) {
     // -- Pressure Geometric Factors
+    // -- State gradient vector
+    if (problemChoice != ELAS_LIN)
+      CeedVectorCreate(ceed, dim*ncompu*nelem*1, &data[fineLevel]->graduPressure);
+
     // ---- Restriction
     CeedElemRestrictionCreateStrided(ceed, nelem, 1, qdatasize,
                                      qdatasize*nelem*1, CEED_STRIDES_BACKEND,
                                      &data[fineLevel]->Erestrictqdpi);
+    if (problemChoice != ELAS_LIN)
+      CeedElemRestrictionCreateStrided(ceed, nelem, 1, dim*ncompu,
+                                       dim*ncompu*nelem*1, CEED_STRIDES_BACKEND,
+                                       &data[fineLevel]->ErestrictGraduPressurei);
 
     // ---- Coordinate basis
     CeedBasis basisx;
@@ -544,8 +554,8 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
     CeedOperatorSetField(opApply, "dv", data[fineLevel]->Erestrictu,
                          data[fineLevel]->basisp, CEED_VECTOR_ACTIVE);
     if (problemChoice != ELAS_LIN)
-      CeedOperatorSetField(opApply, "gradu", data[fineLevel]->ErestrictGradui,
-                           data[fineLevel]->basisp, data[fineLevel]->gradu);
+      CeedOperatorSetField(opApply, "gradu", data[fineLevel]->ErestrictGraduPressurei,
+                           data[fineLevel]->basisp, data[fineLevel]->graduPressure);
 
     // ---- Save libCEED data
     data[fineLevel]->qfPressure = qfApply;
@@ -759,8 +769,8 @@ PetscErrorCode SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
     CeedOperatorSetField(opJacob, "deltadv", data[level]->Erestrictu,
                          data[level]->basisp, CEED_VECTOR_ACTIVE);
     if (problemChoice != ELAS_LIN)
-      CeedOperatorSetField(opJacob, "gradu", data[fineLevel]->ErestrictGradui,
-                           CEED_BASIS_COLLOCATED, data[fineLevel]->gradu);
+      CeedOperatorSetField(opJacob, "gradu", data[fineLevel]->ErestrictGraduPressurei,
+                           CEED_BASIS_COLLOCATED, data[fineLevel]->graduPressure);
 
     // ---- Save libCEED data
     data[fineLevel]->qfPressureJacob = qfJacob;
