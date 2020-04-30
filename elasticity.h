@@ -128,8 +128,10 @@ struct AppCtx_private {
 // Problem specific data
 typedef struct {
   CeedInt           qdatasize;
-  CeedQFunctionUser setupgeo, apply, jacob, energy;
-  const char        *setupgeofname, *applyfname, *jacobfname, *energyfname;
+  CeedQFunctionUser setupgeo, apply, jacob, energy,
+                    pressureApply, pressureJacob;
+  const char        *setupgeofname, *applyfname, *jacobfname, *energyfname,
+                    *pressureApplyfname, *pressureJacobfname;
   CeedQuadMode      qmode;
 } problemData;
 
@@ -181,12 +183,15 @@ struct UserMultProlongRestr_private {
 typedef struct CeedData_private *CeedData;
 struct CeedData_private {
   Ceed                ceed;
-  CeedBasis           basisx, basisu, basisCtoF, basisEnergy;
-  CeedElemRestriction Erestrictx, Erestrictu, Erestrictqdi,
+  CeedBasis           basisx, basisu, basisp, basisCtoF, basisEnergy;
+  CeedElemRestriction Erestrictx, Erestrictu, Erestrictqdi, Erestrictqdpi,
                       ErestrictGradui, ErestrictEnergy;
-  CeedQFunction       qfApply, qfJacob, qfEnergy;
-  CeedOperator        opApply, opJacob, opRestrict, opProlong, opEnergy;
-  CeedVector          qdata, gradu, xceed, yceed, truesoln, energy;
+  CeedQFunction       qfApply, qfPressure, qfJacob, qfPressureJacob, qfEnergy;
+  CeedOperator        opApply, opPressure, opJacob, opPressureJacob,
+                      opDisplace, opDisplaceJacob,
+                      opRestrict, opProlong, opEnergy;
+  CeedVector          qdata, qdataPressure, gradu, xceed, yceed,
+                      truesoln, energy;
 };
 
 // -----------------------------------------------------------------------------
