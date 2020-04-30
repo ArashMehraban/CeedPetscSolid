@@ -82,11 +82,12 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
                                  appCtx->forcingVector, &maxn, NULL);
   CHKERRQ(ierr);
 
-  if (appCtx->problemChoice == ELAS_HYPER_FS &&
+  if (appCtx->problemChoice == (ELAS_HYPER_FS || ELAS_HYPER_FS_INCOMP) &&
       appCtx->forcingChoice == FORCE_CONST)
     SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP,
             "Cannot use constant forcing and finite strain formulation. "
             "Constant forcing in reference frame currently unavaliable.");
+
 
   appCtx->bcClampCount = 16;
   ierr = PetscOptionsIntArray("-bc_clamp",

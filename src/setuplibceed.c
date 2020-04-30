@@ -23,6 +23,8 @@
 #include "../qfunctions/linElas.h"           // Linear elasticity
 #include "../qfunctions/hyperSS.h"           // Hyperelasticity small strain
 #include "../qfunctions/hyperFS.h"           // Hyperelasticity finite strain
+#include "../qfunctions/hyperFSIncomp.h"     // Nearly Incmpressible Hyperelasticity
+                                             // at finite strain (displacement-only)
 #include "../qfunctions/constantForce.h"     // Constant forcing function
 #include "../qfunctions/manufacturedForce.h" // Manufactured solution forcing
 #include "../qfunctions/manufacturedTrue.h"  // Manufactured true solution
@@ -31,7 +33,7 @@
 // Problem options
 // -----------------------------------------------------------------------------
 // Data specific to each problem option
-problemData problemOptions[3] = {
+problemData problemOptions[4] = {
   [ELAS_LIN] = {
     .qdatasize = 10, // For linear elasticity, 6 would be sufficient
     .setupgeo = SetupGeo,
@@ -66,6 +68,18 @@ problemData problemOptions[3] = {
     .applyfname = HyperFSF_loc,
     .jacobfname = HyperFSdF_loc,
     .energyfname = HyperFSEnergy_loc,
+    .qmode = CEED_GAUSS
+  },
+  [ELAS_HYPER_FS_INCOMP] = {
+    .qdatasize = 10,
+    .setupgeo = SetupGeo,
+    .apply = HyperFSIncompF,
+    .jacob = HyperFSIncompdF,
+    .energy = HyperFSIncompEnergy,
+    .setupgeofname = SetupGeo_loc,
+    .applyfname = HyperFSIncompF_loc,
+    .jacobfname = HyperFSIncompdF_loc,
+    .energyfname = HyperFSIncompEnergy_loc,
     .qmode = CEED_GAUSS
   }
 };
