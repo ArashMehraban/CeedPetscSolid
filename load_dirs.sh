@@ -1,9 +1,9 @@
-cd /home/arash/math/petsc-3.14/petsc
+cd /home/arash/math/petsc-3.13/petsc
 export PETSC_DIR=$PWD
 export PETSC_ARCH=arch-linux2-c-debug
 cd /home/arash/math/libCEED
 export CEED_DIR=$PWD
 cd /home/arash/
-echo $PETSC_DIR
-echo $PETSC_ARCH
-echo $CEED_DIR
+echo PETSC_DIR=$PETSC_DIR
+echo PETSC_ARCH=$PETSC_ARCH
+echo CEED_DIR=$CEED_DIR
