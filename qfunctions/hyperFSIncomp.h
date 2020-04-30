@@ -593,6 +593,13 @@ CEED_QFUNCTION(HyperFSIncompdF)(void *ctx, CeedInt Q, const CeedScalar *const *i
 
   return 0;
 }
+//Applying pressure to dP in
+CEED_QFUNCTION(HyperFSPressuredF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
+                         CeedScalar *const *out) {
+
+return 0;
+}
+
 
 // -----------------------------------------------------------------------------
 // Strain energy computation for hyperelasticity, finite strain
@@ -691,5 +698,8 @@ CEED_QFUNCTION(HyperFSIncompEnergy)(void *ctx, CeedInt Q, const CeedScalar *cons
   return 0;
 }
 // -----------------------------------------------------------------------------
+
+
+
 
 #endif // End of HYPER_FS_INCOMP_H

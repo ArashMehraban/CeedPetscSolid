@@ -80,6 +80,10 @@ problemData problemOptions[4] = {
     .applyfname = HyperFSIncompF_loc,
     .jacobfname = HyperFSIncompdF_loc,
     .energyfname = HyperFSIncompEnergy_loc,
+    .pressureApply = HyperFSPressureF,
+    .pressureJacob = HyperFSPressuredF,
+    .pressureApplyfname = HyperFSPressureF_loc,
+    .pressureJacobfname = HyperFSPressuredF_loc,
     .qmode = CEED_GAUSS
   }
 };
