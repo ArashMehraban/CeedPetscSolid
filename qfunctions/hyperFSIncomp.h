@@ -136,6 +136,142 @@ static inline int commonFS_incomp(const CeedScalar lambda, const CeedScalar mu,
 // -----------------------------------------------------------------------------
 // Residual evaluation for hyperelasticity, finite strain
 // -----------------------------------------------------------------------------
+
+//Applying pressure
+CEED_QFUNCTION(HyperFSPressureF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
+                         CeedScalar *const *out) {
+
+ // *INDENT-OFF*
+ // Inputs
+ const CeedScalar (*ug)[3][CEED_Q_VLA] = (const CeedScalar(*)[3][CEED_Q_VLA])in[0],
+                  (*qdata)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+
+ // Outputs
+ CeedScalar (*dvdX)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])out[0];
+ // Store gradu for HyperFSdF (Jacobian of HyperFSF)
+ CeedScalar (*gradu)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])out[1];
+ // *INDENT-ON*
+
+ // Context
+ const Physics context = (Physics)ctx;
+ const CeedScalar E  = context->E;
+ const CeedScalar nu = context->nu;
+ const CeedScalar TwoMu = E / (1 + nu);
+ //const CeedScalar mu = TwoMu / 2;
+ const CeedScalar Kbulk = E / (3*(1 - 2*nu)); // Bulk Modulus
+ const CeedScalar lambda = (3*Kbulk - TwoMu) / 3;
+
+  // E(v) : p*C^{-1}  ---> E(v) : llnj*C^{-1}
+ // Quadrature Point Loop
+ CeedPragmaSIMD
+ for (CeedInt i=0; i<Q; i++) {
+   // Read spatial derivatives of u
+   // *INDENT-OFF*
+   const CeedScalar du[3][3]   = {{ug[0][0][i],
+                                   ug[1][0][i],
+                                   ug[2][0][i]},
+                                  {ug[0][1][i],
+                                   ug[1][1][i],
+                                   ug[2][1][i]},
+                                  {ug[0][2][i],
+                                   ug[1][2][i],
+                                   ug[2][2][i]}
+                                 };
+   // -- Qdata
+   const CeedScalar wdetJ      =   qdata[0][i];
+   const CeedScalar dXdx[3][3] = {{qdata[1][i],
+                                   qdata[2][i],
+                                   qdata[3][i]},
+                                  {qdata[4][i],
+                                   qdata[5][i],
+                                   qdata[6][i]},
+                                  {qdata[7][i],
+                                   qdata[8][i],
+                                   qdata[9][i]}
+                                 };
+   // *INDENT-ON*
+
+   // Compute gradu
+   //   dXdx = (dx/dX)^(-1)
+   // Apply dXdx to du = gradu
+   for (CeedInt j = 0; j < 3; j++)     // Component
+     for (CeedInt k = 0; k < 3; k++) { // Derivative
+       gradu[j][k][i] = 0;
+       for (CeedInt m = 0; m < 3; m++)
+         gradu[j][k][i] += dXdx[m][k] * du[j][m];
+     }
+
+   // *INDENT-ON*
+
+   // Common components of finite strain calculations
+   CeedScalar Cinvwork[6], llnj;
+
+   const CeedInt indj[6] = {0, 1, 2, 1, 0, 0}, indk[6] = {0, 1, 2, 2, 2, 1};
+   CeedScalar E2work[6];
+   for (CeedInt m = 0; m < 6; m++) {
+     E2work[m] = gradu[indj[m]][indk[m]][i] + gradu[indk[m]][indj[m]][i];
+     for (CeedInt n = 0; n < 3; n++)
+       E2work[m] += gradu[n][indj[m]][i]*gradu[n][indk[m]][i];
+   }
+   // *INDENT-OFF*
+   CeedScalar E2[3][3] = {{E2work[0], E2work[5], E2work[4]},
+                          {E2work[5], E2work[1], E2work[3]},
+                          {E2work[4], E2work[3], E2work[2]}
+                         };
+   // *INDENT-ON*
+   const CeedScalar detC_m1 = E2[0][0]*(E2[1][1]*E2[2][2]-E2[1][2]*E2[1][2]) +
+                              E2[0][1]*(E2[0][2]*E2[1][2]-E2[0][1]*E2[2][2]) +
+                              E2[0][2]*(E2[0][1]*E2[1][2]-E2[0][2]*E2[1][1]) +
+                              E2[0][0] + E2[1][1] + E2[2][2] +
+                              E2[0][0]*E2[1][1] + E2[0][0]*E2[2][2] +
+                              E2[1][1]*E2[2][2] - E2[0][1]*E2[0][1] -
+                              E2[0][2]*E2[0][2] - E2[1][2]*E2[1][2];
+
+   // C : right Cauchy-Green tensor
+   // C = I + 2E
+   // *INDENT-OFF*
+   const CeedScalar C[3][3] = {{1 + E2[0][0], E2[0][1], E2[0][2]},
+                               {E2[0][1], 1 + E2[1][1], E2[1][2]},
+                               {E2[0][2], E2[1][2], 1 + E2[2][2]}
+                              };
+
+   //evaluate p = lambda * ln(J) (p is called  llnj)
+   llnj = lambda*log1p_series_shifted_incomp(detC_m1)/2.;
+
+   // *INDENT-ON*
+
+   // Compute C^(-1) : C-Inverse
+   CeedScalar A[6] = {C[1][1]*C[2][2] - C[1][2]*C[2][1], /* *NOPAD* */
+                      C[0][0]*C[2][2] - C[0][2]*C[2][0], /* *NOPAD* */
+                      C[0][0]*C[1][1] - C[0][1]*C[1][0], /* *NOPAD* */
+                      C[0][2]*C[1][0] - C[0][0]*C[1][2], /* *NOPAD* */
+                      C[0][1]*C[1][2] - C[0][2]*C[1][1], /* *NOPAD* */
+                      C[0][2]*C[2][1] - C[0][1]*C[2][2]  /* *NOPAD* */
+                     };
+   for (CeedInt m = 0; m < 6; m++)
+     Cinvwork[m] = A[m] / (detC_m1 + 1.);
+
+   // *INDENT-OFF*
+   const CeedScalar Cinv[3][3] = {{Cinvwork[0], Cinvwork[5], Cinvwork[4]},
+                                  {Cinvwork[5], Cinvwork[1], Cinvwork[3]},
+                                  {Cinvwork[4], Cinvwork[3], Cinvwork[2]}
+                                 };
+
+   // *INDENT-ON*
+   // Apply dXdx^T and weight to llnj*C{-1}
+   for (CeedInt j = 0; j < 3; j++)     // Component
+     for (CeedInt k = 0; k < 3; k++) { // Derivative
+       dvdX[k][j][i] = 0;
+       for (CeedInt m = 0; m < 3; m++)
+         dvdX[k][j][i] += dXdx[k][m] * llnj * Cinv[j][m] * wdetJ;
+     }
+
+ } // End of Quadrature Point Loop
+
+return 0;
+}
+
+//Applying displacement
 CEED_QFUNCTION(HyperFSIncompF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
                          CeedScalar *const *out) {
   // *INDENT-OFF*
@@ -163,14 +299,17 @@ CEED_QFUNCTION(HyperFSIncompF)(void *ctx, CeedInt Q, const CeedScalar *const *in
   //  C     : right Cauchy-Green tensor
   //  Cinv  : inverse of C
   //  F     : deformation gradient
-  //  S     : 2nd Piola-Kirchhoff (in current config)
-  //  P     : 1st Piola-Kirchhoff (in referential config)
+  //  S     : 2nd Piola-Kirchhoff tensor (in current config)
+  //  P     : 1st Piola-Kirchhoff tensor (in referential config)
   // Formulation:
   //  F =  I3 + grad_ue
   //  J = det(F)
   //  C = F(^T)*F
-  //  S = mu*I3 + (lambda*log(J)-mu)*Cinv;
-  //  P = F*S
+  //  S = 2*mu*C^{-1}*E + p*C^{-1}
+  //  E = 0.5*(C-I)
+  //  p = lambda* ln(J)   lowercase p : pressure
+  //  P = F*S             uppercase P : 1st Piola-Kirchhoff tensor
+  //  \int{q(log(J) - p\lambda)*I}  ?  <-- What to do with this?
 
   // Quadrature Point Loop
   CeedPragmaSIMD
