@@ -153,7 +153,7 @@ struct UserMult_private {
   DM           dm;
   Vec          Xloc, Yloc;
   CeedVector   Xceed, Yceed;
-  CeedOperator op;
+  CeedOperator op, opSubPressure, opSubDisplace;
   Ceed         ceed;
   PetscScalar  loadIncrement;
 };
@@ -186,9 +186,10 @@ struct CeedData_private {
   CeedBasis           basisx, basisu, basisp, basisCtoF, basisEnergy;
   CeedElemRestriction Erestrictx, Erestrictu, Erestrictqdi, Erestrictqdpi,
                       ErestrictGradui, ErestrictGraduPressurei, ErestrictEnergy;
-  CeedQFunction       qfApply, qfPressure, qfJacob, qfPressureJacob, qfEnergy;
-  CeedOperator        opApply, opPressure, opJacob, opPressureJacob,
-                      opDisplace, opDisplaceJacob,
+  CeedQFunction       qfApply, qfPressureApply,
+                      qfJacob, qfPressureJacob, qfEnergy;
+  CeedOperator        opApply, opDisplaceApply, opPressureApply,
+                      opJacob, opDisplaceJacob, opPressureJacob,
                       opRestrict, opProlong, opEnergy;
   CeedVector          qdata, qdataPressure, gradu, graduPressure, xceed, yceed,
                       truesoln, energy;

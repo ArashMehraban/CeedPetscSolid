@@ -140,16 +140,16 @@ PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   CeedQFunctionDestroy(&data->qfJacob);
   CeedQFunctionDestroy(&data->qfApply);
   CeedQFunctionDestroy(&data->qfPressureJacob);
-  CeedQFunctionDestroy(&data->qfPressure);
+  CeedQFunctionDestroy(&data->qfPressureApply);
   CeedQFunctionDestroy(&data->qfEnergy);
 
   // Operators
   CeedOperatorDestroy(&data->opJacob);
   CeedOperatorDestroy(&data->opApply);
   CeedOperatorDestroy(&data->opPressureJacob);
-  CeedOperatorDestroy(&data->opPressure);
+  CeedOperatorDestroy(&data->opPressureApply);
   CeedOperatorDestroy(&data->opDisplaceJacob);
-  CeedOperatorDestroy(&data->opDisplace);
+  CeedOperatorDestroy(&data->opDisplaceApply);
   CeedOperatorDestroy(&data->opEnergy);
 
   // Restriction and Prolongation data
@@ -539,7 +539,7 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
     CeedOperatorDestroy(&opSetupGeo);
 
     // -- Swap displacement
-    data[fineLevel]->opDisplace = data[fineLevel]->opApply;
+    data[fineLevel]->opDisplaceApply = data[fineLevel]->opApply;
 
     // -- Pressure operators
     CeedQFunction qfApply;
@@ -575,16 +575,16 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
                            data[fineLevel]->basisp, data[fineLevel]->graduPressure);
 
     // ---- Save libCEED data
-    data[fineLevel]->qfPressure = qfApply;
-    data[fineLevel]->opPressure = opApply;
+    data[fineLevel]->qfPressureApply = qfApply;
+    data[fineLevel]->opPressureApply = opApply;
 
     // -- Composite Operator
     CeedOperator opComposite;
     CeedCompositeOperatorCreate(ceed, &opComposite);
 
     // ---- Add SubOperators
-    CeedCompositeOperatorAddSub(opComposite, data[fineLevel]->opDisplace);
-    CeedCompositeOperatorAddSub(opComposite, data[fineLevel]->opPressure);
+    CeedCompositeOperatorAddSub(opComposite, data[fineLevel]->opDisplaceApply);
+    CeedCompositeOperatorAddSub(opComposite, data[fineLevel]->opPressureApply);
 
     // ---- Save libCEED data
     data[fineLevel]->opApply = opComposite;

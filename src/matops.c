@@ -204,26 +204,35 @@ PetscErrorCode GetDiag_Ceed(Mat A, Vec D) {
 
   ierr = MatShellGetContext(A, &user); CHKERRQ(ierr);
 
-  // Compute Diagonal via libCEED
+  // Clear D entries
+  ierr = VecZeroEntries(D); CHKERRQ(ierr);
+
+  // Compute Diagonal(s) via libCEED
   CeedVector ceedDiagVec;
   const CeedScalar *diagArray;
 
-  // -- Compute Diagonal
-  CeedOperatorAssembleLinearDiagonal(user->op, &ceedDiagVec,
-                                     CEED_REQUEST_IMMEDIATE);
+  // Add diagonal from each sub operator
+  PetscInt numSub = user->opSubDisplace ? 2 : 1;
+  CeedOperator subOps[2] = {user->op, user->opSubPressure};
+  if (numSub == 2)
+    subOps[0] = user->opSubDisplace;
+  for (PetscInt i = 0; i < numSub; i++) {
+    // -- Compute Diagonal
+    CeedOperatorAssembleLinearDiagonal(subOps[i], &ceedDiagVec,
+                                       CEED_REQUEST_IMMEDIATE);
 
-  // -- Place in PETSc vector
-  CeedVectorGetArrayRead(ceedDiagVec, CEED_MEM_HOST, &diagArray);
-  ierr = VecPlaceArray(user->Xloc, diagArray); CHKERRQ(ierr);
+    // -- Place in PETSc vector
+    CeedVectorGetArrayRead(ceedDiagVec, CEED_MEM_HOST, &diagArray);
+    ierr = VecPlaceArray(user->Xloc, diagArray); CHKERRQ(ierr);
 
-  // -- Local-to-Global
-  ierr = VecZeroEntries(D); CHKERRQ(ierr);
-  ierr = DMLocalToGlobal(user->dm, user->Xloc, ADD_VALUES, D); CHKERRQ(ierr);
+    // -- Local-to-Global
+    ierr = DMLocalToGlobal(user->dm, user->Xloc, ADD_VALUES, D); CHKERRQ(ierr);
 
-  // -- Cleanup
-  ierr = VecResetArray(user->Xloc); CHKERRQ(ierr);
-  CeedVectorRestoreArrayRead(ceedDiagVec, &diagArray);
-  CeedVectorDestroy(&ceedDiagVec);
+    // -- Cleanup
+    ierr = VecResetArray(user->Xloc); CHKERRQ(ierr);
+    CeedVectorRestoreArrayRead(ceedDiagVec, &diagArray);
+    CeedVectorDestroy(&ceedDiagVec);
+  }
 
   PetscFunctionReturn(0);
 };

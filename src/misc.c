@@ -42,6 +42,8 @@ PetscErrorCode SetupJacobianCtx(MPI_Comm comm, AppCtx appCtx, DM dm, Vec V,
 
   // libCEED operator
   jacobianCtx->op = ceedData->opJacob;
+  jacobianCtx->opSubDisplace = ceedData->opDisplaceJacob;
+  jacobianCtx->opSubPressure = ceedData->opPressureJacob;
 
   // Ceed
   jacobianCtx->ceed = ceed;
