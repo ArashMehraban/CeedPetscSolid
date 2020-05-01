@@ -272,7 +272,6 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, nelem*Q*Q*Q, 1,
                                    CEED_STRIDES_BACKEND,
                                    &data[fineLevel]->ErestrictEnergy);
-
   // ---------------------------------------------------------------------------
   // Element coordinates
   // ---------------------------------------------------------------------------

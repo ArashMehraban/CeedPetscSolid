@@ -433,7 +433,7 @@ CEED_QFUNCTION(HyperFSIncompF)(void *ctx, CeedInt Q, const CeedScalar *const *in
 // Jacobian evaluation for hyperelasticity, finite strain
 // -----------------------------------------------------------------------------
 CEED_QFUNCTION(HyperFSIncompdF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
-                          CeedScalar *const *out) {
+                                CeedScalar *const *out) {
   // *INDENT-OFF*
   // Inputs
   const CeedScalar (*deltaug)[3][CEED_Q_VLA] = (const CeedScalar(*)[3][CEED_Q_VLA])in[0],
@@ -600,55 +600,55 @@ CEED_QFUNCTION(HyperFSIncompdF)(void *ctx, CeedInt Q, const CeedScalar *const *i
 
   return 0;
 }
+
 //Applying pressure to dP in
 CEED_QFUNCTION(HyperFSPressuredF)(void *ctx, CeedInt Q, const CeedScalar *const *in,
-                         CeedScalar *const *out)
- {
-//Jed's Email:
-//      dP = dF S + F dS
-//
-// S = mu (I - C^{-1}) + p C^{-1}
-//
-// so
-//
-// dS = -mu d(C^{-1})
-//      + dp C^{-1} + p d(C^{-1}
-//
-// where the top line is evaluated using full quadrature and the second
-// line is evaluated at the centroid.  We have
-//
-// d(C^{-1}) = -2 C^{-1} dE C^{-1}
-// dp = \lambda C^{-1} : dE
-//
-// dE = 1/2(dF^T*F + F^T*dF)
-//
-// due to p = \lambda log J.
-// *INDENT-OFF*
-// Inputs
-// *INDENT-OFF*
-// Inputs
-const CeedScalar (*deltaug)[3][CEED_Q_VLA] = (const CeedScalar(*)[3][CEED_Q_VLA])in[0],
-                 (*qdata)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1];
-// gradu is used for hyperelasticity (non-linear)
-const CeedScalar (*gradu)[3][CEED_Q_VLA] = (const CeedScalar(*)[3][CEED_Q_VLA])in[2];
+                         CeedScalar *const *out) {
+  //Jed's Email:
+  //      dP = dF S + F dS
+  //
+  // S = mu (I - C^{-1}) + p C^{-1}
+  //
+  // so
+  //
+  // dS = -mu d(C^{-1})
+  //      + dp C^{-1} + p d(C^{-1}
+  //
+  // where the top line is evaluated using full quadrature and the second
+  // line is evaluated at the centroid.  We have
+  //
+  // d(C^{-1}) = -2 C^{-1} dE C^{-1}
+  // dp = \lambda C^{-1} : dE
+  //
+  // dE = 1/2(dF^T*F + F^T*dF)
+  //
+  // due to p = \lambda log J.
+  // *INDENT-OFF*
+  // Inputs
+  // *INDENT-OFF*
+  // Inputs
+  const CeedScalar (*deltaug)[3][CEED_Q_VLA] = (const CeedScalar(*)[3][CEED_Q_VLA])in[0],
+                   (*qdata)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+  // gradu is used for hyperelasticity (non-linear)
+  const CeedScalar (*gradu)[3][CEED_Q_VLA] = (const CeedScalar(*)[3][CEED_Q_VLA])in[2];
 
-// Outputs
-CeedScalar (*deltadvdX)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])out[0];
-// *INDENT-ON*
+  // Outputs
+  CeedScalar (*deltadvdX)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])out[0];
+  // *INDENT-ON*
 
-// Context
-const Physics context = (Physics)ctx;
-const CeedScalar E  = context->E;
-const CeedScalar nu = context->nu;
-const CeedScalar TwoMu = E / (1 + nu);
-const CeedScalar mu = TwoMu / 2;
-const CeedScalar Kbulk = E / (3*(1 - 2*nu)); // Bulk Modulus
-const CeedScalar lambda = (3*Kbulk - TwoMu) / 3;
+  // Context
+  const Physics context = (Physics)ctx;
+  const CeedScalar E  = context->E;
+  const CeedScalar nu = context->nu;
+  const CeedScalar TwoMu = E / (1 + nu);
+  const CeedScalar mu = TwoMu / 2;
+  const CeedScalar Kbulk = E / (3*(1 - 2*nu)); // Bulk Modulus
+  const CeedScalar lambda = (3*Kbulk - TwoMu) / 3;
 
 
-// Quadrature Point Loop
-CeedPragmaSIMD
-for (CeedInt i=0; i<Q; i++) {
+  // Quadrature Point Loop
+  CeedPragmaSIMD
+  for (CeedInt i=0; i<Q; i++) {
     const CeedScalar deltadu[3][3] = {{deltaug[0][0][i],
                                        deltaug[1][0][i],
                                        deltaug[2][0][i]},
@@ -788,7 +788,6 @@ for (CeedInt i=0; i<Q; i++) {
   return 0;
 }
 
-
 // -----------------------------------------------------------------------------
 // Strain energy computation for hyperelasticity, finite strain
 // -----------------------------------------------------------------------------
@@ -886,8 +885,5 @@ CEED_QFUNCTION(HyperFSIncompEnergy)(void *ctx, CeedInt Q, const CeedScalar *cons
   return 0;
 }
 // -----------------------------------------------------------------------------
-
-
-
 
 #endif // End of HYPER_FS_INCOMP_H

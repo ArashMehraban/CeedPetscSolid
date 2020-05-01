@@ -328,6 +328,8 @@ int main(int argc, char **argv) {
   ierr = PetscMemcpy(resCtx, jacobCtx[fineLevel],
                      sizeof(*jacobCtx[fineLevel])); CHKERRQ(ierr);
   resCtx->op = ceedData[fineLevel]->opApply;
+  resCtx->opSubDisplace = ceedData[fineLevel]->opDisplaceApply;
+  resCtx->opSubPressure = ceedData[fineLevel]->opPressureApply;
   ierr = SNESSetFunction(snes, R, FormResidual_Ceed, resCtx); CHKERRQ(ierr);
 
   // -- Prolongation/Restriction evaluation
