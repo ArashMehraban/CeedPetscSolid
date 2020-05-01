@@ -123,6 +123,7 @@ static inline int commonFS_incomp(const CeedScalar lambda, const CeedScalar mu,
   // *INDENT-ON*
 
   // Compute the partial Second Piola-Kirchhoff (S)
+  // Compute part of S: mu*(I - C^{-1}) = 2mu*C^{-1}*E
   (*llnj) = lambda*log1p_series_shifted_incomp(detC_m1)/2.;
   for (CeedInt m = 0; m < 6; m++) {
     Swork[m] = 0.0;
@@ -161,7 +162,8 @@ CEED_QFUNCTION(HyperFSPressureF)(void *ctx, CeedInt Q, const CeedScalar *const *
   const CeedScalar Kbulk = E / (3*(1 - 2*nu)); // Bulk Modulus
   const CeedScalar lambda = (3*Kbulk - TwoMu) / 3;
 
-  // E(v) : p*C^{-1}  ---> E(v) : llnj*C^{-1}
+//-------New Code begins: This comes from commonFS that is tested ------------\\
+  // E(v) : p*C^{-1}  (p is llnj below)
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
@@ -268,9 +270,11 @@ CEED_QFUNCTION(HyperFSPressureF)(void *ctx, CeedInt Q, const CeedScalar *const *
                                    {Cinvwork[5], Cinvwork[1], Cinvwork[3]},
                                    {Cinvwork[4], Cinvwork[3], Cinvwork[2]}
                                   };
-    // *INDENT-ON*
+//-------New Code ends: This comes from commonFS that is tested ------------\\
 
-    // Compute the partial First Piola-Kirchhoff : P = F*S
+    // *INDENT-ON*
+//-------- NEW CODE------------------------------------------------\\
+    // Compute a part of first Piola-Kirchhoff : P = F*(pC^{-1})
     CeedScalar P[3][3];
     for (CeedInt j = 0; j < 3; j++)
       for (CeedInt k = 0; k < 3; k++) {
@@ -278,8 +282,9 @@ CEED_QFUNCTION(HyperFSPressureF)(void *ctx, CeedInt Q, const CeedScalar *const *
         for (CeedInt m = 0; m < 3; m++)
           P[j][k] += F[j][m] * llnj * Cinv[m][k];
       }
+//-------New Code ends----------------------------------------\\
 
-    // Apply dXdx^T and weight to P (First Piola-Kirchhoff)
+    // Apply dXdx^T and weight to a part of P (First Piola-Kirchhoff) above
     for (CeedInt j = 0; j < 3; j++)     // Component
       for (CeedInt k = 0; k < 3; k++) { // Derivative
         dvdX[k][j][i] = 0;
@@ -301,7 +306,7 @@ CEED_QFUNCTION(HyperFSIncompF)(void *ctx, CeedInt Q, const CeedScalar *const *in
 
   // Outputs
   CeedScalar (*dvdX)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])out[0];
-  // Store gradu for HyperFSdF (Jacobian of HyperFSF)
+  // Store gradu for HyperFSIncompdF (Jacobian of HyperFSIncompF)
   CeedScalar (*gradu)[3][CEED_Q_VLA] = (CeedScalar(*)[3][CEED_Q_VLA])out[1];
   // *INDENT-ON*
 
@@ -329,6 +334,7 @@ CEED_QFUNCTION(HyperFSIncompF)(void *ctx, CeedInt Q, const CeedScalar *const *in
   //  E = 0.5*(C-I)
   //  P = F*S             uppercase P : 1st Piola-Kirchhoff tensor
 
+  //
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
@@ -404,17 +410,18 @@ CEED_QFUNCTION(HyperFSIncompF)(void *ctx, CeedInt Q, const CeedScalar *const *in
     const CeedScalar S[3][3] = {{Swork[0], Swork[5], Swork[4]},
                                 {Swork[5], Swork[1], Swork[3]},
                                 {Swork[4], Swork[3], Swork[2]}
-                               };
+                            }; // <-- S here is mu(I - C^{-1}) == 2m C^{-1} E
     // *INDENT-ON*
-
-    // Compute the partial First Piola-Kirchhoff : P = F*S
+//-------New Code begin----------------------------------------\\
+    // Compute full-quadrature part of First Piola-Kirchhoff : P = F*(mu(I - C^{-1}))
     CeedScalar P[3][3];
     for (CeedInt j = 0; j < 3; j++)
       for (CeedInt k = 0; k < 3; k++) {
         P[j][k] = 0;
         for (CeedInt m = 0; m < 3; m++)
-          P[j][k] += F[j][m] * S[m][k];
+          P[j][k] += F[j][m] * S[m][k]; //<-- S here is mu(I - C^{-1}) = 2m C^{-1} E
       }
+//-------New Code ends----------------------------------------\\
 
     // Apply dXdx^T and weight to P (First Piola-Kirchhoff)
     for (CeedInt j = 0; j < 3; j++)     // Component
@@ -560,6 +567,8 @@ CEED_QFUNCTION(HyperFSIncompdF)(void *ctx, CeedInt Q, const CeedScalar *const *i
                                };
     // *INDENT-ON*
 
+//-------New Code begins--------------------------------------------\\
+// This deltaS is only: -mu d(C^{-1}) using full quadrature rule
     // deltaS = dSdE:deltaE
     //      = -mu*2*Cinv*deltaE*Cinv
     // -- deltaE*Cinv
@@ -578,13 +587,14 @@ CEED_QFUNCTION(HyperFSIncompdF)(void *ctx, CeedInt Q, const CeedScalar *const *i
         for (CeedInt m = 0; m < 3; m++)
           deltaS[j][k] += -mu*2.0*Cinv[j][m]*deltaECinv[m][k];
       }
+//-------New Code ends--------------------------------------------\\
 
     // deltaP = dPdF:deltaF = deltaF*S + F*deltaS
     CeedScalar deltaP[3][3];
     for (CeedInt j = 0; j < 3; j++)
       for (CeedInt k = 0; k < 3; k++) {
         deltaP[j][k] = 0;
-        for (CeedInt m = 0; m < 3; m++)
+        for (CeedInt m = 0; m < 3; m++)                    //deltaS = -mu d(C^{-1})
           deltaP[j][k] += graddeltau[j][m]*S[m][k] + F[j][m]*deltaS[m][k];
       }
 
@@ -625,8 +635,7 @@ CEED_QFUNCTION(HyperFSPressuredF)(void *ctx, CeedInt Q, const CeedScalar *const 
   // due to p = \lambda log J.
   // *INDENT-OFF*
   // Inputs
-  // *INDENT-OFF*
-  // Inputs
+
   const CeedScalar (*deltaug)[3][CEED_Q_VLA] = (const CeedScalar(*)[3][CEED_Q_VLA])in[0],
                    (*qdata)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1];
   // gradu is used for hyperelasticity (non-linear)
@@ -739,7 +748,10 @@ CEED_QFUNCTION(HyperFSPressuredF)(void *ctx, CeedInt Q, const CeedScalar *const 
                                    {Cinvwork[4], Cinvwork[3], Cinvwork[2]}
                                    };
 
-    //d(C^{-1}) = -2 C^{-1} dE C^{-1} using 1 quadrature point
+
+//-------New Code ends-------------------------------------------------\\
+
+    //dp C^{-1} and p dC^{-1} with dC^{-1} = -2 C^{-1} dE C^{-1} using 1 quadrature point
     // *INDENT-ON*
 
     // deltaS = dSdE:deltaE
@@ -765,6 +777,8 @@ CEED_QFUNCTION(HyperFSPressuredF)(void *ctx, CeedInt Q, const CeedScalar *const 
        for (CeedInt m = 0; m < 3; m++)
          deltaS[j][k] -= Cinv[j][m]*deltaECinv[m][k]*2.*llnj;
     }
+//-------New Code ends--------------------------------------------\\
+
 
     // deltaP = dPdF:deltaF = deltaF*S + F*deltaS
     CeedScalar deltaP[3][3];
