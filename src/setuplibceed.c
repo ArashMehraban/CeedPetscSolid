@@ -488,24 +488,28 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   // ---------------------------------------------------------------------------
   if (appCtx->problemChoice == ELAS_HYPER_FS_INCOMP) {
     // -- Pressure Geometric Factors
+    CeedInt Q = 1;
+    CeedInt nqpts = Q*Q*Q;
     // -- Geometric data vector
-    CeedVectorCreate(ceed, qdatasize*nelem*1, &data[fineLevel]->qdataPressure);
+    CeedVectorCreate(ceed, qdatasize*nelem*nqpts, &data[fineLevel]->qdataPressure);
     // -- State gradient vector
     if (problemChoice != ELAS_LIN)
-      CeedVectorCreate(ceed, dim*ncompu*nelem*1, &data[fineLevel]->graduPressure);
+      CeedVectorCreate(ceed, dim*ncompu*nelem*nqpts, &data[fineLevel]->graduPressure);
 
     // ---- Restriction
-    CeedElemRestrictionCreateStrided(ceed, nelem, 1, qdatasize,
-                                     qdatasize*nelem*1, CEED_STRIDES_BACKEND,
+    CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, qdatasize,
+                                     qdatasize*nelem*Q*Q*Q,
+                                     CEED_STRIDES_BACKEND,
                                      &data[fineLevel]->Erestrictqdpi);
     if (problemChoice != ELAS_LIN)
-      CeedElemRestrictionCreateStrided(ceed, nelem, 1, dim*ncompu,
-                                       dim*ncompu*nelem*1, CEED_STRIDES_BACKEND,
+      CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, dim*ncompu,
+                                       dim*ncompu*nelem*Q*Q*Q,
+                                       CEED_STRIDES_BACKEND,
                                        &data[fineLevel]->ErestrictGraduPressurei);
 
     // ---- Coordinate basis
     CeedBasis basisx;
-    CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompx, 2, 1,
+    CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompx, 2, Q,
                                     problemOptions[problemChoice].qmode,
                                     &basisx);
     // ---- QFunction
@@ -520,9 +524,9 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
     CeedOperatorCreate(ceed, qfSetupGeo, CEED_QFUNCTION_NONE,
                        CEED_QFUNCTION_NONE, &opSetupGeo);
     CeedOperatorSetField(opSetupGeo, "dx", data[fineLevel]->Erestrictx,
-                         data[fineLevel]->basisx, CEED_VECTOR_ACTIVE);
+                         basisx, CEED_VECTOR_ACTIVE);
     CeedOperatorSetField(opSetupGeo, "weight", CEED_ELEMRESTRICTION_NONE,
-                         data[fineLevel]->basisx, CEED_VECTOR_NONE);
+                         basisx, CEED_VECTOR_NONE);
     CeedOperatorSetField(opSetupGeo, "qdata", data[fineLevel]->Erestrictqdpi,
                          CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
 
@@ -754,7 +758,7 @@ PetscErrorCode SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   // ---------------------------------------------------------------------------
   if (appCtx->problemChoice == ELAS_HYPER_FS_INCOMP) {
     // -- Swap displacement
-    data[fineLevel]->opDisplaceJacob = data[fineLevel]->opJacob;
+    data[level]->opDisplaceJacob = data[level]->opJacob;
 
     // -- Pressure operators
     CeedQFunction qfJacob;
@@ -785,19 +789,19 @@ PetscErrorCode SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
                            CEED_BASIS_COLLOCATED, data[fineLevel]->graduPressure);
 
     // ---- Save libCEED data
-    data[fineLevel]->qfPressureJacob = qfJacob;
-    data[fineLevel]->opPressureJacob = opJacob;
+    data[level]->qfPressureJacob = qfJacob;
+    data[level]->opPressureJacob = opJacob;
 
     // -- Composite Operator
     CeedOperator opComposite;
     CeedCompositeOperatorCreate(ceed, &opComposite);
 
     // ---- Add SubOperators
-    CeedCompositeOperatorAddSub(opComposite, data[fineLevel]->opDisplaceJacob);
-    CeedCompositeOperatorAddSub(opComposite, data[fineLevel]->opPressureJacob);
+    CeedCompositeOperatorAddSub(opComposite, data[level]->opDisplaceJacob);
+    CeedCompositeOperatorAddSub(opComposite, data[level]->opPressureJacob);
 
     // ---- Save libCEED data
-    data[fineLevel]->opJacob = opComposite;
+    data[level]->opJacob = opComposite;
   }
 
   PetscFunctionReturn(0);

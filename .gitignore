@@ -2,3 +2,4 @@ build/*
 elasticity
 *.d
 solution*
+vgcore*
