@@ -658,6 +658,12 @@ PetscErrorCode SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
                                     problemOptions[problemChoice].qmode,
                                     &data[level]->basisu);
 
+  // -- Pressure basis
+  if (level != fineLevel)
+    CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompu, P, 1,
+                                    problemOptions[problemChoice].qmode,
+                                    &data[level]->basisp);
+
   // -- Prolongation basis
   if (level != 0)
     CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompu,
