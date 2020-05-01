@@ -562,7 +562,7 @@ CEED_QFUNCTION(HyperFSIncompdF)(void *ctx, CeedInt Q, const CeedScalar *const *i
     // *INDENT-ON*
 
     // deltaS = dSdE:deltaE
-    //      = lambda(Cinv:deltaE)Cinv + 2(mu-lambda*log(J))Cinv*deltaE*Cinv
+    //      = lambda(Cinv:deltaE)Cinv + 2*mu*Cinv*deltaE*Cinv
     // -- Cinv:deltaE
     CeedScalar Cinv_contract_E = 0;
     for (CeedInt j = 0; j < 3; j++)
@@ -777,13 +777,22 @@ for (CeedInt i=0; i<Q; i++) {
       deltaS[j][k] += Cinv[j][m]*deltaECinv[m][k]*(-2.*llnj);
  }
 
-  // Apply dXdx^T and weight
- for (CeedInt j = 0; j < 3; j++)     // Component
-    for (CeedInt k = 0; k < 3; k++) { // Derivative
-       deltadvdX[k][j][i] = 0;
-       for (CeedInt m = 0; m < 3; m++)
-         deltadvdX[k][j][i] += dXdx[k][m] * deltaS[j][m] * wdetJ;
-  }
+    // deltaP = dPdF:deltaF = deltaF*S + F*deltaS
+    CeedScalar deltaP[3][3];
+    for (CeedInt j = 0; j < 3; j++)
+      for (CeedInt k = 0; k < 3; k++) {
+        deltaP[j][k] = 0;
+        for (CeedInt m = 0; m < 3; m++)
+          deltaP[j][k] += graddeltau[j][m]*llnj*Cinv[m][k] + F[j][m]*deltaS[m][k];
+      }
+
+    // Apply dXdx^T and weight
+    for (CeedInt j = 0; j < 3; j++)     // Component
+      for (CeedInt k = 0; k < 3; k++) { // Derivative
+        deltadvdX[k][j][i] = 0;
+        for (CeedInt m = 0; m < 3; m++)
+          deltadvdX[k][j][i] += dXdx[k][m] * deltaP[j][m] * wdetJ;
+      }
 
 } // End of Quadrature Point Loop
 
