@@ -473,6 +473,13 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
     CeedVectorRestoreArray(data[fineLevel]->truesoln, &truearray);
     CeedVectorRestoreArrayRead(multvec, &multarray);
 
+    // -- Cleanup
+    CeedVectorDestroy(&multvec);
+    CeedBasisDestroy(&basisxtrue);
+    CeedQFunctionDestroy(&qfTrue);
+    CeedOperatorDestroy(&opTrue);
+  }
+
   // ---------------------------------------------------------------------------
   // Reduced integration pressure
   // ---------------------------------------------------------------------------
@@ -481,6 +488,8 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   // ---------------------------------------------------------------------------
   if (appCtx->problemChoice == ELAS_HYPER_FS_INCOMP) {
     // -- Pressure Geometric Factors
+    // -- Geometric data vector
+    CeedVectorCreate(ceed, qdatasize*nelem*1, &data[fineLevel]->qdataPressure);
     // -- State gradient vector
     if (problemChoice != ELAS_LIN)
       CeedVectorCreate(ceed, dim*ncompu*nelem*1, &data[fineLevel]->graduPressure);
@@ -575,13 +584,6 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
 
     // ---- Save libCEED data
     data[fineLevel]->opApply = opComposite;
-  }
-
-    // -- Cleanup
-    CeedVectorDestroy(&multvec);
-    CeedBasisDestroy(&basisxtrue);
-    CeedQFunctionDestroy(&qfTrue);
-    CeedOperatorDestroy(&opTrue);
   }
 
   // ---------------------------------------------------------------------------
