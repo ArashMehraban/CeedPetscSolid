@@ -52,8 +52,7 @@ static const char *const problemTypes[] = {"linElas",
 static const char *const problemTypesForDisp[] = {"Linear elasticity",
                                                   "Hyper elasticity small strain",
                                                   "Hyper elasticity finite strain",
-                                                  "Nearly Incompressible (displacement-only)\
-                                                   Hyperelasticity finite strain"
+          "Nearly Incompressible (displacement-only) Hyperelasticity finite strain"
                                                  };
 
 // Forcing function options
