@@ -214,9 +214,16 @@ PetscErrorCode GetDiag_Ceed(Mat A, Vec D) {
   // Add diagonal from each sub operator
   PetscInt numSub = user->opSubDisplace ? 2 : 1;
   CeedOperator subOps[2] = {user->op, user->opSubPressure};
-  if (numSub == 2)
+  CeedQFunction subQFs[2] = {user->qf, user->qfSubPressure};
+  if (numSub == 2) {
     subOps[0] = user->opSubDisplace;
+    subQFs[0] = user->qfSubDisplace;
+  }
   for (PetscInt i = 0; i < numSub; i++) {
+    // -- Set nu
+    CeedQFunctionSetContext(subQFs[i], user->physSmoother,
+                            sizeof(user->physSmoother));
+
     // -- Compute Diagonal
     CeedOperatorAssembleLinearDiagonal(subOps[i], &ceedDiagVec,
                                        CEED_REQUEST_IMMEDIATE);
@@ -232,6 +239,9 @@ PetscErrorCode GetDiag_Ceed(Mat A, Vec D) {
     ierr = VecResetArray(user->Xloc); CHKERRQ(ierr);
     CeedVectorRestoreArrayRead(ceedDiagVec, &diagArray);
     CeedVectorDestroy(&ceedDiagVec);
+
+    // -- Reset nu
+    CeedQFunctionSetContext(subQFs[i], user->phys, sizeof(user->phys));
   }
 
   PetscFunctionReturn(0);
