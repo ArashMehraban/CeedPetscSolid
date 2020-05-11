@@ -323,7 +323,7 @@ PetscErrorCode ComputeCauchyPressure(UserMult user, CeedOperator opCauchy, Vec X
   (*minCauchy) = e[0];
   (*maxCauchy) = e[0];
   CeedVectorGetLength(cauchyLoc, &length);
-  for (CeedInt i=0; i<length; i++) {
+  for (CeedInt i=1; i<length; i++) {
     (*minCauchy) = e[i] < (*minCauchy) ? e[i] : (*minCauchy);
     (*maxCauchy) = e[i] > (*maxCauchy) ? e[i] : (*maxCauchy);
   }

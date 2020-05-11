@@ -236,6 +236,10 @@ PetscErrorCode ProcessPhysics(MPI_Comm comm, Physics phys, Units units) {
   ierr = PetscOptionsScalar("-nu", "Poisson's ratio", NULL, phys->nu, &phys->nu,
                             &nuFlag); CHKERRQ(ierr);
 
+  ierr = PetscOptionsScalar("-nu_smoother", "Poisson's ratio", NULL,
+                            phys->nu_smoother, &phys->nu_smoother, NULL);
+  CHKERRQ(ierr);
+
   ierr = PetscOptionsScalar("-E", "Young's Modulus", NULL, phys->E, &phys->E,
                             &YoungFlag); CHKERRQ(ierr);
 

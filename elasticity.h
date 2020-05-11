@@ -32,6 +32,7 @@
 typedef struct Physics_private *Physics;
 struct Physics_private {
   CeedScalar   nu;      // Poisson's ratio
+  CeedScaar    nu_smoother;
   CeedScalar   E;       // Young's Modulus
 };
 #endif

@@ -739,7 +739,7 @@ int main(int argc, char **argv) {
     ierr = ComputeCauchyPressure(resCtx,
                                ceedData[fineLevel]->opCauchy, U,
                                ceedData[fineLevel]->cauchy, &minCauchy,
-                               &maxCauchy); CHKERRQ(ierr);
+                               maxCauchy); CHKERRQ(ierr);
 
     // -- Output
     ierr = PetscPrintf(comm,
