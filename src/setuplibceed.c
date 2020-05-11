@@ -219,7 +219,7 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
                                      CeedQFunction qfProlong) {
   int           ierr;
   CeedInt       P = appCtx->levelDegrees[fineLevel] + 1;
-  CeedInt       Q = appCtx->levelDegrees[fineLevel] + 1;
+  CeedInt       Q = appCtx->levelDegrees[fineLevel] + 1 + appCtx->qextra;
   CeedInt       dim, ncompx;
   CeedInt       nqpts;
   CeedInt       qdatasize = problemOptions[appCtx->problemChoice].qdatasize;
@@ -487,7 +487,7 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   // ---------------------------------------------------------------------------
   if (appCtx->problemChoice == ELAS_HYPER_FS_INCOMP) {
     // -- Pressure Geometric Factors
-    CeedInt Q = 1;
+    CeedInt Q = 1 + appCtx->qextraPressure;
     CeedInt nqpts = Q*Q*Q;
     // -- Geometric data vector
     CeedVectorCreate(ceed, qdatasize*nelem*nqpts, &data[fineLevel]->qdataPressure);
@@ -634,7 +634,7 @@ PetscErrorCode SetupLibceedLevel(DM dm, Ceed ceed, AppCtx appCtx, Physics phys,
   PetscErrorCode ierr;
   CeedInt        fineLevel = appCtx->numLevels - 1;
   CeedInt        P = appCtx->levelDegrees[level] + 1;
-  CeedInt        Q = appCtx->levelDegrees[fineLevel] + 1;
+  CeedInt        Q = appCtx->levelDegrees[fineLevel] + 1 + appCtx->qextra;
   CeedInt        dim;
   CeedInt        qdatasize = problemOptions[appCtx->problemChoice].qdatasize;
   problemType    problemChoice = appCtx->problemChoice;

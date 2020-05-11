@@ -51,6 +51,17 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
                          NULL, appCtx->degree, &appCtx->degree,
                          &degreeFlag); CHKERRQ(ierr);
 
+  appCtx->qextra         = 0;
+  ierr = PetscOptionsInt("-qextra", "Number of extra quadrature points",
+                         NULL, appCtx->qextra, &appCtx->qextra, NULL);
+  CHKERRQ(ierr);
+
+  appCtx->qextraPressure = 0;
+  ierr = PetscOptionsInt("-qextra_pressure",
+                         "Number of extra quadrature points for pressure",
+                         NULL, appCtx->qextraPressure, &appCtx->qextraPressure,
+                         NULL); CHKERRQ(ierr);
+
   ierr = PetscOptionsString("-mesh", "Read mesh from file", NULL,
                             appCtx->meshFile, appCtx->meshFile,
                             sizeof(appCtx->meshFile), NULL); CHKERRQ(ierr);
@@ -144,6 +155,11 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
   ierr = PetscOptionsBool("-view_soln", "Write out solution vector for viewing",
                           NULL, appCtx->viewSoln, &(appCtx->viewSoln), NULL);
   CHKERRQ(ierr);
+
+  appCtx->viewFinalSoln = PETSC_FALSE;
+  ierr = PetscOptionsBool("-view_final_soln", "Write out final solution vector for viewing",
+                          NULL, appCtx->viewFinalSoln, &(appCtx->viewFinalSoln),
+                          NULL); CHKERRQ(ierr);
 
   ierr = PetscOptionsEnd(); CHKERRQ(ierr); // End of setting AppCtx
 
