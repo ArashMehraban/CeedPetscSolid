@@ -72,7 +72,7 @@ static inline CeedScalar log1p_series_shifted_incomp(CeedScalar x) {
 static inline int commonFS_incomp(const CeedScalar lambda, const CeedScalar mu,
                            const CeedScalar gradu[3][3], bool computeS,
                            CeedScalar Swork[6], CeedScalar Cinvwork[6],
-                           CeedScalar *llnj) {
+                           CeedScalar *llnj, CeedScalar *detC_m1) {
   // E - Green-Lagrange strain tensor
   //     E = 1/2 (gradu + gradu^T + gradu^T*gradu)
   const CeedInt indj[6] = {0, 1, 2, 1, 0, 0}, indk[6] = {0, 1, 2, 2, 2, 1};
@@ -88,13 +88,13 @@ static inline int commonFS_incomp(const CeedScalar lambda, const CeedScalar mu,
                          {E2work[4], E2work[3], E2work[2]}
                         };
   // *INDENT-ON*
-  const CeedScalar detC_m1 = E2[0][0]*(E2[1][1]*E2[2][2]-E2[1][2]*E2[1][2]) +
-                             E2[0][1]*(E2[0][2]*E2[1][2]-E2[0][1]*E2[2][2]) +
-                             E2[0][2]*(E2[0][1]*E2[1][2]-E2[0][2]*E2[1][1]) +
-                             E2[0][0] + E2[1][1] + E2[2][2] +
-                             E2[0][0]*E2[1][1] + E2[0][0]*E2[2][2] +
-                             E2[1][1]*E2[2][2] - E2[0][1]*E2[0][1] -
-                             E2[0][2]*E2[0][2] - E2[1][2]*E2[1][2];
+  (*detC_m1) = E2[0][0]*(E2[1][1]*E2[2][2]-E2[1][2]*E2[1][2]) +
+               E2[0][1]*(E2[0][2]*E2[1][2]-E2[0][1]*E2[2][2]) +
+               E2[0][2]*(E2[0][1]*E2[1][2]-E2[0][2]*E2[1][1]) +
+               E2[0][0] + E2[1][1] + E2[2][2] +
+               E2[0][0]*E2[1][1] + E2[0][0]*E2[2][2] +
+               E2[1][1]*E2[2][2] - E2[0][1]*E2[0][1] -
+               E2[0][2]*E2[0][2] - E2[1][2]*E2[1][2];
 
   // C : right Cauchy-Green tensor
   // C = I + 2E
@@ -114,7 +114,7 @@ static inline int commonFS_incomp(const CeedScalar lambda, const CeedScalar mu,
                      C[0][2]*C[2][1] - C[0][1]*C[2][2]  /* *NOPAD* */
                     };
   for (CeedInt m = 0; m < 6; m++)
-    Cinvwork[m] = A[m] / (detC_m1 + 1.);
+    Cinvwork[m] = A[m] / ((*detC_m1) + 1.);
 
   // *INDENT-OFF*
   const CeedScalar Cinv[3][3] = {{Cinvwork[0], Cinvwork[5], Cinvwork[4]},
@@ -125,7 +125,7 @@ static inline int commonFS_incomp(const CeedScalar lambda, const CeedScalar mu,
 
   // Compute the partial Second Piola-Kirchhoff (S)
   // Compute part of S: mu*(I - C^{-1}) = 2mu*C^{-1}*E
-  (*llnj) = lambda*log1p_series_shifted_incomp(detC_m1)/2.;
+  (*llnj) = lambda*log1p_series_shifted_incomp((*detC_m1))/2.;
   if (computeS) {
     for (CeedInt m = 0; m < 6; m++) {
       Swork[m] = 0.0;
@@ -234,7 +234,7 @@ CEED_QFUNCTION(HyperFSIncompF)(void *ctx, CeedInt Q, const CeedScalar *const *in
     // *INDENT-ON*
 
     // Common components of finite strain calculations
-    CeedScalar Swork[6], Cinvwork[6], llnj;
+    CeedScalar Swork[6], Cinvwork[6], llnj, detC_m1;
     // *INDENT-OFF*
     const CeedScalar tempgradu[3][3] =  {{gradu[0][0][i],
                                           gradu[0][1][i],
@@ -248,7 +248,7 @@ CEED_QFUNCTION(HyperFSIncompF)(void *ctx, CeedInt Q, const CeedScalar *const *in
                                         };
     // *INDENT-ON*
     const int err = commonFS_incomp(lambda, mu, tempgradu, true, Swork,
-                                    Cinvwork, &llnj);
+                                    Cinvwork, &llnj, &detC_m1);
     if (err)
       return err;
 
@@ -361,7 +361,7 @@ CEED_QFUNCTION(HyperFSPressureF)(void *ctx, CeedInt Q, const CeedScalar *const *
      // *INDENT-ON*
 
     // Common components of finite strain calculations
-    CeedScalar Swork[6], Cinvwork[6], llnj;
+    CeedScalar Swork[6], Cinvwork[6], llnj, detC_m1;
     // *INDENT-OFF*
     const CeedScalar tempgradu[3][3] =  {{gradu[0][0][i],
                                           gradu[0][1][i],
@@ -375,7 +375,7 @@ CEED_QFUNCTION(HyperFSPressureF)(void *ctx, CeedInt Q, const CeedScalar *const *
                                         };
     // *INDENT-ON*
     const int err = commonFS_incomp(lambda, mu, tempgradu, false, Swork,
-                     Cinvwork, &llnj);
+                     Cinvwork, &llnj, &detC_m1);
     if (err)
       return err;
 
@@ -491,7 +491,7 @@ CEED_QFUNCTION(HyperFSIncompdF)(void *ctx, CeedInt Q, const CeedScalar *const *i
     // *INDENT-ON*
 
     // Common components of finite strain calculations
-    CeedScalar Swork[6], Cinvwork[6], llnj;
+    CeedScalar Swork[6], Cinvwork[6], llnj, detC_m1;
     // *INDENT-OFF*
     const CeedScalar tempgradu[3][3] =  {{gradu[0][0][i],
                                           gradu[0][1][i],
@@ -505,7 +505,7 @@ CEED_QFUNCTION(HyperFSIncompdF)(void *ctx, CeedInt Q, const CeedScalar *const *i
                                         };
     // *INDENT-ON*
     const int err = commonFS_incomp(lambda, mu, tempgradu, true, Swork,
-                                    Cinvwork, &llnj);
+                                    Cinvwork, &llnj, &detC_m1);
     if (err)
       return err;
 
@@ -664,7 +664,7 @@ CEED_QFUNCTION(HyperFSPressuredF)(void *ctx, CeedInt Q, const CeedScalar *const 
     // *INDENT-ON*
 
     // Common components of finite strain calculations
-    CeedScalar Swork[6], Cinvwork[6], llnj;
+    CeedScalar Swork[6], Cinvwork[6], llnj, detC_m1;
     // *INDENT-OFF*
     const CeedScalar tempgradu[3][3] =  {{gradu[0][0][i],
                                           gradu[0][1][i],
@@ -678,7 +678,7 @@ CEED_QFUNCTION(HyperFSPressuredF)(void *ctx, CeedInt Q, const CeedScalar *const 
                                         };
     // *INDENT-ON*
     const int err = commonFS_incomp(lambda, mu, tempgradu, false, Swork,
-                                    Cinvwork, &llnj);
+                                    Cinvwork, &llnj, &detC_m1);
     if (err)
       return err;
 
@@ -852,6 +852,142 @@ CEED_QFUNCTION(HyperFSIncompEnergy)(void *ctx, CeedInt Q, const CeedScalar *cons
     CeedScalar logj = log1p_series_shifted_incomp(detC_m1)/2.;
     energy[i] = (lambda*logj*logj/2. - mu*logj +
                  mu*(E2[0][0] + E2[1][1] + E2[2][2])/2.) * wdetJ;
+
+  } // End of Quadrature Point Loop
+
+  return 0;
+}
+
+// -----------------------------------------------------------------------------
+// Cauchy pressure, finite strain
+// -----------------------------------------------------------------------------
+CEED_QFUNCTION(HyperFSIncompCauchy)(void *ctx, CeedInt Q,
+                                    const CeedScalar *const *in,
+                                    CeedScalar *const *out) {
+
+  // *INDENT-OFF*
+  // Inputs
+  const CeedScalar (*ug)[3][CEED_Q_VLA] = (const CeedScalar(*)[3][CEED_Q_VLA])in[0],
+                   (*qdata)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1];
+
+  // Outputs
+  CeedScalar (*cauchy) = (CeedScalar(*))out[0];
+  // *INDENT-ON*
+
+  // Context
+  const Physics context = (Physics)ctx;
+  const CeedScalar E  = context->E;
+  const CeedScalar nu = context->nu;
+  const CeedScalar TwoMu = E / (1 + nu);
+  const CeedScalar mu = TwoMu / 2;
+  const CeedScalar Kbulk = E / (3*(1 - 2*nu)); // Bulk Modulus
+  const CeedScalar lambda = (3*Kbulk - TwoMu) / 3;
+
+  // Formulation Terminology:
+  //  I3    : 3x3 Identity matrix
+  //  C     : right Cauchy-Green tensor
+  //  Cinv  : inverse of C
+  //  F     : deformation gradient
+  //  S     : 2nd Piola-Kirchhoff tensor (in current config)
+  //  P     : 1st Piola-Kirchhoff tensor (in referential config)
+  // Formulation:
+  //  F =  I3 + grad_ue
+  //  J = det(F)
+  //  C = F(^T)*F
+  //  S = 2*mu*C^{-1}*E
+  //  E = 0.5*(C-I)
+  //  P = F*S             uppercase P : 1st Piola-Kirchhoff tensor
+
+  //
+  // Quadrature Point Loop
+  CeedPragmaSIMD
+  for (CeedInt i=0; i<Q; i++) {
+    // Read spatial derivatives of u
+    // *INDENT-OFF*
+    const CeedScalar du[3][3]   = {{ug[0][0][i],
+                                    ug[1][0][i],
+                                    ug[2][0][i]},
+                                   {ug[0][1][i],
+                                    ug[1][1][i],
+                                    ug[2][1][i]},
+                                   {ug[0][2][i],
+                                    ug[1][2][i],
+                                    ug[2][2][i]}
+                                  };
+    // -- Qdata
+    const CeedScalar dXdx[3][3] = {{qdata[1][i],
+                                    qdata[2][i],
+                                    qdata[3][i]},
+                                   {qdata[4][i],
+                                    qdata[5][i],
+                                    qdata[6][i]},
+                                   {qdata[7][i],
+                                    qdata[8][i],
+                                    qdata[9][i]}
+                                  };
+    // *INDENT-ON*
+
+    // Compute gradu
+    //   dXdx = (dx/dX)^(-1)
+    // Apply dXdx to du = gradu
+    CeedScalar gradu[3][3];
+    for (CeedInt j = 0; j < 3; j++)     // Component
+      for (CeedInt k = 0; k < 3; k++) { // Derivative
+        gradu[j][k] = 0;
+        for (CeedInt m = 0; m < 3; m++)
+          gradu[j][k] += dXdx[m][k] * du[j][m];
+      }
+
+    // I3 : 3x3 Identity matrix
+    // Compute The Deformation Gradient : F = I3 + gradu
+    // *INDENT-OFF*
+    const CeedScalar F[3][3] =  {{gradu[0][0] + 1,
+                                  gradu[0][1],
+                                  gradu[0][2]},
+                                 {gradu[1][0],
+                                  gradu[1][1] + 1,
+                                  gradu[1][2]},
+                                 {gradu[2][0],
+                                  gradu[2][1],
+                                  gradu[2][2] + 1}
+                                };
+    // *INDENT-ON*
+
+    // Common components of finite strain calculations
+    CeedScalar Swork[6], Cinvwork[6], llnj, detC_m1;
+    const int err = commonFS_incomp(lambda, mu, gradu, true, Swork,
+                                    Cinvwork, &llnj, &detC_m1);
+    if (err)
+      return err;
+
+    // Full second Piola-Kirchhoff : S = mu(I - C^{-1}) + p C^{-1}
+    for (CeedInt j = 0; j < 6; j++)
+      Swork[j] += llnj*Cinvwork[j];
+    // *INDENT-OFF*
+    const CeedScalar S[3][3] = {{Swork[0], Swork[5], Swork[4]},
+                                {Swork[5], Swork[1], Swork[3]},
+                                {Swork[4], Swork[3], Swork[2]}
+                            };
+    // *INDENT-ON*
+
+    // Cauchy pressure = 1/3 * 1/J * trace(F^T S F)
+    // -- First matrix product
+    CeedScalar SF[3][3];
+    for (CeedInt j = 0; j < 3; j++)
+      for (CeedInt k = 0; k < 3; k++) {
+        SF[j][k] = 0;
+        for (CeedInt m = 0; m < 3; m++)
+          SF[j][k] += S[j][m] * F[m][k];
+      }
+
+    // -- Second matrix product
+    cauchy[i] = 0;
+    for (CeedInt j = 0; j < 3; j++)
+      for (CeedInt m = 0; m < 3; m++)
+        cauchy[i] += F[m][j] * SF[m][j];
+
+    // -- Scale
+    cauchy[i] /= 3*sqrt(detC_m1 + 1);
 
   } // End of Quadrature Point Loop
 

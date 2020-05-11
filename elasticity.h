@@ -131,9 +131,9 @@ struct AppCtx_private {
 typedef struct {
   CeedInt           qdatasize;
   CeedQFunctionUser setupgeo, apply, jacob, energy,
-                    pressureApply, pressureJacob;
+                    pressureApply, pressureJacob, cauchy;
   const char        *setupgeofname, *applyfname, *jacobfname, *energyfname,
-                    *pressureApplyfname, *pressureJacobfname;
+                    *pressureApplyfname, *pressureJacobfname, *cauchyfname;
   CeedQuadMode      qmode;
 } problemData;
 
@@ -187,16 +187,17 @@ struct UserMultProlongRestr_private {
 typedef struct CeedData_private *CeedData;
 struct CeedData_private {
   Ceed                ceed;
-  CeedBasis           basisx, basisu, basisp, basisCtoF, basisEnergy;
+  CeedBasis           basisx, basisu, basisp, basisCtoF, basisEnergy, basisuCauchy;
   CeedElemRestriction Erestrictx, Erestrictu, Erestrictqdi, Erestrictqdpi,
-                      ErestrictGradui, ErestrictGraduPressurei, ErestrictEnergy;
+                      ErestrictGradui, ErestrictGraduPressurei, ErestrictEnergy,
+                      ErestrictqdCauchyi, ErestrictCauchy;
   CeedQFunction       qfApply, qfPressureApply,
-                      qfJacob, qfPressureJacob, qfEnergy;
+                      qfJacob, qfPressureJacob, qfEnergy, qfCauchy;
   CeedOperator        opApply, opDisplaceApply, opPressureApply,
                       opJacob, opDisplaceJacob, opPressureJacob,
-                      opRestrict, opProlong, opEnergy;
-  CeedVector          qdata, qdataPressure, gradu, graduPressure, xceed, yceed,
-                      truesoln, energy;
+                      opRestrict, opProlong, opEnergy, opCauchy;
+  CeedVector          qdata, qdataPressure, qdataCauchy, gradu, graduPressure,
+                      xceed, yceed, truesoln, energy, cauchy;
 };
 
 // -----------------------------------------------------------------------------
@@ -302,6 +303,11 @@ PetscErrorCode GetDiag_Ceed(Mat A, Vec D);
 // This function calculates the strain energy in the final solution
 PetscErrorCode ComputeStrainEnergy(UserMult user, CeedOperator opEnergy, Vec X,
                                    CeedVector energyLoc, PetscReal *energy);
+
+// This function calculates the Cauchy pressure for each node in the final solution
+PetscErrorCode ComputeCauchyPressure(UserMult user, CeedOperator opCauchy, Vec X,
+                                     CeedVector cauchyLoc, PetscReal *minCauchy,
+                                     PetscReal *maxCauchy);
 
 // -----------------------------------------------------------------------------
 // Boundary Functions

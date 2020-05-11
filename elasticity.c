@@ -731,6 +731,24 @@ int main(int argc, char **argv) {
   }
 
   // ---------------------------------------------------------------------------
+  // Compute Cauchy pressure
+  // ---------------------------------------------------------------------------
+  if (!appCtx->testMode) {
+    // -- Compute L2 error
+    CeedScalar minCauchy, maxCauchy;
+    ierr = ComputeCauchyPressure(resCtx,
+                               ceedData[fineLevel]->opCauchy, U,
+                               ceedData[fineLevel]->cauchy, &minCauchy,
+                               &maxCauchy); CHKERRQ(ierr);
+
+    // -- Output
+    ierr = PetscPrintf(comm,
+                       "    Min Cauchy pressure                : %e\n"
+                       "    Max Cauchy pressure                : %e\n",
+                       minCauchy, maxCauchy); CHKERRQ(ierr);
+  }
+
+  // ---------------------------------------------------------------------------
   // Free objects
   // ---------------------------------------------------------------------------
   // Data in arrays per level

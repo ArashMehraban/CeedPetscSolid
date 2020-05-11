@@ -40,10 +40,12 @@ problemData problemOptions[4] = {
     .apply = LinElasF,
     .jacob = LinElasdF,
     .energy = LinElasEnergy,
+    .cauchy = HyperFSIncompCauchy,
     .setupgeofname = SetupGeo_loc,
     .applyfname = LinElasF_loc,
     .jacobfname = LinElasdF_loc,
     .energyfname = LinElasEnergy_loc,
+    .cauchyfname = HyperFSIncompCauchy_loc,
     .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_SS] = {
@@ -52,10 +54,12 @@ problemData problemOptions[4] = {
     .apply = HyperSSF,
     .jacob = HyperSSdF,
     .energy = HyperSSEnergy,
+    .cauchy = HyperFSIncompCauchy,
     .setupgeofname = SetupGeo_loc,
     .applyfname = HyperSSF_loc,
     .jacobfname = HyperSSdF_loc,
     .energyfname = HyperSSEnergy_loc,
+    .cauchyfname = HyperFSIncompCauchy_loc,
     .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_FS] = {
@@ -64,10 +68,12 @@ problemData problemOptions[4] = {
     .apply = HyperFSF,
     .jacob = HyperFSdF,
     .energy = HyperFSEnergy,
+    .cauchy = HyperFSIncompCauchy,
     .setupgeofname = SetupGeo_loc,
     .applyfname = HyperFSF_loc,
     .jacobfname = HyperFSdF_loc,
     .energyfname = HyperFSEnergy_loc,
+    .cauchyfname = HyperFSIncompCauchy_loc,
     .qmode = CEED_GAUSS
   },
   [ELAS_HYPER_FS_INCOMP] = {
@@ -76,10 +82,12 @@ problemData problemOptions[4] = {
     .apply = HyperFSIncompF,
     .jacob = HyperFSIncompdF,
     .energy = HyperFSIncompEnergy,
+    .cauchy = HyperFSIncompCauchy,
     .setupgeofname = SetupGeo_loc,
     .applyfname = HyperFSIncompF_loc,
     .jacobfname = HyperFSIncompdF_loc,
     .energyfname = HyperFSIncompEnergy_loc,
+    .cauchyfname = HyperFSIncompCauchy_loc,
     .pressureApply = HyperFSPressureF,
     .pressureJacob = HyperFSPressuredF,
     .pressureApplyfname = HyperFSPressureF_loc,
@@ -114,12 +122,14 @@ PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   // Vectors
   CeedVectorDestroy(&data->qdata);
   CeedVectorDestroy(&data->qdataPressure);
+  CeedVectorDestroy(&data->qdataCauchy);
   CeedVectorDestroy(&data->gradu);
   CeedVectorDestroy(&data->graduPressure);
   CeedVectorDestroy(&data->xceed);
   CeedVectorDestroy(&data->yceed);
   CeedVectorDestroy(&data->truesoln);
   CeedVectorDestroy(&data->energy);
+  CeedVectorDestroy(&data->cauchy);
 
   // Restrictions
   CeedElemRestrictionDestroy(&data->Erestrictu);
@@ -129,10 +139,13 @@ PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   CeedElemRestrictionDestroy(&data->Erestrictqdi);
   CeedElemRestrictionDestroy(&data->Erestrictqdpi);
   CeedElemRestrictionDestroy(&data->ErestrictEnergy);
+  CeedElemRestrictionDestroy(&data->ErestrictqdCauchyi);
+  CeedElemRestrictionDestroy(&data->ErestrictCauchy);
 
   // Bases
   CeedBasisDestroy(&data->basisx);
   CeedBasisDestroy(&data->basisu);
+  CeedBasisDestroy(&data->basisuCauchy);
   CeedBasisDestroy(&data->basisp);
   CeedBasisDestroy(&data->basisEnergy);
 
@@ -142,6 +155,7 @@ PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   CeedQFunctionDestroy(&data->qfPressureJacob);
   CeedQFunctionDestroy(&data->qfPressureApply);
   CeedQFunctionDestroy(&data->qfEnergy);
+  CeedQFunctionDestroy(&data->qfCauchy);
 
   // Operators
   CeedOperatorDestroy(&data->opJacob);
@@ -151,6 +165,7 @@ PetscErrorCode CeedDataDestroy(CeedInt level, CeedData data) {
   CeedOperatorDestroy(&data->opDisplaceJacob);
   CeedOperatorDestroy(&data->opDisplaceApply);
   CeedOperatorDestroy(&data->opEnergy);
+  CeedOperatorDestroy(&data->opCauchy);
 
   // Restriction and Prolongation data
   CeedBasisDestroy(&data->basisCtoF);
@@ -231,8 +246,8 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   PetscInt      cStart, cEnd, nelem;
   const PetscScalar *coordArray;
   CeedVector    xcoord;
-  CeedQFunction qfSetupGeo, qfApply, qfEnergy;
-  CeedOperator  opSetupGeo, opApply, opEnergy;
+  CeedQFunction qfSetupGeo, qfApply, qfEnergy, qfCauchy;
+  CeedOperator  opSetupGeo, opApply, opEnergy, opCauchy;
 
   PetscFunctionBeginUser;
 
@@ -249,7 +264,6 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   // -- Coordinate restriction
   ierr = CreateRestrictionPlex(ceed, 2, ncompx, &(data[fineLevel]->Erestrictx),
                                dmcoord); CHKERRQ(ierr);
-
   // -- Solution restriction
   ierr = CreateRestrictionPlex(ceed, P, ncompu, &data[fineLevel]->Erestrictu,
                                dm); CHKERRQ(ierr);
@@ -272,6 +286,16 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   CeedElemRestrictionCreateStrided(ceed, nelem, Q*Q*Q, 1, nelem*Q*Q*Q,
                                    CEED_STRIDES_BACKEND,
                                    &data[fineLevel]->ErestrictEnergy);
+  // -- Energy restriction
+  CeedElemRestrictionCreateStrided(ceed, nelem, P*P*P, 1, nelem*P*P*P,
+                                   CEED_STRIDES_BACKEND,
+                                   &data[fineLevel]->ErestrictCauchy);
+  // -- Geometric data restriction, Cauchy pressure
+  CeedElemRestrictionCreateStrided(ceed, nelem, P*P*P, qdatasize,
+                                   qdatasize*nelem*P*P*P,
+                                   CEED_STRIDES_BACKEND,
+                                   &data[fineLevel]->ErestrictqdCauchyi);
+
   // ---------------------------------------------------------------------------
   // Element coordinates
   // ---------------------------------------------------------------------------
@@ -299,6 +323,9 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   CeedBasisCreateTensorH1Lagrange(ceed, dim, 1, P, Q,
                                   problemOptions[problemChoice].qmode,
                                   &data[fineLevel]->basisEnergy);
+  // -- Cauchy pressure basis
+  CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompu, P, P, CEED_GAUSS_LOBATTO,
+                                  &data[fineLevel]->basisuCauchy);
 
   // ---------------------------------------------------------------------------
   // Persistent libCEED vectors
@@ -311,6 +338,10 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
     CeedVectorCreate(ceed, dim*ncompu*nelem*nqpts, &data[fineLevel]->gradu);
   // -- Energy vector
   CeedVectorCreate(ceed, nelem*nqpts, &data[fineLevel]->energy);
+  // -- Geometric data vector
+  CeedVectorCreate(ceed, qdatasize*nelem*P*P*P, &data[fineLevel]->qdataCauchy);
+  // -- Cauchy pressure vector
+  CeedVectorCreate(ceed, nelem*P*P*P, &data[fineLevel]->cauchy);
 
   // ---------------------------------------------------------------------------
   // Geometric factor computation
@@ -373,6 +404,7 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   if (problemChoice != ELAS_LIN)
     CeedOperatorSetField(opApply, "gradu", data[fineLevel]->ErestrictGradui,
                          CEED_BASIS_COLLOCATED, data[fineLevel]->gradu);
+
   // -- Save libCEED data
   data[fineLevel]->qfApply = qfApply;
   data[fineLevel]->opApply = opApply;
@@ -615,6 +647,70 @@ PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
   // -- Save libCEED data
   data[fineLevel]->qfEnergy = qfEnergy;
   data[fineLevel]->opEnergy = opEnergy;
+
+  // ---------------------------------------------------------------------------
+  // Cauchy pressure computation
+  // ---------------------------------------------------------------------------
+  // Create the QFunction and Operator that computes the Cauchy pressure at each node
+  // ---------------------------------------------------------------------------
+  // TODO, qdataMeanStrain, qf source
+
+  // Geometric factor computation
+  // -- Basis
+  CeedBasis basisxCauchy;
+  CeedBasisCreateTensorH1Lagrange(ceed, dim, ncompx, 2, P, CEED_GAUSS_LOBATTO,
+                                  &basisxCauchy);
+
+  // -- QFunction
+  CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].setupgeo,
+                              problemOptions[problemChoice].setupgeofname,
+                              &qfSetupGeo);
+  CeedQFunctionAddInput(qfSetupGeo, "dx", ncompx*dim, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qfSetupGeo, "weight", 1, CEED_EVAL_WEIGHT);
+  CeedQFunctionAddOutput(qfSetupGeo, "qdata", qdatasize, CEED_EVAL_NONE);
+
+  // -- Operator
+  CeedOperatorCreate(ceed, qfSetupGeo, CEED_QFUNCTION_NONE,
+                     CEED_QFUNCTION_NONE, &opSetupGeo);
+  CeedOperatorSetField(opSetupGeo, "dx", data[fineLevel]->Erestrictx,
+                       basisxCauchy, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(opSetupGeo, "weight", CEED_ELEMRESTRICTION_NONE,
+                       basisxCauchy, CEED_VECTOR_NONE);
+  CeedOperatorSetField(opSetupGeo, "qdata", data[fineLevel]->ErestrictqdCauchyi,
+                       CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+
+  // -- Compute the quadrature data
+  CeedOperatorApply(opSetupGeo, xcoord, data[fineLevel]->qdataCauchy,
+                    CEED_REQUEST_IMMEDIATE);
+
+  // -- Cleanup
+  CeedBasisDestroy(&basisxCauchy);
+  CeedQFunctionDestroy(&qfSetupGeo);
+  CeedOperatorDestroy(&opSetupGeo);
+
+  // Cauchy pressure computation
+  // -- QFunction
+  CeedQFunctionCreateInterior(ceed, 1, problemOptions[problemChoice].cauchy,
+                              problemOptions[problemChoice].cauchyfname,
+                              &qfCauchy);
+  CeedQFunctionAddInput(qfCauchy, "du", ncompu*dim, CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(qfCauchy, "qdata", qdatasize, CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(qfCauchy, "meanStrain", 1, CEED_EVAL_NONE);
+  CeedQFunctionSetContext(qfCauchy, phys, sizeof(phys));
+
+  // -- Operator
+  CeedOperatorCreate(ceed, qfCauchy, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
+                     &opCauchy);
+  CeedOperatorSetField(opCauchy, "du", data[fineLevel]->Erestrictu,
+                       data[fineLevel]->basisuCauchy, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(opCauchy, "qdata", data[fineLevel]->ErestrictqdCauchyi,
+                       CEED_BASIS_COLLOCATED, data[fineLevel]->qdataCauchy);
+  CeedOperatorSetField(opCauchy, "meanStrain", data[fineLevel]->ErestrictCauchy,
+                       CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+
+  // -- Save libCEED data
+  data[fineLevel]->qfCauchy = qfCauchy;
+  data[fineLevel]->opCauchy = opCauchy;
 
   // ---------------------------------------------------------------------------
   // Cleanup

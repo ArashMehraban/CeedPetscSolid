@@ -288,3 +288,51 @@ PetscErrorCode ComputeStrainEnergy(UserMult user, CeedOperator opEnergy, Vec X,
 
   PetscFunctionReturn(0);
 };
+
+// This function calculates the Cauchy pressure for each node in the final solution
+PetscErrorCode ComputeCauchyPressure(UserMult user, CeedOperator opCauchy, Vec X,
+                                     CeedVector cauchyLoc, PetscReal *minCauchy,
+                                     PetscReal *maxCauchy) {
+  PetscErrorCode ierr;
+  PetscScalar *x;
+  CeedInt length;
+
+  PetscFunctionBeginUser;
+
+  // Global-to-local
+  ierr = VecZeroEntries(user->Xloc); CHKERRQ(ierr);
+  ierr = DMGlobalToLocal(user->dm, X, INSERT_VALUES, user->Xloc); CHKERRQ(ierr);
+  ierr = DMPlexInsertBoundaryValues(user->dm, PETSC_TRUE, user->Xloc,
+                                    user->loadIncrement, NULL, NULL, NULL);
+
+  // Setup libCEED vector
+  ierr = VecGetArrayRead(user->Xloc, (const PetscScalar **)&x);
+  CHKERRQ(ierr);
+  CeedVectorSetArray(user->Xceed, CEED_MEM_HOST, CEED_USE_POINTER, x);
+
+  // Apply libCEED operator
+  CeedOperatorApply(opCauchy, user->Xceed, cauchyLoc, CEED_REQUEST_IMMEDIATE);
+
+  // Restore PETSc vector
+  ierr = VecRestoreArrayRead(user->Xloc, (const PetscScalar **)&x);
+  CHKERRQ(ierr);
+
+  // Reduce max error
+  const CeedScalar *e;
+  CeedVectorGetArrayRead(cauchyLoc, CEED_MEM_HOST, &e);
+  (*minCauchy) = e[0];
+  (*maxCauchy) = e[0];
+  CeedVectorGetLength(cauchyLoc, &length);
+  for (CeedInt i=0; i<length; i++) {
+    (*minCauchy) = e[i] < (*minCauchy) ? e[i] : (*minCauchy);
+    (*maxCauchy) = e[i] > (*maxCauchy) ? e[i] : (*maxCauchy);
+  }
+  CeedVectorRestoreArrayRead(cauchyLoc, &e);
+
+  ierr = MPI_Allreduce(MPI_IN_PLACE, minCauchy, 1, MPIU_REAL, MPIU_MIN,
+                       user->comm); CHKERRQ(ierr);
+  ierr = MPI_Allreduce(MPI_IN_PLACE, maxCauchy, 1, MPIU_REAL, MPIU_MAX,
+                       user->comm); CHKERRQ(ierr);
+
+  PetscFunctionReturn(0);
+};
