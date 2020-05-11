@@ -859,7 +859,7 @@ CEED_QFUNCTION(HyperFSIncompEnergy)(void *ctx, CeedInt Q, const CeedScalar *cons
 }
 
 // -----------------------------------------------------------------------------
-// Cauchy pressure, finite strain
+// Mean Cauchy stress, finite strain
 // -----------------------------------------------------------------------------
 CEED_QFUNCTION(HyperFSIncompCauchy)(void *ctx, CeedInt Q,
                                     const CeedScalar *const *in,
@@ -970,7 +970,7 @@ CEED_QFUNCTION(HyperFSIncompCauchy)(void *ctx, CeedInt Q,
                             };
     // *INDENT-ON*
 
-    // Cauchy pressure = 1/3 * 1/J * trace(F^T S F)
+    // Mean Cauchy stress = 1/3 * 1/J * trace(F^T S F)
     // -- First matrix product
     CeedScalar SF[3][3];
     for (CeedInt j = 0; j < 3; j++)

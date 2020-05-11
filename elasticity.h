@@ -32,7 +32,6 @@
 typedef struct Physics_private *Physics;
 struct Physics_private {
   CeedScalar   nu;      // Poisson's ratio
-  CeedScaar    nu_smoother;
   CeedScalar   E;       // Young's Modulus
 };
 #endif
@@ -305,10 +304,10 @@ PetscErrorCode GetDiag_Ceed(Mat A, Vec D);
 PetscErrorCode ComputeStrainEnergy(UserMult user, CeedOperator opEnergy, Vec X,
                                    CeedVector energyLoc, PetscReal *energy);
 
-// This function calculates the Cauchy pressure for each node in the final solution
-PetscErrorCode ComputeCauchyPressure(UserMult user, CeedOperator opCauchy, Vec X,
-                                     CeedVector cauchyLoc, PetscReal *minCauchy,
-                                     PetscReal *maxCauchy);
+// This function calculates the mean Cauchy stress for each node in the final solution
+PetscErrorCode ComputeCauchyStress(UserMult user, CeedOperator opCauchy, Vec X,
+                                   CeedVector cauchyLoc, PetscReal *minCauchy,
+                                   PetscReal *maxCauchy);
 
 // -----------------------------------------------------------------------------
 // Boundary Functions

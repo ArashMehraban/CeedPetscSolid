@@ -289,10 +289,10 @@ PetscErrorCode ComputeStrainEnergy(UserMult user, CeedOperator opEnergy, Vec X,
   PetscFunctionReturn(0);
 };
 
-// This function calculates the Cauchy pressure for each node in the final solution
-PetscErrorCode ComputeCauchyPressure(UserMult user, CeedOperator opCauchy, Vec X,
-                                     CeedVector cauchyLoc, PetscReal *minCauchy,
-                                     PetscReal *maxCauchy) {
+// This function calculates the mean Cauchy stress for each node in the final solution
+PetscErrorCode ComputeCauchyStress(UserMult user, CeedOperator opCauchy, Vec X,
+                                   CeedVector cauchyLoc, PetscReal *minCauchy,
+                                   PetscReal *maxCauchy) {
   PetscErrorCode ierr;
   PetscScalar *x;
   CeedInt length;
