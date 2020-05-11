@@ -988,6 +988,7 @@ CEED_QFUNCTION(HyperFSIncompCauchy)(void *ctx, CeedInt Q,
 
     // -- Scale
     cauchy[i] /= 3.*sqrt(detC_m1 + 1.);
+    cauchy[i] = llnj;
 
   } // End of Quadrature Point Loop
 

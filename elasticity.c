@@ -46,9 +46,9 @@ int main(int argc, char **argv) {
   PetscInt       ierr;
   MPI_Comm       comm;
   // Context structs
-  AppCtx         appCtx;                 // Contains problem options
-  Physics        phys, physSmoother;     // Contains physical constants
-  Units          units;                  // Contains units scaling
+  AppCtx         appCtx;                    // Contains problem options
+  Physics        phys, physSmoother = NULL; // Contains physical constants
+  Units          units;                     // Contains units scaling
   // PETSc objects
   PetscLogStage  stageDMSetup, stageLibceedSetup,
                  stageSnesSetup, stageSnesSolve;
