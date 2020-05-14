@@ -196,8 +196,8 @@ PetscErrorCode CreateRestrictionPlex(Ceed ceed, CeedInt P, CeedInt ncomp,
   ierr = PetscMalloc1(nelem*P*P*P, &erestrict); CHKERRQ(ierr);
   for (c=cStart, eoffset=0; c<cEnd; c++) {
     PetscInt numindices, *indices, i;
-    ierr = DMPlexGetClosureIndices(dm, section, section, c, &numindices,
-                                   &indices, NULL); CHKERRQ(ierr);
+    ierr = DMPlexGetClosureIndices(dm, section, section, c, PETSC_TRUE, &numindices,
+                                   &indices, NULL, NULL); CHKERRQ(ierr);
     for (i=0; i<numindices; i+=ncomp) {
       for (PetscInt j=0; j<ncomp; j++) {
         if (indices[i+j] != indices[i] + (PetscInt)(copysign(j, indices[i])))
@@ -208,8 +208,8 @@ PetscErrorCode CreateRestrictionPlex(Ceed ceed, CeedInt P, CeedInt ncomp,
       PetscInt loc = indices[i] >= 0 ? indices[i] : -(indices[i] + 1);
       erestrict[eoffset++] = loc;
     }
-    ierr = DMPlexRestoreClosureIndices(dm, section, section, c, &numindices,
-                                       &indices, NULL); CHKERRQ(ierr);
+    ierr = DMPlexRestoreClosureIndices(dm, section, section, c, PETSC_TRUE, &numindices,
+                                       &indices, NULL, NULL); CHKERRQ(ierr);
   }
 
   // Setup CEED restriction
