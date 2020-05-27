@@ -31,8 +31,12 @@ Printf("New cyl: %g %g %g %g %g %g %g %g", cyl[0], cyl[1], cyl[2], cyl[3], cyl[4
 Transfinite Volume {:};
 Recombine Surface {:};
 
+inner = 996;
+outer = 997;
 bottom = 998;
 top = 999;
+Physical Surface(outer) = {cyl[3], cyl[3+6], cyl[3+12], cyl[3+18]};
+Physical Surface(inner) = {cyl[5], cyl[5+6], cyl[5+12], cyl[5+18]};
 Physical Surface(bottom) = {1:4};
 Physical Surface(top) = {cyl[0], cyl[6], cyl[12], cyl[18]};
 Physical Volume(1) = {1:4};
