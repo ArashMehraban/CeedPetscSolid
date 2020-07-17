@@ -25,7 +25,6 @@
 // Process general command line options
 PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
   PetscErrorCode ierr;
-  PetscBool degreeFlag   = PETSC_FALSE;
   PetscBool ceedFlag     = PETSC_FALSE;
 
   PetscFunctionBeginUser;
@@ -48,19 +47,13 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
 
   appCtx->degree         = 3;
   ierr = PetscOptionsInt("-degree", "Polynomial degree of tensor product basis",
-                         NULL, appCtx->degree, &appCtx->degree,
-                         &degreeFlag); CHKERRQ(ierr);
+                         NULL, appCtx->degree, &appCtx->degree, NULL);
+  CHKERRQ(ierr);
 
   appCtx->qextra         = 0;
   ierr = PetscOptionsInt("-qextra", "Number of extra quadrature points",
                          NULL, appCtx->qextra, &appCtx->qextra, NULL);
   CHKERRQ(ierr);
-
-  appCtx->qextraPressure = 0;
-  ierr = PetscOptionsInt("-qextra_pressure",
-                         "Number of extra quadrature points for pressure",
-                         NULL, appCtx->qextraPressure, &appCtx->qextraPressure,
-                         NULL); CHKERRQ(ierr);
 
   ierr = PetscOptionsString("-mesh", "Read mesh from file", NULL,
                             appCtx->meshFile, appCtx->meshFile,
@@ -93,8 +86,7 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
                                  appCtx->forcingVector, &maxn, NULL);
   CHKERRQ(ierr);
 
-  if (((appCtx->problemChoice == ELAS_HYPER_FS) ||
-       (appCtx->problemChoice == ELAS_HYPER_FS_INCOMP)) &&
+  if (appCtx->problemChoice == ELAS_HYPER_FS &&
       appCtx->forcingChoice == FORCE_CONST)
     SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP,
             "Cannot use constant forcing and finite strain formulation. "
@@ -145,6 +137,11 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
                           (PetscEnum *)&appCtx->multigridChoice, NULL);
   CHKERRQ(ierr);
 
+  appCtx->nuSmoother = 0.;
+  ierr = PetscOptionsScalar("-nu_smoother", "Poisson's ratio for smoother",
+                            NULL, appCtx->nuSmoother, &appCtx->nuSmoother, NULL);
+  CHKERRQ(ierr);
+
   appCtx->testMode = PETSC_FALSE;
   ierr = PetscOptionsBool("-test",
                           "Testing mode (do not print unless error is large)",
@@ -157,17 +154,31 @@ PetscErrorCode ProcessCommandLineOptions(MPI_Comm comm, AppCtx appCtx) {
   CHKERRQ(ierr);
 
   appCtx->viewFinalSoln = PETSC_FALSE;
-  ierr = PetscOptionsBool("-view_final_soln", "Write out final solution vector for viewing",
+  ierr = PetscOptionsBool("-view_final_soln",
+                          "Write out final solution vector for viewing",
                           NULL, appCtx->viewFinalSoln, &(appCtx->viewFinalSoln),
                           NULL); CHKERRQ(ierr);
+
+  // Check PETSc CUDA support
+  // *INDENT-OFF*
+  #ifdef PETSC_HAVE_CUDA
+  appCtx->petscHaveCuda = PETSC_TRUE;
+  #else
+  appCtx->petscHaveCuda = PETSC_FALSE;
+  #endif
+  // *INDENT-ON*
+
+  appCtx->memTypeRequested = appCtx->petscHaveCuda ? CEED_MEM_DEVICE :
+                             CEED_MEM_HOST;
+  ierr = PetscOptionsEnum("-memtype", "CEED MemType requested", NULL, memTypes,
+                          (PetscEnum)appCtx->memTypeRequested,
+                          (PetscEnum *)&appCtx->memTypeRequested,
+                          &appCtx->setMemTypeRequest); CHKERRQ(ierr);
 
   ierr = PetscOptionsEnd(); CHKERRQ(ierr); // End of setting AppCtx
 
   // Check for all required values set
   if (!appCtx->testMode) {
-    if (!degreeFlag) {
-      SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "-degree option needed");
-    }
     if (!appCtx->bcClampCount && (appCtx->forcingChoice != FORCE_MMS)) {
       SETERRQ(PETSC_COMM_SELF, PETSC_ERR_SUP, "-boundary options needed");
     }
@@ -267,7 +278,7 @@ PetscErrorCode ProcessPhysics(MPI_Comm comm, Physics phys, Units units) {
   // Define derived units
   units->Pascal = units->kilogram / (units->meter * PetscSqr(units->second));
 
-  // Scale E to GPa
+  // Scale E to Pa
   phys->E *= units->Pascal;
 
   PetscFunctionReturn(0);
