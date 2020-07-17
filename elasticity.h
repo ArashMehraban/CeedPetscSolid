@@ -41,18 +41,16 @@ struct Physics_private {
 // -----------------------------------------------------------------------------
 // Problem options
 typedef enum {
-  ELAS_LIN = 0, ELAS_HYPER_SS = 1, ELAS_HYPER_FS = 2, ELAS_HYPER_FS_INCOMP
+  ELAS_LIN = 0, ELAS_HYPER_SS = 1, ELAS_HYPER_FS = 2
 } problemType;
 static const char *const problemTypes[] = {"linElas",
                                            "hyperSS",
                                            "hyperFS",
-                                           "hyperFSIncomp",
                                            "problemType","ELAS_",0
                                           };
 static const char *const problemTypesForDisp[] = {"Linear elasticity",
                                                   "Hyper elasticity small strain",
-                                                  "Hyper elasticity finite strain",
-          "Nearly Incompressible (displacement-only) Hyperelasticity finite strain"
+                                                  "Hyper elasticity finite strain"
                                                  };
 
 // Forcing function options
@@ -89,6 +87,11 @@ typedef PetscErrorCode BCFunc(PetscInt, PetscReal, const PetscReal *, PetscInt,
 //         are added to boundary.c.
 BCFunc BCMMS, BCZero, BCClamp;
 
+// MemType Options
+static const char *const memTypes[] = {"host","device","memType",
+                                       "CEED_MEM_",0
+                                      };
+
 // -----------------------------------------------------------------------------
 // Structs
 // -----------------------------------------------------------------------------
@@ -115,9 +118,9 @@ struct AppCtx_private {
   problemType   problemChoice;
   forcingType   forcingChoice;
   multigridType multigridChoice;
+  PetscScalar   nuSmoother;
   PetscInt      degree;
   PetscInt      qextra;
-  PetscInt      qextraPressure;
   PetscInt      numLevels;
   PetscInt      *levelDegrees;
   PetscInt      numIncrements;                        // Number of steps
@@ -125,20 +128,23 @@ struct AppCtx_private {
   PetscInt      bcClampCount;
   PetscScalar   bcClampMax[16][7];
   PetscScalar   forcingVector[3];
+  PetscBool     petscHaveCuda, setMemTypeRequest;
+  CeedMemType   memTypeRequested;
 };
 
 // Problem specific data
+// *INDENT-OFF*
 typedef struct {
   CeedInt           qdatasize;
-  CeedQFunctionUser setupgeo, apply, jacob, energy,
-                    pressureApply, pressureJacob, cauchy;
+  CeedQFunctionUser setupgeo, apply, jacob, energy, diagnostic;
   const char        *setupgeofname, *applyfname, *jacobfname, *energyfname,
-                    *pressureApplyfname, *pressureJacobfname, *cauchyfname;
+                    *diagnosticfname;
   CeedQuadMode      qmode;
 } problemData;
+// *INDENT-ON*
 
 // Data specific to each problem option
-extern problemData problemOptions[4];
+extern problemData problemOptions[3];
 
 // Forcing function data
 typedef struct {
@@ -155,11 +161,16 @@ struct UserMult_private {
   DM            dm;
   Vec           Xloc, Yloc;
   CeedVector    Xceed, Yceed;
-  CeedOperator  op, opSubPressure, opSubDisplace;
-  CeedQFunction qf, qfSubPressure, qfSubDisplace;
+  CeedOperator  op;
+  CeedQFunction qf;
   Ceed          ceed;
   PetscScalar   loadIncrement;
   Physics       phys, physSmoother;
+  CeedMemType   memType;
+  int (*VecGetArray)(Vec, PetscScalar **);
+  int (*VecGetArrayRead)(Vec, const PetscScalar **);
+  int (*VecRestoreArray)(Vec, PetscScalar **);
+  int (*VecRestoreArrayRead)(Vec, const PetscScalar **);
 };
 
 // Data for Jacobian setup routine
@@ -181,23 +192,25 @@ struct UserMultProlongRestr_private {
   CeedVector   ceedVecC, ceedVecF;
   CeedOperator opProlong, opRestrict;
   Ceed         ceed;
+  CeedMemType   memType;
+  int (*VecGetArray)(Vec, PetscScalar **);
+  int (*VecGetArrayRead)(Vec, const PetscScalar **);
+  int (*VecRestoreArray)(Vec, PetscScalar **);
+  int (*VecRestoreArrayRead)(Vec, const PetscScalar **);
 };
 
 // libCEED data struct for level
 typedef struct CeedData_private *CeedData;
 struct CeedData_private {
   Ceed                ceed;
-  CeedBasis           basisx, basisu, basisp, basisCtoF, basisEnergy, basisuCauchy;
-  CeedElemRestriction Erestrictx, Erestrictu, Erestrictqdi, Erestrictqdpi,
-                      ErestrictGradui, ErestrictGraduPressurei, ErestrictEnergy,
-                      ErestrictqdCauchyi, ErestrictCauchy;
-  CeedQFunction       qfApply, qfPressureApply,
-                      qfJacob, qfPressureJacob, qfEnergy, qfCauchy;
-  CeedOperator        opApply, opDisplaceApply, opPressureApply,
-                      opJacob, opDisplaceJacob, opPressureJacob,
-                      opRestrict, opProlong, opEnergy, opCauchy;
-  CeedVector          qdata, qdataPressure, qdataCauchy, gradu, graduPressure,
-                      xceed, yceed, truesoln, energy, cauchy;
+  CeedBasis           basisx, basisu, basisCtoF, basisEnergy, basisDiagnostic;
+  CeedElemRestriction Erestrictx, Erestrictu, Erestrictqdi,
+                      ErestrictGradui, ErestrictEnergy, ErestrictDiagnostic,
+                      ErestrictqdDiagnostici;
+  CeedQFunction       qfApply, qfJacob, qfEnergy, qfDiagnostic;
+  CeedOperator        opApply, opJacob, opRestrict, opProlong, opEnergy,
+                      opDiagnostic;
+  CeedVector          qdata, qdataDiagnostic, gradu, xceed, yceed, truesoln;
 };
 
 // -----------------------------------------------------------------------------
@@ -224,7 +237,7 @@ PetscErrorCode CreateDistributedDM(MPI_Comm comm, AppCtx appCtx, DM *dm);
 
 // Setup DM with FE space of appropriate degree
 PetscErrorCode SetupDMByDegree(DM dm, AppCtx appCtx, PetscInt order,
-                               PetscInt ncompu);
+                               PetscBool boundary, PetscInt ncompu);
 
 // -----------------------------------------------------------------------------
 // libCEED Functions
@@ -237,11 +250,11 @@ PetscErrorCode CreateRestrictionPlex(Ceed ceed, CeedInt P, CeedInt ncomp,
                                      CeedElemRestriction *Erestrict, DM dm);
 
 // Set up libCEED for a given degree
-PetscErrorCode SetupLibceedFineLevel(DM dm, Ceed ceed, AppCtx appCtx,
-                                     Physics phys, CeedData *data,
-                                     PetscInt fineLevel, PetscInt ncompu,
-                                     PetscInt Ugsz, PetscInt Ulocsz,
-                                     CeedVector forceCeed,
+PetscErrorCode SetupLibceedFineLevel(DM dm, DM dmEnergy, DM dmDiagnostic,
+                                     Ceed ceed, AppCtx appCtx, Physics phys,
+                                     CeedData *data, PetscInt fineLevel,
+                                     PetscInt ncompu, PetscInt Ugsz,
+                                     PetscInt Ulocsz, CeedVector forceCeed,
                                      CeedQFunction qfRestrict,
                                      CeedQFunction qfProlong);
 
@@ -260,9 +273,10 @@ PetscErrorCode SetupJacobianCtx(MPI_Comm comm, AppCtx appCtx, DM dm, Vec V,
                                 UserMult jacobianCtx);
 
 // Setup context data for prolongation and restriction operators
-PetscErrorCode SetupProlongRestrictCtx(MPI_Comm comm, DM dmC, DM dmF, Vec VF,
-                                       Vec VlocC, Vec VlocF, CeedData ceedDataC,
-                                       CeedData ceedDataF, Ceed ceed,
+PetscErrorCode SetupProlongRestrictCtx(MPI_Comm comm, AppCtx appCtx, DM dmC,
+                                       DM dmF, Vec VF, Vec VlocC, Vec VlocF,
+                                       CeedData ceedDataC, CeedData ceedDataF,
+                                       Ceed ceed,
                                        UserMultProlongRestr prolongRestrCtx);
 
 // -----------------------------------------------------------------------------
@@ -271,10 +285,14 @@ PetscErrorCode SetupProlongRestrictCtx(MPI_Comm comm, DM dmC, DM dmF, Vec VF,
 PetscErrorCode FormJacobian(SNES snes, Vec U, Mat J, Mat Jpre, void *ctx);
 
 // -----------------------------------------------------------------------------
-// SNES Monitor
+// Solution output
 // -----------------------------------------------------------------------------
 PetscErrorCode ViewSolution(MPI_Comm comm, Vec U, PetscInt increment,
                             PetscScalar loadIncrement);
+
+PetscErrorCode ViewDiagnosticQuantities(MPI_Comm comm, DM dmU,
+                                        UserMult user, Vec U,
+                                        CeedElemRestriction ErestrictDiagnostic);
 
 // -----------------------------------------------------------------------------
 // libCEED Operators for MatShell
@@ -301,13 +319,9 @@ PetscErrorCode Restrict_Ceed(Mat A, Vec X, Vec Y);
 PetscErrorCode GetDiag_Ceed(Mat A, Vec D);
 
 // This function calculates the strain energy in the final solution
-PetscErrorCode ComputeStrainEnergy(UserMult user, CeedOperator opEnergy, Vec X,
-                                   CeedVector energyLoc, PetscReal *energy);
-
-// This function calculates the mean Cauchy stress for each node in the final solution
-PetscErrorCode ComputeCauchyStress(UserMult user, CeedOperator opCauchy, Vec X,
-                                   CeedVector cauchyLoc, PetscReal *minCauchy,
-                                   PetscReal *maxCauchy);
+PetscErrorCode ComputeStrainEnergy(DM dmEnergy, UserMult user,
+                                   CeedOperator opEnergy, Vec X,
+                                   PetscReal *energy);
 
 // -----------------------------------------------------------------------------
 // Boundary Functions

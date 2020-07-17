@@ -29,11 +29,11 @@
 //
 //     ./elasticity -mesh [.exo file] -degree 2 -E 1 -nu 0.3 -problem linElas -forcing mms
 //     ./elasticity -mesh [.exo file] -degree 2 -E 1 -nu 0.3 -bc_clamp 998,999 -bc_clamp_998_translate 0.1,0.2,0.3 -problem hyperSS -forcing none -ceed /cpu/self
-//     ./elasticity -mesh [.exo file] -degree 2 -E 1 -nu 0.3 -bc_clamp 998,999 -bc_clamp_998 rotate 1,0,0,0.2 -problem hyperFS -forcing none -ceed /gpu/occa
+//     ./elasticity -mesh [.exo file] -degree 2 -E 1 -nu 0.3 -bc_clamp 998,999 -bc_clamp_998_rotate 1,0,0,0.2 -problem hyperFS -forcing none -ceed /gpu/occa
 //
 // Sample meshes can be found at https://github.com/jeremylt/ceedSampleMeshes
 //
-//TESTARGS -ceed {ceed_resource} -test -degree 2 -nu 0.3 -E 1 -dm_plex_box_faces 3,3,3
+//TESTARGS -ceed {ceed_resource} -test -degree 3 -nu 0.3 -E 1 -dm_plex_box_faces 3,3,3
 
 /// @file
 /// CEED elasticity example using PETSc with DMPlex
@@ -46,13 +46,15 @@ int main(int argc, char **argv) {
   PetscInt       ierr;
   MPI_Comm       comm;
   // Context structs
-  AppCtx         appCtx;                    // Contains problem options
-  Physics        phys, physSmoother = NULL; // Contains physical constants
-  Units          units;                     // Contains units scaling
+  AppCtx         appCtx;                 // Contains problem options
+  Physics        phys;                   // Contains physical constants
+  Physics        physSmoother = NULL;    // Separate context if nuSmoother set
+  Units          units;                  // Contains units scaling
   // PETSc objects
   PetscLogStage  stageDMSetup, stageLibceedSetup,
                  stageSnesSetup, stageSnesSolve;
   DM             dmOrig;                 // Distributed DM to clone
+  DM             dmEnergy, dmDiagnostic; // DMs for postprocessing
   DM             *levelDMs;
   Vec            U, *Ug, *Uloc;          // U: solution, R: residual, F: forcing
   Vec            R, Rloc, F, Floc;       // g: global, loc: local
@@ -69,9 +71,10 @@ int main(int argc, char **argv) {
   CeedQFunction  qfRestrict = NULL, qfProlong = NULL;
   // Parameters
   PetscInt       ncompu = 3;             // 3 DoFs in 3D
+  PetscInt       ncompe = 1, ncompd = 5; // 1 energy output, 5 diagnostic
   PetscInt       numLevels = 1, fineLevel = 0;
   PetscInt       *Ugsz, *Ulsz, *Ulocsz;  // sz: size
-  PetscInt       snesIts = 0;
+  PetscInt       snesIts = 0, kspIts = 0;
   // Timing
   double         startTime, elapsedTime, minTime, maxTime;
 
@@ -94,11 +97,29 @@ int main(int argc, char **argv) {
   ierr = PetscMalloc1(1, &phys); CHKERRQ(ierr);
   ierr = PetscMalloc1(1, &units); CHKERRQ(ierr);
   ierr = ProcessPhysics(comm, phys, units); CHKERRQ(ierr);
-  if (appCtx->problemChoice == ELAS_HYPER_FS_INCOMP) {
+  if (fabs(appCtx->nuSmoother) > 1E-14) {
     ierr = PetscMalloc1(1, &physSmoother); CHKERRQ(ierr);
     ierr = PetscMemcpy(physSmoother, phys, sizeof(*phys)); CHKERRQ(ierr);
-    physSmoother->nu = phys->nu > 0.4 ? 0.4 : phys->nu;
+    physSmoother->nu = appCtx->nuSmoother;
   }
+
+  // ---------------------------------------------------------------------------
+  // Initalize libCEED
+  // ---------------------------------------------------------------------------
+  // Initalize backend
+  CeedInit(appCtx->ceedResource, &ceed);
+  if (appCtx->degree > 4 && appCtx->ceedResourceFine[0])
+    CeedInit(appCtx->ceedResourceFine, &ceedFine);
+
+  // Check preferred MemType
+  CeedMemType memTypeBackend;
+  CeedGetPreferredMemType(ceed, &memTypeBackend);
+  if (!appCtx->setMemTypeRequest)
+    appCtx->memTypeRequested = memTypeBackend;
+  else if (!appCtx->petscHaveCuda && appCtx->memTypeRequested == CEED_MEM_DEVICE)
+    SETERRQ1(PETSC_COMM_WORLD, PETSC_ERR_SUP_SYS,
+             "PETSc was not built with CUDA. "
+             "Requested MemType CEED_MEM_DEVICE is not supported.", NULL);
 
   // ---------------------------------------------------------------------------
   // Setup DM
@@ -115,8 +136,57 @@ int main(int argc, char **argv) {
   ierr = PetscMalloc1(numLevels, &levelDMs); CHKERRQ(ierr);
   for (PetscInt level = 0; level < numLevels; level++) {
     ierr = DMClone(dmOrig, &levelDMs[level]); CHKERRQ(ierr);
+    if (appCtx->memTypeRequested == CEED_MEM_DEVICE) {
+      ierr = DMSetVecType(levelDMs[level], VECCUDA); CHKERRQ(ierr);
+    }
     ierr = SetupDMByDegree(levelDMs[level], appCtx, appCtx->levelDegrees[level],
-                           ncompu); CHKERRQ(ierr);
+                           PETSC_TRUE, ncompu); CHKERRQ(ierr);
+    // -- Label field components for viewing
+    // Empty name for conserved field (because there is only one field)
+    PetscSection section;
+    ierr = DMGetLocalSection(levelDMs[level], &section); CHKERRQ(ierr);
+    ierr = PetscSectionSetFieldName(section, 0, "Displacement"); CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 0, "DisplacementX");
+    CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 1, "DisplacementY");
+    CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 2, "DisplacementZ");
+    CHKERRQ(ierr);
+  }
+
+  // -- Setup postprocessing DMs
+  ierr = DMClone(dmOrig, &dmEnergy); CHKERRQ(ierr);
+  ierr = SetupDMByDegree(dmEnergy, appCtx, appCtx->levelDegrees[fineLevel],
+                         PETSC_FALSE, ncompe); CHKERRQ(ierr);
+  ierr = DMClone(dmOrig, &dmDiagnostic); CHKERRQ(ierr);
+  ierr = SetupDMByDegree(dmDiagnostic, appCtx, appCtx->levelDegrees[fineLevel],
+                         PETSC_FALSE, ncompu + ncompd); CHKERRQ(ierr);
+  if (appCtx->memTypeRequested == CEED_MEM_DEVICE) {
+    ierr = DMSetVecType(dmEnergy, VECCUDA); CHKERRQ(ierr);
+    ierr = DMSetVecType(dmDiagnostic, VECCUDA); CHKERRQ(ierr);
+  }
+  {
+    // -- Label field components for viewing
+    // Empty name for conserved field (because there is only one field)
+    PetscSection section;
+    ierr = DMGetLocalSection(dmDiagnostic, &section); CHKERRQ(ierr);
+    ierr = PetscSectionSetFieldName(section, 0, "Diagnostics"); CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 0, "DisplacementX");
+    CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 1, "DisplacementY");
+    CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 2, "DisplacementZ");
+    CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 3, "Pressure");
+    CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 4, "VolumentricStrain");
+    CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 5, "TraceE2");
+    CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 6, "detJ");
+    CHKERRQ(ierr);
+    ierr = PetscSectionSetComponentName(section, 0, 7, "StrainEnergyDensity");
+    CHKERRQ(ierr);
   }
 
   // ---------------------------------------------------------------------------
@@ -161,18 +231,17 @@ int main(int argc, char **argv) {
   CHKERRQ(ierr);
   ierr = PetscLogStagePush(stageLibceedSetup); CHKERRQ(ierr);
 
-  // Initalize backend
-  CeedInit(appCtx->ceedResource, &ceed);
-  if (appCtx->degree > 4 && appCtx->ceedResourceFine[0])
-    CeedInit(appCtx->ceedResourceFine, &ceedFine);
-
   // -- Create libCEED local forcing vector
   CeedVector forceCeed;
   CeedScalar *f;
   if (appCtx->forcingChoice != FORCE_NONE) {
-    ierr = VecGetArray(Floc, &f); CHKERRQ(ierr);
+    if (appCtx->memTypeRequested == CEED_MEM_HOST) {
+      ierr = VecGetArray(Floc, &f); CHKERRQ(ierr);
+    } else {
+      ierr = VecCUDAGetArray(Floc, &f); CHKERRQ(ierr);
+    }
     CeedVectorCreate(ceed, Ulocsz[fineLevel], &forceCeed);
-    CeedVectorSetArray(forceCeed, CEED_MEM_HOST, CEED_USE_POINTER, f);
+    CeedVectorSetArray(forceCeed, appCtx->memTypeRequested, CEED_USE_POINTER, f);
   }
 
   // -- Restriction and prolongation QFunction
@@ -190,10 +259,10 @@ int main(int argc, char **argv) {
   {
     bool highOrder = (appCtx->levelDegrees[fineLevel] > 4 && ceedFine);
     Ceed levelCeed = highOrder ? ceedFine : ceed;
-    ierr = SetupLibceedFineLevel(levelDMs[fineLevel], levelCeed, appCtx,
-                                 phys, ceedData, fineLevel, ncompu,
-                                 Ugsz[fineLevel], Ulocsz[fineLevel], forceCeed,
-                                 qfRestrict, qfProlong);
+    ierr = SetupLibceedFineLevel(levelDMs[fineLevel], dmEnergy, dmDiagnostic,
+                                 levelCeed, appCtx, phys, ceedData, fineLevel,
+                                 ncompu, Ugsz[fineLevel], Ulocsz[fineLevel],
+                                 forceCeed, qfRestrict, qfProlong);
     CHKERRQ(ierr);
   }
   // ---- Setup Jacobian evaluator and prolongation/restriction
@@ -220,7 +289,12 @@ int main(int argc, char **argv) {
   ierr = VecZeroEntries(F); CHKERRQ(ierr);
 
   if (appCtx->forcingChoice != FORCE_NONE) {
-    ierr = VecRestoreArray(Floc, &f); CHKERRQ(ierr);
+    CeedVectorTakeArray(forceCeed, appCtx->memTypeRequested, NULL);
+    if (appCtx->memTypeRequested == CEED_MEM_HOST) {
+      ierr = VecRestoreArray(Floc, &f); CHKERRQ(ierr);
+    } else {
+      ierr = VecCUDARestoreArray(Floc, &f); CHKERRQ(ierr);
+    }
     ierr = DMLocalToGlobal(levelDMs[fineLevel], Floc, ADD_VALUES, F);
     CHKERRQ(ierr);
     CeedVectorDestroy(&forceCeed);
@@ -234,16 +308,28 @@ int main(int argc, char **argv) {
     CeedGetResource(ceed, &usedresource);
 
     ierr = PetscPrintf(comm,
-                       "\n-- Elastisticy Example - libCEED + PETSc --\n"
+                       "\n-- Elasticity Example - libCEED + PETSc --\n"
                        "  libCEED:\n"
-                       "    libCEED Backend                    : %s\n",
-                       usedresource); CHKERRQ(ierr);
+                       "    libCEED Backend                    : %s\n"
+                       "    libCEED Backend MemType            : %s\n"
+                       "    libCEED User Requested MemType     : %s\n",
+                       usedresource, CeedMemTypes[memTypeBackend],
+                       (appCtx->setMemTypeRequest) ?
+                       CeedMemTypes[appCtx->memTypeRequested] : "none");
+    CHKERRQ(ierr);
 
     if (ceedFine) {
       ierr = PetscPrintf(comm,
                          "    libCEED Backend - high order       : %s\n",
                          appCtx->ceedResourceFine); CHKERRQ(ierr);
     }
+
+    VecType vecType;
+    ierr = VecGetType(U, &vecType); CHKERRQ(ierr);
+    ierr = PetscPrintf(comm,
+                       "  PETSc:\n"
+                       "    PETSc Vec Type                     : %s\n",
+                       vecType); CHKERRQ(ierr);
 
     ierr = PetscPrintf(comm,
                        "  Problem:\n"
@@ -308,8 +394,7 @@ int main(int argc, char **argv) {
     ierr = PetscMalloc1(1, &jacobCtx[level]); CHKERRQ(ierr);
     ierr = SetupJacobianCtx(comm, appCtx, levelDMs[level], Ug[level],
                             Uloc[level], ceedData[level], ceed, phys,
-                            physSmoother ? physSmoother : phys,
-                            jacobCtx[level]); CHKERRQ(ierr);
+                            physSmoother, jacobCtx[level]); CHKERRQ(ierr);
 
     // -- Form Action of Jacobian on delta_u
     ierr = MatCreateShell(comm, Ulsz[level], Ulsz[level], Ugsz[level],
@@ -320,7 +405,9 @@ int main(int argc, char **argv) {
     CHKERRQ(ierr);
     ierr = MatShellSetOperation(jacobMat[level], MATOP_GET_DIAGONAL,
                                 (void(*)(void))GetDiag_Ceed);
-
+    if (appCtx->memTypeRequested == CEED_MEM_DEVICE) {
+      ierr = MatShellSetVecType(jacobMat[level], VECCUDA); CHKERRQ(ierr);
+    }
   }
   // Note: FormJacobian updates Jacobian matrices on each level
   //   and assembles the Jpre matrix, if needed
@@ -334,11 +421,7 @@ int main(int argc, char **argv) {
   ierr = PetscMemcpy(resCtx, jacobCtx[fineLevel],
                      sizeof(*jacobCtx[fineLevel])); CHKERRQ(ierr);
   resCtx->op = ceedData[fineLevel]->opApply;
-  resCtx->opSubDisplace = ceedData[fineLevel]->opDisplaceApply;
-  resCtx->opSubPressure = ceedData[fineLevel]->opPressureApply;
   resCtx->qf = ceedData[fineLevel]->qfApply;
-  resCtx->qfSubDisplace = ceedData[fineLevel]->qfApply;
-  resCtx->qfSubPressure = ceedData[fineLevel]->qfPressureApply;
   ierr = SNESSetFunction(snes, R, FormResidual_Ceed, resCtx); CHKERRQ(ierr);
 
   // -- Prolongation/Restriction evaluation
@@ -347,9 +430,10 @@ int main(int argc, char **argv) {
   for (PetscInt level = 1; level < numLevels; level++) {
     // ---- Prolongation/restriction context for level
     ierr = PetscMalloc1(1, &prolongRestrCtx[level]); CHKERRQ(ierr);
-    ierr = SetupProlongRestrictCtx(comm, levelDMs[level-1], levelDMs[level],
-                                   Ug[level], Uloc[level-1], Uloc[level],
-                                   ceedData[level-1], ceedData[level], ceed,
+    ierr = SetupProlongRestrictCtx(comm, appCtx, levelDMs[level-1],
+                                   levelDMs[level], Ug[level], Uloc[level-1],
+                                   Uloc[level], ceedData[level-1],
+                                   ceedData[level], ceed,
                                    prolongRestrCtx[level]); CHKERRQ(ierr);
 
     // ---- Form Action of Jacobian on delta_u
@@ -362,6 +446,9 @@ int main(int argc, char **argv) {
     ierr = MatShellSetOperation(prolongRestrMat[level], MATOP_MULT_TRANSPOSE,
                                 (void (*)(void))Restrict_Ceed);
     CHKERRQ(ierr);
+    if (appCtx->memTypeRequested == CEED_MEM_DEVICE) {
+      ierr = MatShellSetVecType(prolongRestrMat[level], VECCUDA); CHKERRQ(ierr);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -521,6 +608,7 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Set initial guess
   // ---------------------------------------------------------------------------
+  ierr = PetscObjectSetName((PetscObject)U, ""); CHKERRQ(ierr);
   ierr = VecSet(U, 0.0); CHKERRQ(ierr);
 
   // View solution
@@ -566,8 +654,7 @@ int main(int argc, char **argv) {
     ierr = SNESSolve(snes, F, U); CHKERRQ(ierr);
 
     // -- View solution
-    if (appCtx->viewSoln ||
-        (increment == appCtx->numIncrements && appCtx->viewFinalSoln)) {
+    if (appCtx->viewSoln) {
       ierr = ViewSolution(comm, U, increment, loadIncrement); CHKERRQ(ierr);
     }
 
@@ -575,6 +662,8 @@ int main(int argc, char **argv) {
     PetscInt its;
     ierr = SNESGetIterationNumber(snes, &its); CHKERRQ(ierr);
     snesIts += its;
+    ierr = SNESGetLinearSolveIterations(snes, &its); CHKERRQ(ierr);
+    kspIts += its;
 
     // -- Check for divergence
     SNESConvergedReason reason;
@@ -619,8 +708,9 @@ int main(int argc, char **argv) {
     ierr = KSPGetType(ksp, &kspType); CHKERRQ(ierr);
     ierr = PetscPrintf(comm,
                        "  Linear Solver:\n"
-                       "    KSP Type                           : %s\n",
-                       kspType); CHKERRQ(ierr);
+                       "    KSP Type                           : %s\n"
+                       "    Total KSP Iterations               : %D\n",
+                       kspType, kspIts); CHKERRQ(ierr);
 
     // -- PC
     PC pc;
@@ -668,8 +758,10 @@ int main(int argc, char **argv) {
     CHKERRQ(ierr);
     ierr = PetscPrintf(comm,
                        "  Performance:\n"
-                       "    SNES Solve Time                    : %g (%g) sec\n",
-                       maxTime, minTime); CHKERRQ(ierr);
+                       "    SNES Solve Time                    : %g (%g) sec\n"
+                       "    DoFs/Sec in SNES                   : %g (%g) million\n",
+                       maxTime, minTime, 1e-6*Ugsz[fineLevel]*kspIts/maxTime,
+                       1e-6*Ugsz[fineLevel]*kspIts/minTime); CHKERRQ(ierr);
   }
 
   // ---------------------------------------------------------------------------
@@ -687,12 +779,22 @@ int main(int argc, char **argv) {
     ierr = VecSet(trueVec, 0.0); CHKERRQ(ierr);
 
     // -- Assemble global true solution vector
-    CeedVectorGetArrayRead(ceedData[fineLevel]->truesoln, CEED_MEM_HOST,
-                           &truearray);
-    ierr = VecPlaceArray(resCtx->Yloc, truearray); CHKERRQ(ierr);
+    CeedVectorGetArrayRead(ceedData[fineLevel]->truesoln,
+                           appCtx->memTypeRequested, &truearray);
+    if (appCtx->memTypeRequested == CEED_MEM_HOST) {
+      ierr = VecPlaceArray(resCtx->Yloc, (PetscScalar *)truearray);
+      CHKERRQ(ierr);
+    } else {
+      ierr = VecCUDAPlaceArray(resCtx->Yloc, (PetscScalar *)truearray);
+      CHKERRQ(ierr);
+    }
     ierr = DMLocalToGlobal(resCtx->dm, resCtx->Yloc, INSERT_VALUES, trueVec);
     CHKERRQ(ierr);
-    ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
+    if (appCtx->memTypeRequested == CEED_MEM_HOST) {
+      ierr = VecResetArray(resCtx->Yloc); CHKERRQ(ierr);
+    } else {
+      ierr = VecCUDAResetArray(resCtx->Yloc); CHKERRQ(ierr);
+    }
     CeedVectorRestoreArrayRead(ceedData[fineLevel]->truesoln, &truearray);
 
     // -- Compute L2 error
@@ -719,10 +821,8 @@ int main(int argc, char **argv) {
   if (!appCtx->testMode) {
     // -- Compute L2 error
     CeedScalar energy;
-    ierr = ComputeStrainEnergy(resCtx,
-                               ceedData[fineLevel]->opEnergy, U,
-                               ceedData[fineLevel]->energy, &energy);
-    CHKERRQ(ierr);
+    ierr = ComputeStrainEnergy(dmEnergy, resCtx, ceedData[fineLevel]->opEnergy,
+                               U, &energy); CHKERRQ(ierr);
 
     // -- Output
     ierr = PetscPrintf(comm,
@@ -731,20 +831,23 @@ int main(int argc, char **argv) {
   }
 
   // ---------------------------------------------------------------------------
-  // Compute Cauchy pressure
+  // Output diagnostic quantities
   // ---------------------------------------------------------------------------
-  if (!appCtx->testMode) {
-    // -- Compute L2 error
-    CeedScalar minCauchy, maxCauchy;
-    ierr = ComputeCauchyStress(resCtx, ceedData[fineLevel]->opCauchy, U,
-                               ceedData[fineLevel]->cauchy, &minCauchy,
-                               &maxCauchy); CHKERRQ(ierr);
+  if (appCtx->viewSoln || appCtx->viewFinalSoln) {
+    // -- Setup context
+    UserMult diagnosticCtx;
+    ierr = PetscMalloc1(1, &diagnosticCtx); CHKERRQ(ierr);
+    ierr = PetscMemcpy(diagnosticCtx, resCtx, sizeof(*resCtx)); CHKERRQ(ierr);
+    diagnosticCtx->dm = dmDiagnostic;
+    diagnosticCtx->op = ceedData[fineLevel]->opDiagnostic;
 
-    // -- Output
-    ierr = PetscPrintf(comm,
-                       "    Min mean Cauchy stress             : %e\n"
-                       "    Max mean Cauchy stress             : %e\n",
-                       minCauchy, maxCauchy); CHKERRQ(ierr);
+    // -- Compute and output
+    ierr = ViewDiagnosticQuantities(comm, levelDMs[fineLevel], diagnosticCtx, U,
+                                    ceedData[fineLevel]->ErestrictDiagnostic);
+    CHKERRQ(ierr);
+
+    // -- Cleanup
+    ierr = PetscFree(diagnosticCtx); CHKERRQ(ierr);
   }
 
   // ---------------------------------------------------------------------------
@@ -804,6 +907,8 @@ int main(int argc, char **argv) {
   ierr = SNESDestroy(&snes); CHKERRQ(ierr);
   ierr = SNESDestroy(&snesCoarse); CHKERRQ(ierr);
   ierr = DMDestroy(&dmOrig); CHKERRQ(ierr);
+  ierr = DMDestroy(&dmEnergy); CHKERRQ(ierr);
+  ierr = DMDestroy(&dmDiagnostic); CHKERRQ(ierr);
   ierr = PetscFree(levelDMs); CHKERRQ(ierr);
 
   // Structs
