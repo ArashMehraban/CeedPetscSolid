@@ -40,14 +40,21 @@ struct Physics_private {
 // Command Line Options
 // -----------------------------------------------------------------------------
 // Problem options
+// *****************************************************************************
+// INCOMP HACK
+// *****************************************************************************
 typedef enum {
-  ELAS_LIN = 0, ELAS_HYPER_SS = 1, ELAS_HYPER_FS = 2
+  ELAS_LIN = 0, ELAS_HYPER_SS = 1, ELAS_HYPER_FS = 2, ELAS_HYPER_FS_INCOMP = 3
 } problemType;
 static const char *const problemTypes[] = {"linElas",
                                            "hyperSS",
                                            "hyperFS",
+                                           "hyperFSIncomp",
                                            "problemType","ELAS_",0
                                           };
+// *****************************************************************************
+// END OF INCOMP HACK
+// *****************************************************************************
 static const char *const problemTypesForDisp[] = {"Linear elasticity",
                                                   "Hyper elasticity small strain",
                                                   "Hyper elasticity finite strain"
@@ -140,11 +147,19 @@ typedef struct {
   const char        *setupgeofname, *applyfname, *jacobfname, *energyfname,
                     *diagnosticfname;
   CeedQuadMode      qmode;
+// *****************************************************************************
+// INCOMP HACK
+// *****************************************************************************
+  CeedQFunctionUser pressureApply, pressureJacob;
+  const char        *pressureApplyfname, *pressureJacobfname;
+// *****************************************************************************
+// END OF INCOMP HACK
+// *****************************************************************************
 } problemData;
 // *INDENT-ON*
 
 // Data specific to each problem option
-extern problemData problemOptions[3];
+extern problemData problemOptions[4];
 
 // Forcing function data
 typedef struct {
@@ -211,6 +226,17 @@ struct CeedData_private {
   CeedOperator        opApply, opJacob, opRestrict, opProlong, opEnergy,
                       opDiagnostic;
   CeedVector          qdata, qdataDiagnostic, gradu, xceed, yceed, truesoln;
+// *****************************************************************************
+// INCOMP HACK
+// *****************************************************************************
+  CeedElemRestriction ErestrictGraduPressurei, Erestrictqdpi;
+  CeedBasis           basisp;
+  CeedQFunction       qfPressureApply, qfPressureJacob;
+  CeedOperator        opPressureApply, opPressureJacob, opDisplaceApply, opDisplaceJacob;
+  CeedVector          qdataPressure, graduPressure;
+// *****************************************************************************
+// END OF INCOMP HACK
+// *****************************************************************************
 };
 
 // -----------------------------------------------------------------------------
